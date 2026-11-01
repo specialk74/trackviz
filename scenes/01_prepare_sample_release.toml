@@ -1,0 +1,308 @@
+# Scene 01 — single carrier with tube, happy path
+# Prepare -> Sample Acquisition -> Sample Complete -> Release
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "Single carrier with sample tube — happy path"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+[[point]]
+id = "main_in"
+x = 70
+y = 740
+[[point]]
+id = "nsd"
+x = 250
+y = 740
+[[point]]
+id = "pit_in"
+x = 360
+y = 540
+[[point]]
+id = "sampling"
+x = 540
+y = 540
+[[point]]
+id = "pit_out"
+x = 690
+y = 540
+[[point]]
+id = "merge"
+x = 800
+y = 740
+[[point]]
+id = "main_out"
+x = 915
+y = 740
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["main_in", "nsd", "merge", "main_out"]
+label_x = 56
+label_y = 800
+
+[[lane]]
+id = "pit"
+label = "Pit-Lane"
+kind = "pit"
+points = ["pit_in", "sampling", "pit_out"]
+label_x = 650
+label_y = 500
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 170
+y = 425
+w = 720
+h = 420
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 300
+y = 185
+w = 480
+h = 175
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+[[device]]
+id = "sp"
+kind = "sampling"
+at = "sampling"
+label = "Sampling point"
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "sampling", "pit_out", "merge", "main_out"]
+speed = 75
+
+# ---------------------------------------------------------------- steps
+# start = "after" (default: when the previous step ends) | "with" (same start
+# as the previous step) | "after_all" (when every previous step has ended)
+
+[[step]]
+action = "caption"
+title = "1 · Main-Lane"
+text = "A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface."
+
+[[step]]
+action = "move"
+start = "with"
+delay = 1.0
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "caption"
+title = "2 · NSD — Prepare"
+text = "At the NSD (No Stop Divert) the carrier is diverted into the Pit-Lane without stopping. At this moment the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+start = "with"
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "move"
+start = "with"
+carrier = "C1"
+to = "sampling"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+
+[[step]]
+action = "message"
+delay = 0.5
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+reply = true
+
+[[step]]
+action = "caption"
+delay = 1.8
+title = "3 · Test query"
+text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+
+[[step]]
+action = "message"
+delay = 0.5
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+reply = true
+
+[[step]]
+action = "caption"
+start = "after_all"
+delay = 0.6
+title = "4 · Sampling point — Sample Acquisition"
+text = "The carrier stops at the sampling point. The interface sends Sample Acquisition: the tube is in position and can be aspirated."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+
+[[step]]
+action = "caption"
+delay = 2.0
+title = "5 · Pipetting"
+text = "The analyzer aspirates the biological material from the tube. Meanwhile the carrier is held at the sampling point."
+
+[[step]]
+action = "pipette"
+start = "with"
+device = "sp"
+duration = 4.5
+
+[[step]]
+action = "note"
+start = "with"
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
+
+[[step]]
+action = "caption"
+delay = 0.3
+title = "6 · Sample Complete"
+text = "When aspiration is finished the analyzer sends Sample Complete. Only after receiving it does the interface release the carrier."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+
+[[step]]
+action = "caption"
+delay = 2.8
+title = "7 · Carrier released"
+text = "The interface releases the carrier: it leaves the Pit-Lane and heads back to the Main-Lane."
+
+[[step]]
+action = "move"
+start = "with"
+delay = 0.4
+carrier = "C1"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "caption"
+title = "8 · Main-Lane — Release"
+text = "As soon as the carrier with the tube is back on the Main-Lane, the interface sends Release: the sample has left the analyzer interface."
+
+[[step]]
+action = "move"
+start = "with"
+carrier = "C1"
+to = "main_out"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+
+[[step]]
+action = "caption"
+start = "after_all"
+delay = 2.5
+title = "9 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "note"
+start = "with"
+delay = 0.3
+actor = "AN"
+text = "Analysis"
+duration = 1.5
+
+[[step]]
+action = "message"
+from = "AN"
+to = "DMX"
+text = "Results"
+params = "SampleId={SampleId}"
