@@ -42,10 +42,10 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[video]` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times` |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = [ids], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below), `label` |
+| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color` |
-| `[[step]]` | `action`, `start`, `delay`, `duration` + action keys (below) |
+| `[[step]]` | `action`, `start` or `at`, `delay`, `duration` + action keys (below) |
 
 ### Steps
 
@@ -55,13 +55,14 @@ Steps run in file order. Each step's `start` decides when it begins:
 - `with`: at the same time as the previous step
 - `after_all`: when every previous step has ended
 
-`delay` adds seconds on top of that.
+`at = <seconds>` instead of `start` starts the step at an absolute time.
+`delay` adds seconds on top of either.
 
 | action | keys | default duration |
 |---|---|---|
 | `caption` | `title`, `text` | stays until the next caption |
 | `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed` | computed from length and speed |
-| `message` | `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier` | 1.5 s (arrow travel time) |
+| `message` | `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
 | `pipette` | `device` (a `sampling` or `turnstile` device) | 3 s |
 | `highlight` | `device` | 1.5 s |
@@ -101,6 +102,21 @@ the entry pocket must be free when a carrier arrives, a carrier can leave only
 from the exit position, a rotation can't start while a carrier is still in the
 exit position, and nothing arrives or leaves while the wheel is turning.
 See `scenes/02_turnstile_three_carriers.toml`.
+
+### Gate and antenna
+
+`gate` and `antenna` are placed on a point (`at`) of a horizontal lane; both
+work by themselves, without steps:
+
+- **gate**: a barrier across the lane that opens while a carrier drives through
+  its point and closes after it. The gate point doesn't need to be in the routes,
+  only on their path.
+- **antenna**: a reader above the lane. It shows a reading animation while a
+  carrier stands still on its point (put that point in the routes, as the stop
+  before the gate).
+
+`--check` also refuses a carrier that drives into a turnstile while the analyzer
+is pipetting there: it has to wait at the gate until the sampling is over.
 
 When the sequence diagram has more rows than fit, it scrolls up as new rows appear.
 If `--check` finds an error, it also prints the timeline up to that point.

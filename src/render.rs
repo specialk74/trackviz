@@ -191,6 +191,66 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 let col = if glow.is_some() { ACCENT } else { "#475569" };
                 let _ = write!(o, r##"<text x="{cx}" y="{}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##, cy + disk + 26.0, esc(&d.label));
             }
+            DeviceKind::Gate => {
+                // Drawn for a horizontal lane: post above the lane, arm across it.
+                // Seen from above, the lifting arm gets shorter as it opens.
+                let (gx, gy) = sc.pt(d.at.as_deref().unwrap());
+                let iv = tl.gates.iter().find(|g| g.0 == di).map(|g| g.1.as_slice()).unwrap_or(&[]);
+                let open = iv
+                    .iter()
+                    .map(|&(a, b)| Ease::InOut.apply(((t - (a - 0.4)) / 0.4).min((b + 0.4 - t) / 0.4)))
+                    .fold(0.0, f64::max);
+                let (py, len) = (gy - 30.0, 60.0 * (1.0 - open));
+                if let Some(a) = glow {
+                    let _ = write!(o, r#"<rect x="{}" y="{}" width="28" height="72" rx="8" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#, gx - 14.0, gy - 40.0);
+                }
+                if len > 0.5 {
+                    let _ = write!(
+                        o,
+                        r##"<line x1="{gx}" y1="{py}" x2="{gx}" y2="{:.1}" stroke="#DC2626" stroke-width="7" stroke-linecap="round"/><line x1="{gx}" y1="{py}" x2="{gx}" y2="{:.1}" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="6 6"/>"##,
+                        py + len, py + len
+                    );
+                }
+                let col = if glow.is_some() { ACCENT } else { "#475569" };
+                let _ = write!(
+                    o,
+                    r##"<rect x="{}" y="{}" width="14" height="14" rx="3" fill="#334155"/><text x="{gx}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
+                    gx - 7.0, py - 12.0, gy + 44.0, esc(&d.label)
+                );
+            }
+            DeviceKind::Antenna => {
+                // Small reader above the lane; waves while a carrier stands on its point.
+                let (ax, ay) = sc.pt(d.at.as_deref().unwrap());
+                let by = ay - 36.0;
+                let reading = (0..sc.carriers.len()).any(|ci| {
+                    let (x, y) = tl.carrier_pos(ci, t);
+                    ((x - ax).powi(2) + (y - ay).powi(2)).sqrt() < 3.0 && !tl.carriers[ci].moving(t)
+                });
+                if let Some(a) = glow {
+                    let _ = write!(o, r#"<circle cx="{ax}" cy="{by}" r="22" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
+                }
+                let wave = if reading { "#2563EB" } else { "#94A3B8" };
+                for k in 1..=2 {
+                    let r = 7.0 * k as f64;
+                    let op = if reading { 0.35 + 0.65 * ((t * 3.0 - k as f64 * 0.3).sin() * 0.5 + 0.5) } else { 1.0 };
+                    // Arcs on both sides of the reader, opening sideways.
+                    let _ = write!(
+                        o,
+                        r##"<path d="M{:.1},{:.1} A{r},{r} 0 0 0 {:.1},{:.1} M{:.1},{:.1} A{r},{r} 0 0 1 {:.1},{:.1}" fill="none" stroke="{wave}" stroke-width="2.5" stroke-linecap="round" opacity="{op:.2}"/>"##,
+                        ax - r * 0.7, by - r * 0.7, ax - r * 0.7, by + r * 0.7,
+                        ax + r * 0.7, by - r * 0.7, ax + r * 0.7, by + r * 0.7
+                    );
+                }
+                if reading {
+                    let _ = write!(o, r##"<line x1="{ax}" y1="{}" x2="{ax}" y2="{}" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 4"/>"##, by + 6.0, ay - 22.0);
+                }
+                let col = if glow.is_some() { ACCENT } else { "#475569" };
+                let _ = write!(
+                    o,
+                    r##"<circle cx="{ax}" cy="{by}" r="5" fill="#334155"/><text x="{ax}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
+                    by - 28.0, esc(&d.label)
+                );
+            }
             DeviceKind::Zone => {}
         }
     }
@@ -330,13 +390,13 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         let fresh = t <= e.t1 + 1.5;
         let alpha = clamp01((t - e.t0) / 0.3);
         match &e.ev {
-            Ev::Message { from, to, text, params, reply, row } => {
+            Ev::Message { from, to, text, params, reply, row, color } => {
                 let y = row_y(*row);
                 let (x1, x2) = (ax(*from), ax(*to));
                 let dir = if x2 > x1 { 1.0 } else { -1.0 };
                 let x2a = x2 - dir * 4.0;
                 let xt = x1 + (x2a - x1) * Ease::Out.apply(p);
-                let col = &sc.actors[*from].color;
+                let col = color.as_deref().unwrap_or(&sc.actors[*from].color);
                 let sw = if fresh { 4.0 } else { 2.5 };
                 let dash = if *reply { r#" stroke-dasharray="10 7""# } else { "" };
                 if fresh {

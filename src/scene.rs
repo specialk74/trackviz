@@ -40,6 +40,10 @@ pub enum DeviceKind {
     Analyzer,
     Zone,
     Turnstile,
+    /// Barrier across a lane; opens by itself while a carrier drives through it.
+    Gate,
+    /// Reader next to a lane; shows a reading animation while a carrier stands on its point.
+    Antenna,
 }
 
 pub struct Device {
@@ -117,7 +121,7 @@ impl Ease {
 pub enum Action {
     Caption { title: String, text: String },
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64> },
-    Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String> },
+    Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String> },
     Note { actor: String, text: String },
     Pipette { device: String, carrier: Option<String> },
     Highlight { device: String },
@@ -130,6 +134,8 @@ pub enum StartMode {
     After,
     With,
     AfterAll,
+    /// Absolute start time in seconds (`at = ...`); `delay` is added on top.
+    At(f64),
 }
 
 pub struct Step {
@@ -200,14 +206,16 @@ impl Scene {
                 "analyzer" => DeviceKind::Analyzer,
                 "zone" => DeviceKind::Zone,
                 "turnstile" => DeviceKind::Turnstile,
-                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone|turnstile)", t.location())),
+                "gate" => DeviceKind::Gate,
+                "antenna" => DeviceKind::Antenna,
+                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone|turnstile|gate|antenna)", t.location())),
             };
             let id = t.str_req("id")?;
             let mut at = None;
             let mut rect = (0.0, 0.0, 0.0, 0.0);
             let mut entry_right = true;
             match kind {
-                DeviceKind::Nsd | DeviceKind::Sampling => {
+                DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Gate | DeviceKind::Antenna => {
                     t.check_keys(&["id", "kind", "at", "label"])?;
                     let a = t.str_req("at")?;
                     if !points.contains_key(&a) {
@@ -309,12 +317,12 @@ impl Scene {
 
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
-            let common = ["action", "start", "delay", "duration"];
+            let common = ["action", "start", "at", "delay", "duration"];
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed"],
-                "message" => &["from", "to", "text", "params", "reply", "carrier"],
+                "message" => &["from", "to", "text", "params", "reply", "carrier", "color"],
                 "note" => &["actor", "text"],
                 "pipette" => &["device", "carrier"],
                 "highlight" => &["device"],
@@ -345,6 +353,7 @@ impl Scene {
                     params: t.str_opt("params")?.unwrap_or_default(),
                     reply: t.bool_opt("reply")?.unwrap_or(false),
                     carrier: t.str_opt("carrier")?,
+                    color: t.str_opt("color")?,
                 },
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
                 "pipette" => Action::Pipette { device: t.str_req("device")?, carrier: t.str_opt("carrier")? },
@@ -357,11 +366,15 @@ impl Scene {
                     Action::Wait
                 }
             };
-            let start = match t.str_opt("start")?.as_deref().unwrap_or("after") {
-                "after" => StartMode::After,
-                "with" => StartMode::With,
-                "after_all" => StartMode::AfterAll,
-                o => return Err(format!("{}: unknown start '{o}' (after|with|after_all)", t.location())),
+            let start = match (t.num_opt("at")?, t.str_opt("start")?) {
+                (Some(_), Some(_)) => return Err(format!("{}: use either 'at' or 'start', not both", t.location())),
+                (Some(at), None) => StartMode::At(at),
+                (None, s) => match s.as_deref().unwrap_or("after") {
+                    "after" => StartMode::After,
+                    "with" => StartMode::With,
+                    "after_all" => StartMode::AfterAll,
+                    o => return Err(format!("{}: unknown start '{o}' (after|with|after_all)", t.location())),
+                },
             };
             steps.push(Step {
                 action,
@@ -415,6 +428,8 @@ pub struct CarrierPath {
 pub struct Attach {
     pub wheel: usize,
     pub pocket: usize,
+    /// When the move into the entry position starts (the carrier passes the gate).
+    pub t_move: f64,
     pub t0: f64,
     /// When the carrier leaves the exit position (infinity if it never does).
     pub t1: f64,
@@ -562,11 +577,45 @@ impl CarrierPath {
     pub fn pos(&self, t: f64) -> (f64, f64) {
         self.pos_at_s(self.s_at(t))
     }
+    pub fn moving(&self, t: f64) -> bool {
+        self.moves.iter().any(|m| t > m.t0 && t < m.t1)
+    }
+    /// Distance along the route of point p, if p lies on the route (within 3 px).
+    fn project(&self, p: (f64, f64)) -> Option<f64> {
+        for i in 1..self.pts.len() {
+            let (a, b) = (self.pts[i - 1], self.pts[i]);
+            let len2 = (b.0 - a.0).powi(2) + (b.1 - a.1).powi(2);
+            if len2 == 0.0 {
+                continue;
+            }
+            let u = (((p.0 - a.0) * (b.0 - a.0) + (p.1 - a.1) * (b.1 - a.1)) / len2).clamp(0.0, 1.0);
+            let (qx, qy) = (a.0 + (b.0 - a.0) * u, a.1 + (b.1 - a.1) * u);
+            if ((p.0 - qx).powi(2) + (p.1 - qy).powi(2)).sqrt() < 3.0 {
+                return Some(self.cum[i - 1] + u * len2.sqrt());
+            }
+        }
+        None
+    }
+    /// First time within move m at which the carrier reaches distance s.
+    fn time_at_s(&self, m: &MoveSeg, s: f64) -> f64 {
+        if s <= m.s0 {
+            return m.t0;
+        }
+        let n = 400;
+        for k in 0..=n {
+            let t = m.t0 + (m.t1 - m.t0) * k as f64 / n as f64;
+            if self.s_at(t) >= s {
+                return t;
+            }
+        }
+        m.t1
+    }
 }
 
 pub enum Ev {
     Caption { title: String, text: String },
-    Message { from: usize, to: usize, text: String, params: String, reply: bool, row: usize },
+    /// `color`: overrides the sender's color (e.g. to tell apart a repeated message).
+    Message { from: usize, to: usize, text: String, params: String, reply: bool, row: usize, color: Option<String> },
     Note { actor: usize, text: String, row: usize },
     Pipette { device: usize },
     Highlight { device: usize },
@@ -583,6 +632,8 @@ pub struct Timeline {
     pub events: Vec<Timed>,
     pub carriers: Vec<CarrierPath>,
     pub wheels: Vec<Wheel>,
+    /// Gate devices: (device index, intervals in which a carrier drives through).
+    pub gates: Vec<(usize, Vec<(f64, f64)>)>,
     pub rows: usize,
     pub duration: f64,
     pub log: Vec<String>,
@@ -681,14 +732,12 @@ impl Timeline {
         let mut first = true;
 
         for st in &sc.steps {
-            let base = if first {
-                0.0
-            } else {
-                match st.start {
-                    StartMode::After => prev_end,
-                    StartMode::With => prev_start,
-                    StartMode::AfterAll => max_end,
-                }
+            let base = match st.start {
+                StartMode::At(at) => at,
+                _ if first => 0.0,
+                StartMode::After => prev_end,
+                StartMode::With => prev_start,
+                StartMode::AfterAll => max_end,
             };
             first = false;
             let t0 = base + st.delay;
@@ -728,14 +777,14 @@ impl Timeline {
                     // The pocket is assigned later, in time order (simulate_wheels).
                     if let Some(&(wi, 0)) = wheel_pts.get(to) {
                         let t_in = t0 + d;
-                        carriers[ci].attach.push(Attach { wheel: wi, pocket: 0, t0: t_in, t1: f64::INFINITY });
+                        carriers[ci].attach.push(Attach { wheel: wi, pocket: 0, t_move: t0, t0: t_in, t1: f64::INFINITY });
                         let ai = carriers[ci].attach.len() - 1;
                         attached[ci] = Some(ai);
                         wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
                     }
                     (d, Ev::Wait, format!("move      {carrier} -> {to}"))
                 }
-                Action::Message { from, to, text, params, reply, carrier } => {
+                Action::Message { from, to, text, params, reply, carrier, color } => {
                     let fi = sc.actor_idx(from).ok_or_else(|| format!("{}: unknown actor '{from}'", st.loc))?;
                     let ti = sc.actor_idx(to).ok_or_else(|| format!("{}: unknown actor '{to}'", st.loc))?;
                     if fi == ti {
@@ -748,7 +797,7 @@ impl Timeline {
                     let text = subst(text, sc, ci);
                     let params = subst(params, sc, ci);
                     let desc = format!("message   {from} -> {to}  {text}  {params}");
-                    let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row };
+                    let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row, color: color.clone() };
                     row += 1;
                     (st.duration.unwrap_or(1.5), ev, desc)
                 }
@@ -791,6 +840,37 @@ impl Timeline {
             max_end = max_end.max(t1);
         }
         simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
-        Ok(Timeline { events, carriers, wheels, rows: row, duration: max_end + sc.video.tail, log: std::mem::take(log) })
+
+        // The gate in front of a turnstile holds carriers while the analyzer is
+        // sampling there: nobody may drive into the wheel during a pipette.
+        for (ci, c) in carriers.iter().enumerate() {
+            for a in &c.attach {
+                let di = wheels[a.wheel].device;
+                for e in &events {
+                    if matches!(e.ev, Ev::Pipette { device } if device == di) && a.t_move < e.t1 - 1e-9 && a.t0 > e.t0 + 1e-9 {
+                        return Err(format!(
+                            "carrier '{}' drives into turnstile '{}' ({:.2}s - {:.2}s) while the analyzer is sampling there ({:.2}s - {:.2}s): it must wait at the gate",
+                            sc.carriers[ci].id, sc.devices[di].id, a.t_move, a.t0, e.t0, e.t1
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Gates: open from shortly before a carrier reaches them until it is through.
+        let mut gates = Vec::new();
+        for (di, d) in sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Gate) {
+            let g = sc.pt(d.at.as_deref().unwrap());
+            let mut iv = Vec::new();
+            for c in &carriers {
+                if let Some(sg) = c.project(g) {
+                    for m in c.moves.iter().filter(|m| m.s0 < sg && m.s1 > sg) {
+                        iv.push((c.time_at_s(m, sg - 60.0), c.time_at_s(m, sg + 45.0)));
+                    }
+                }
+            }
+            gates.push((di, iv));
+        }
+        Ok(Timeline { events, carriers, wheels, gates, rows: row, duration: max_end + sc.video.tail, log: std::mem::take(log) })
     }
 }

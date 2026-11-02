@@ -27,6 +27,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Pit-Lane** | Corsia secondaria, parallela alla Main-Lane, in cui il carrier viene fermato per farlo campionare dall'analizzatore. Dopo il punto di campionamento rientra nella Main-Lane, così i carrier processati (pieni o vuoti) tornano nella corsia principale. |
 | **Punto di campionamento** | Posizione sulla Pit-Lane in cui il carrier si ferma e l'analizzatore aspira (pipetta) il campione. |
 | **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
+| **Gate + antenna** | Davanti alla ruota. Il carrier si ferma **sempre** all'antenna, che lo legge: l'Interfaccia manda **di nuovo Prepare** (in futuro con un'informazione in più; per ora è disegnato in viola). Se sotto l'ago non c'è un campionamento in corso il gate si apre e il carrier entra nella tasca d'ingresso; altrimenti aspetta il Sample Complete. Solo dopo che il carrier in attesa è entrato la ruota gira (in ingresso → ago, campionato → uscita). |
 | **Interfaccia** | Il modulo di automazione Inpeco davanti all'analizzatore (NSD + Pit-Lane + rientro). È anche l'attore che scambia i messaggi con l'analizzatore. |
 | **Analizzatore / strumento** | Lo strumento di terze parti che esegue i test. |
 | **DMX** | Il nome Inpeco del **LIS**. Comunica con lo strumento: gli dice quali test eseguire e ne riceve i risultati. |
@@ -137,7 +138,11 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, rotate 2 s, move calcolata (vedi sotto).
 
-**Turnstile:** il device genera i punti `<id>.in`, `<id>.needle`, `<id>.out` (posizioni fisse delle tre posizioni). Un `move` che termina in `<id>.in` aggancia il carrier alla tasca in ingresso; da lì la sua posizione segue l'angolo della ruota (`Timeline::carrier_pos`); un `move` successivo lo sgancia dall'uscita. Le tasche vengono assegnate e controllate **in ordine di tempo** dopo aver disposto tutti gli step (`simulate_wheels`), perché l'ordine nel file non coincide sempre con l'ordine temporale. Errori: ingresso occupato, uscita da una posizione diversa dall'uscita, rotazione con un carrier ancora in uscita, arrivi o uscite durante una rotazione. In caso di errore `--check` stampa anche la timeline calcolata fino a quel punto.
+**Turnstile:** il device genera i punti `<id>.in`, `<id>.needle`, `<id>.out` (posizioni fisse delle tre posizioni). Un `move` che termina in `<id>.in` aggancia il carrier alla tasca in ingresso; da lì la sua posizione segue l'angolo della ruota (`Timeline::carrier_pos`); un `move` successivo lo sgancia dall'uscita. Le tasche vengono assegnate e controllate **in ordine di tempo** dopo aver disposto tutti gli step (`simulate_wheels`), perché l'ordine nel file non coincide sempre con l'ordine temporale. Errori: ingresso occupato, uscita da una posizione diversa dall'uscita, rotazione con un carrier ancora in uscita, arrivi o uscite durante una rotazione. In caso di errore `--check` stampa anche la timeline calcolata fino a quel punto. Un carrier che entra nella ruota (dal gate alla tasca d'ingresso) mentre è in corso un `pipette` su quel turnstile è un errore: deve aspettare al gate.
+
+**Gate e antenna** (`gate`, `antenna`, con `at`): nessuno step dedicato. Il gate è aperto negli intervalli in cui un carrier lo attraversa (calcolati in `Timeline::gates` proiettando il punto del gate sulla route di ogni carrier: da 60 px prima a 45 px dopo, con apertura/chiusura di 0,4 s). L'antenna mostra la lettura quando un carrier è fermo sul suo punto.
+
+**`at`:** uno step con `at = <secondi>` parte a un istante assoluto (più `delay`); non si può usare insieme a `start`.
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
@@ -168,6 +173,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 3. Analizzatore: rettangolo grigio con etichetta.
 4. NSD: riquadro 72×64 sul punto, con etichetta sotto. Durante un `highlight` diventa ambra e pulsa.
 5. Punto di campionamento: cerchio rosso tratteggiato con etichetta sotto.
+   Gate: paletto sopra la corsia e sbarra rossa/bianca che attraversa la corsia; aprendosi si accorcia (vista dall'alto della sbarra che si alza). Antenna: lettore sopra la corsia con due archi per lato, che pulsano in blu con una linea tratteggiata verso il carrier durante la lettura.
    Turnstile: disco grigio con tre tasche e razzi che ruotano (ease in-out), mozzo centrale, posizione sotto l'ago segnata da un cerchio rosso tratteggiato fisso, etichetta sotto la ruota. Con la pipetta sul turnstile, "Aspirating…" va a sinistra del braccio.
 6. Carrier: disco scuro (r 22) con ombra. Se ha il tubo, cerchio bianco con tappo colorato (`cap_color`); se è vuoto, alloggiamento scuro. Accanto c'è il **cartellino con il SampleId** (o "C1 (empty)"): a destra se c'è spazio, altrimenti a sinistra, sotto o sopra, scegliendo la prima posizione che non copre altri carrier o cartellini. Nessun cartellino per i carrier fuori dal pannello.
 7. Pipetta (durante `pipette`): braccio che scende dal fondo dell'analizzatore fino al tubo (20% discesa, 60% aspirazione, 20% risalita). Durante l'aspirazione compaiono onde blu e la scritta "Aspirating…".
@@ -194,16 +200,16 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)), `label` |
+| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color` |
-| `[[step]]` | `action`, `start` = after\|with\|after_all, `delay`, `duration` + le chiavi specifiche dell'azione |
+| `[[step]]` | `action`, `start` = after\|with\|after_all oppure `at` (secondi assoluti), `delay`, `duration` + le chiavi specifiche dell'azione |
 
 | action | Chiavi specifiche |
 |---|---|
 | `caption` | `title`, `text` |
 | `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed` |
-| `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier` |
+| `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
 | `pipette` | `device` sampling o turnstile (`carrier` è accettato ma non ancora usato) |
 | `highlight` | `device` |
@@ -272,7 +278,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 ## 9b. Scena 02 — `02_turnstile_three_carriers.toml`
 
-Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento; tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40), così non si accumulano sul bordo. Per ogni carrier gli stessi messaggi della scena 01 (Prepare/OK all'NSD, Query/Tests to perform con DMX, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro). Quattro rotazioni: la prima subito dopo l'arrivo di C1 (ruota vuota), le altre dopo ogni Sample Complete. Pipettatura 5 s per C1, 4,5 s per C2 e C3. Durata ≈ 63 s, 24 righe nel sequence diagram (scorre).
+Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento, con **antenna** (`pit_wait`, x 640) e **gate** (x 596) davanti. Tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40). Per ogni carrier: Prepare/OK all'NSD, Query/Tests to perform con DMX, **secondo Prepare (viola) all'antenna**, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro. C1 trova la ruota libera: sosta all'antenna, entra, la ruota gira. C2 e C3 aspettano al gate chiuso durante il pipettaggio del carrier precedente; dopo il Sample Complete entrano e solo allora la ruota gira. L'ultima rotazione avviene senza carrier in attesa. Messaggi, didascalie e rotazioni usano `at`. Durata ≈ 68 s, 27 righe nel sequence diagram (scorre).
 
 ---
 
@@ -287,6 +293,7 @@ Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di 
 | A5 | I risultati a DMX sono mostrati alla fine, con la didascalia "Later…" | Scelta narrativa |
 | A6 | SampleId `SID-000123` e durata della pipettatura 4,5 s | Segnaposto |
 | A7 | Messaggi di stato dell'analizzatore omessi | Da aggiungere |
+| A8 | Il secondo Prepare (all'antenna) non ha risposta OK; l'informazione in più che porterà è ancora da definire | Da confermare |
 
 ---
 
