@@ -9,11 +9,14 @@ scene, not new code.
 
 ## Requirements
 
-- Rust (stable). The tool uses no external crates.
-- `rsvg-convert` (librsvg) and `ffmpeg` on PATH
-  - Debian/Ubuntu: `apt install librsvg2-bin ffmpeg`
-  - macOS: `brew install librsvg ffmpeg`
-- Fonts: Inter (preferred) or DejaVu Sans / DejaVu Sans Mono
+- Rust (stable). Frames are rasterized in-process with the `resvg` crate.
+- `ffmpeg` on PATH (only for MP4 output; `--still` and `--check` don't need it)
+  - Debian/Ubuntu: `apt install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Windows: `winget install Gyan.FFmpeg`
+- Fonts: none to install, and no `.ttf` in git. Both are embedded in the executable:
+  Inter is downloaded by `build.rs` on the first build (needs `curl`, SHA-256 checked),
+  DejaVu Sans Mono comes from the `dejavu` crate. For offline builds see `fonts/README.md`.
 
 ## Usage
 

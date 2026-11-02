@@ -68,16 +68,16 @@ Comportamento descritto dall'utente:
 | Decisione | Motivazione |
 |---|---|
 | **Linguaggio: Rust** | Richiesta dell'utente: tool riutilizzabile e da far evolvere. |
-| **Zero dipendenze esterne (solo `std`)** | Nell'ambiente di sviluppo crates.io era bloccato. Questo rende anche il tool facile da compilare ovunque. Si possono introdurre crate in futuro (vedi §12). |
+| **Poche dipendenze: `resvg`, `dejavu`** | All'inizio crates.io era bloccato e il tool usava solo `std`. Il parser TOML resta scritto a mano; per la rasterizzazione si usa `resvg`, che rende il tool un unico eseguibile portabile (anche Windows). |
 | **Parser TOML scritto a mano** (sottoinsieme) | Al posto di `serde`/`toml`. |
 | **Rendering: un SVG per fotogramma** | L'SVG viene generato come stringa, così la grafica vettoriale è semplice da scrivere e scalabile. |
-| **Rasterizzazione con `rsvg-convert`** (librsvg) | Il decoder SVG integrato in ffmpeg (`svg_pipe`) **non funzionava** con più fotogrammi concatenati. |
+| **Rasterizzazione in-process con `resvg`** | Il decoder SVG integrato in ffmpeg (`svg_pipe`) **non funzionava** con più fotogrammi concatenati. In origine si usava `rsvg-convert` (un processo per fotogramma); `resvg` elimina la dipendenza di sistema ed è molto più veloce. I fotogrammi vanno a ffmpeg come RGBA grezzo (`-f rawvideo`), senza passare dal PNG. |
 | **Encoding con `ffmpeg`** | I PNG vengono passati via `image2pipe` e codificati in H.264 (`libx264`, `-preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart`). |
 | **Rendering parallelo** | N thread worker (default = numero di core): ognuno genera l'SVG, lo rasterizza e invia il PNG. Il thread principale li riordina (BTreeMap) e li scrive in sequenza a ffmpeg. |
 | **Spazio di coordinate fisso 1920×1080** | Lo scenario usa sempre queste coordinate. `width`/`height` del video scalano solo l'output tramite `viewBox`. |
 | **Timeline deterministica calcolata in anticipo** | Ogni step ha un inizio e una fine. Il fotogramma al tempo *t* è una funzione pura di *t*, quindi è possibile renderizzare qualunque istante (`--still`). |
 
-**Dipendenze di sistema:** `rsvg-convert`, `ffmpeg`, font **Inter** (fallback DejaVu Sans) e **DejaVu Sans Mono** per i testi monospazio.
+**Dipendenze di sistema:** solo `ffmpeg` (e solo per l'MP4). I font vengono incorporati nell'eseguibile, così il risultato è identico su ogni macchina, ma i `.ttf` non sono nel repository: **Inter** (font variabile, OFL 1.1) lo scarica `build.rs` alla prima compilazione con `curl`, da un URL del repository Google Fonts fissato a un commit, e ne verifica lo SHA-256; **DejaVu Sans Mono** arriva dal crate `dejavu`. Per compilare offline basta mettere a mano `fonts/Inter.ttf` (vedi `fonts/README.md`). I font di sistema servono solo per i glifi mancanti.
 
 ---
 
@@ -85,14 +85,16 @@ Comportamento descritto dall'utente:
 
 ```
 trackviz/
-├── Cargo.toml            # edition 2021, nessuna dipendenza
+├── Cargo.toml            # edition 2021, dipendenze: resvg, dejavu (build: sha2)
 ├── README.md             # guida rapida e riferimento del formato
+├── build.rs              # scarica Inter (SHA-256 verificato) in OUT_DIR
+├── fonts/                # README e licenze dei font (i .ttf non sono in git)
 ├── PROJECT.md            # questo documento
 ├── scenes/
 │   └── 01_prepare_sample_release.toml
 ├── out/                  # video generati
 └── src/
-    ├── main.rs           # CLI, pipeline rsvg → ffmpeg, thread worker
+    ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── toml.rs           # parser del sottoinsieme TOML
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     └── render.rs         # generazione dell'SVG di un fotogramma
@@ -169,7 +171,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 **Sequence diagram:**
 - Riquadri degli attori distribuiti uniformemente, con la banda superiore del colore dell'attore. Linee della vita tratteggiate.
 - Messaggio: la freccia cresce dalla sorgente alla destinazione durante la sua durata (ease-out). Il colore è quello del mittente. Le risposte (`reply`) sono tratteggiate con punta aperta.
-- Etichetta su una riga sopra la freccia: **nome** in grassetto più `params` in monospazio grigio, su un rettangolo bianco che copre le linee della vita. Il `paint-order` non è supportato da librsvg, per questo si usa il rettangolo.
+- Etichetta su una riga sopra la freccia: **nome** in grassetto più `params` in monospazio grigio, su un rettangolo bianco che copre le linee della vita. Si usa il rettangolo invece di `paint-order` (non supportato da librsvg, il primo rasterizzatore usato).
 - Un messaggio "fresco" (fino a 1,5 s dopo l'arrivo) ha la freccia più spessa e un alone ambra.
 - Note: box giallo centrato sulla linea della vita.
 - A sinistra di ogni riga, in grigio, l'istante di inizio (`show_times`).
@@ -289,9 +291,9 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 ## 12. Limiti noti e note per chi riparte
 
-- Il parser TOML è un sottoinsieme: niente tabelle inline `{}`, chiavi puntate, date o stringhe multilinea `"""`. Se la rete lo permette, si possono adottare `serde` + `toml` (e magari `tiny-skia` + `ab_glyph` per eliminare rsvg-convert).
+- Il parser TOML è un sottoinsieme: niente tabelle inline `{}`, chiavi puntate, date o stringhe multilinea `"""`. Se la rete lo permette, si possono adottare `serde` + `toml`.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
-- Il rendering costa ~70–150 ms per fotogramma in rsvg-convert: ~2 minuti per 48 s su 2 core.
+- Con `resvg` la scena 01 (1432 fotogrammi) si genera in ~9 s su un Mac a 10 core.
 - La pipetta usa sempre il primo device `analyzer` della scena.
 - `ffmpeg -f svg_pipe` è stato provato e **non funziona** (errori di decodifica con più SVG concatenati): non riprovarlo.
 - In Rust attenzione alle raw string: gli SVG contengono `"#RRGGBB"`, quindi vanno usati delimitatori `r##"…"##`.

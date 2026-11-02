@@ -5,32 +5,47 @@
 //!   trackviz <scene.toml> --still <seconds> [-o frame.png]
 //!   trackviz <scene.toml> --check            (validate + print the timeline)
 //!
-//! Requires `rsvg-convert` (librsvg) and `ffmpeg` on PATH.
+//! Frames are rasterized in-process with resvg; only `ffmpeg` is needed on PATH
+//! (and only for video output).
 
 mod render;
 mod scene;
 mod toml;
 
+use resvg::{tiny_skia, usvg};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 
-fn rasterize(svg: &str, w: u32, h: u32) -> Result<Vec<u8>, String> {
-    let mut child = Command::new("rsvg-convert")
-        .args(["-w", &w.to_string(), "-h", &h.to_string(), "-f", "png"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("cannot run rsvg-convert: {e}"))?;
-    child.stdin.take().unwrap().write_all(svg.as_bytes()).map_err(|e| e.to_string())?;
-    let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(format!("rsvg-convert failed: {}", String::from_utf8_lossy(&out.stderr)));
-    }
-    Ok(out.stdout)
+/// Inter (variable font: font-weight maps to the wght axis), fetched by build.rs.
+const INTER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Inter.ttf"));
+
+/// Rendering options shared by all frames. Fonts are loaded once (this is the
+/// slow part), then the options are reused for every frame.
+fn raster_options() -> usvg::Options<'static> {
+    let mut opt = usvg::Options::default();
+    let db = opt.fontdb_mut();
+    // Both fonts are embedded in the executable, so every machine renders the
+    // same frames regardless of what is installed.
+    db.load_font_data(INTER.to_vec());
+    db.load_font_data(dejavu::sans_mono::regular().to_vec());
+    db.set_sans_serif_family("Inter");
+    db.set_monospace_family("DejaVu Sans Mono");
+    // System fonts only as a fallback for glyphs the bundled fonts lack.
+    db.load_system_fonts();
+    opt
+}
+
+/// Rasterizes one SVG frame into a w x h pixmap (premultiplied RGBA).
+fn rasterize(opt: &usvg::Options, svg: &str, w: u32, h: u32) -> Result<tiny_skia::Pixmap, String> {
+    let tree = usvg::Tree::from_str(svg, opt).map_err(|e| format!("invalid frame SVG: {e}"))?;
+    let mut pixmap = tiny_skia::Pixmap::new(w, h).ok_or_else(|| format!("invalid frame size {w}x{h}"))?;
+    let size = tree.size();
+    let tr = tiny_skia::Transform::from_scale(w as f32 / size.width(), h as f32 / size.height());
+    resvg::render(&tree, tr, &mut pixmap.as_mut());
+    Ok(pixmap)
 }
 
 fn run() -> Result<(), String> {
@@ -89,7 +104,8 @@ fn run() -> Result<(), String> {
         if svg_out {
             std::fs::write(&path, svg).map_err(|e| e.to_string())?;
         } else {
-            std::fs::write(&path, rasterize(&svg, w, h)?).map_err(|e| e.to_string())?;
+            let png = rasterize(&raster_options(), &svg, w, h)?.encode_png().map_err(|e| e.to_string())?;
+            std::fs::write(&path, png).map_err(|e| e.to_string())?;
         }
         eprintln!("wrote {path}");
         return Ok(());
@@ -98,8 +114,8 @@ fn run() -> Result<(), String> {
     let out = out.unwrap_or_else(|| "out.mp4".into());
     let n = (tl.duration * fps as f64).ceil() as usize;
     let mut ff = Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-c:v", "png"])
-        .args(["-framerate", &fps.to_string(), "-i", "-"])
+        .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba"])
+        .args(["-s", &format!("{w}x{h}"), "-framerate", &fps.to_string(), "-i", "-"])
         .args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart"])
         .arg(&out)
         .stdin(Stdio::piped())
@@ -107,19 +123,22 @@ fn run() -> Result<(), String> {
         .map_err(|e| format!("cannot run ffmpeg: {e}"))?;
     let mut ff_in = ff.stdin.take().unwrap();
 
+    let opt = raster_options();
     let next = AtomicUsize::new(0);
     let result: Result<(), String> = std::thread::scope(|s| {
         let (tx, rx) = mpsc::channel::<Result<(usize, Vec<u8>), String>>();
         for _ in 0..jobs.max(1) {
             let tx = tx.clone();
-            let (sc, tl, next) = (&sc, &tl, &next);
+            let (sc, tl, next, opt) = (&sc, &tl, &next, &opt);
             s.spawn(move || loop {
                 let i = next.fetch_add(1, Ordering::SeqCst);
                 if i >= n {
                     break;
                 }
                 let svg = render::frame(sc, tl, i as f64 / fps as f64);
-                let r = rasterize(&svg, w, h).map(|png| (i, png));
+                // Raw RGBA straight to ffmpeg: the background is opaque, so
+                // premultiplied and straight alpha are the same here.
+                let r = rasterize(opt, &svg, w, h).map(|pm| (i, pm.take()));
                 let failed = r.is_err();
                 if tx.send(r).is_err() || failed {
                     next.store(n, Ordering::SeqCst);
@@ -131,10 +150,10 @@ fn run() -> Result<(), String> {
         let mut pending = BTreeMap::new();
         let mut written = 0usize;
         for r in rx {
-            let (i, png) = r?;
-            pending.insert(i, png);
-            while let Some(png) = pending.remove(&written) {
-                ff_in.write_all(&png).map_err(|e| format!("ffmpeg pipe: {e}"))?;
+            let (i, rgba) = r?;
+            pending.insert(i, rgba);
+            while let Some(rgba) = pending.remove(&written) {
+                ff_in.write_all(&rgba).map_err(|e| format!("ffmpeg pipe: {e}"))?;
                 written += 1;
                 if written % (fps as usize * 5) == 0 || written == n {
                     eprint!("\rframes {written}/{n}");

@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dejavu = "2.37.0"
+resvg = "0.49.0"
+
+[build-dependencies]
+sha2 = "0.11.1"
