@@ -26,6 +26,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **NSD** | **No Stop Divert**: il dispositivo che sposta il carrier, pieno o vuoto, dalla Main-Lane alla Pit-Lane **senza fermarlo**. |
 | **Pit-Lane** | Corsia secondaria, parallela alla Main-Lane, in cui il carrier viene fermato per farlo campionare dall'analizzatore. Dopo il punto di campionamento rientra nella Main-Lane, così i carrier processati (pieni o vuoti) tornano nella corsia principale. |
 | **Punto di campionamento** | Posizione sulla Pit-Lane in cui il carrier si ferma e l'analizzatore aspira (pipetta) il campione. |
+| **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
 | **Interfaccia** | Il modulo di automazione Inpeco davanti all'analizzatore (NSD + Pit-Lane + rientro). È anche l'attore che scambia i messaggi con l'analizzatore. |
 | **Analizzatore / strumento** | Lo strumento di terze parti che esegue i test. |
 | **DMX** | Il nome Inpeco del **LIS**. Comunica con lo strumento: gli dice quali test eseguire e ne riceve i risultati. |
@@ -126,7 +127,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Modello:** `Video`, `Point`, `Lane` (Main/Pit/Link), `Device` (Nsd/Sampling/Analyzer/Zone), `Actor`, `Carrier`, `Step` con `Action`.
 
-**Validazioni:** riferimenti a point/actor/device/carrier esistenti, punto `start` sulla route, target del `move` **più avanti** sulla route del carrier, carrier che non può ricevere un nuovo move mentre è ancora in movimento, `pipette` solo su device `sampling` e solo se esiste un `analyzer`, `wait` con `duration` obbligatoria, niente messaggi di un attore verso sé stesso.
+**Validazioni:** riferimenti a point/actor/device/carrier esistenti, punto `start` sulla route, target del `move` **più avanti** sulla route del carrier, carrier che non può ricevere un nuovo move mentre è ancora in movimento, `pipette` solo su device `sampling` o `turnstile` e solo se esiste un `analyzer`, route che attraversano un turnstile solo come `<id>.in`, `<id>.out` consecutivi, regole della ruota (vedi sotto), `wait` con `duration` obbligatoria, niente messaggi di un attore verso sé stesso.
 
 **Calcolo dei tempi degli step** (in ordine di file):
 - `start = "after"` (default): inizia alla fine dello step precedente.
@@ -134,7 +135,9 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 - `start = "after_all"`: inizia quando tutti gli step precedenti sono finiti.
 - A questi si somma `delay`. Il primo step parte da 0 (+ delay).
 
-**Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, move calcolata (vedi sotto).
+**Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, rotate 2 s, move calcolata (vedi sotto).
+
+**Turnstile:** il device genera i punti `<id>.in`, `<id>.needle`, `<id>.out` (posizioni fisse delle tre posizioni). Un `move` che termina in `<id>.in` aggancia il carrier alla tasca in ingresso; da lì la sua posizione segue l'angolo della ruota (`Timeline::carrier_pos`); un `move` successivo lo sgancia dall'uscita. Le tasche vengono assegnate e controllate **in ordine di tempo** dopo aver disposto tutti gli step (`simulate_wheels`), perché l'ordine nel file non coincide sempre con l'ordine temporale. Errori: ingresso occupato, uscita da una posizione diversa dall'uscita, rotazione con un carrier ancora in uscita, arrivi o uscite durante una rotazione. In caso di errore `--check` stampa anche la timeline calcolata fino a quel punto.
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
@@ -165,7 +168,8 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 3. Analizzatore: rettangolo grigio con etichetta.
 4. NSD: riquadro 72×64 sul punto, con etichetta sotto. Durante un `highlight` diventa ambra e pulsa.
 5. Punto di campionamento: cerchio rosso tratteggiato con etichetta sotto.
-6. Carrier: disco scuro (r 22) con ombra. Se ha il tubo, cerchio bianco con tappo colorato (`cap_color`); se è vuoto, alloggiamento scuro. Accanto c'è il **cartellino con il SampleId** (o "C1 (empty)"), che si sposta a sinistra se uscirebbe dal pannello.
+   Turnstile: disco grigio con tre tasche e razzi che ruotano (ease in-out), mozzo centrale, posizione sotto l'ago segnata da un cerchio rosso tratteggiato fisso, etichetta sotto la ruota. Con la pipetta sul turnstile, "Aspirating…" va a sinistra del braccio.
+6. Carrier: disco scuro (r 22) con ombra. Se ha il tubo, cerchio bianco con tappo colorato (`cap_color`); se è vuoto, alloggiamento scuro. Accanto c'è il **cartellino con il SampleId** (o "C1 (empty)"): a destra se c'è spazio, altrimenti a sinistra, sotto o sopra, scegliendo la prima posizione che non copre altri carrier o cartellini. Nessun cartellino per i carrier fuori dal pannello.
 7. Pipetta (durante `pipette`): braccio che scende dal fondo dell'analizzatore fino al tubo (20% discesa, 60% aspirazione, 20% risalita). Durante l'aspirazione compaiono onde blu e la scritta "Aspirating…".
 
 **Sequence diagram:**
@@ -175,7 +179,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 - Un messaggio "fresco" (fino a 1,5 s dopo l'arrivo) ha la freccia più spessa e un alone ambra.
 - Note: box giallo centrato sulla linea della vita.
 - A sinistra di ogni riga, in grigio, l'istante di inizio (`show_times`).
-- Altezza delle righe = spazio disponibile / numero di righe, massimo 70 px.
+- Altezza delle righe = spazio disponibile / numero di righe, massimo 70 px. Se verrebbe sotto 38 px, le righe sono alte 46 px e il diagramma **scorre** verso l'alto: ogni nuova riga è visibile quando compare (scroll di 0,6 s che termina all'inizio della riga). Le righe sono ritagliate sotto i riquadri degli attori.
 
 **Didascalie:** l'ultima caption iniziata resta visibile, con fade-in di 0,4 s. Il titolo è maiuscolo in ambra, il testo bianco 27 px va a capo a ~118 caratteri, massimo 2 righe con titolo e 3 senza.
 
@@ -190,7 +194,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`), `label` |
+| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color` |
 | `[[step]]` | `action`, `start` = after\|with\|after_all, `delay`, `duration` + le chiavi specifiche dell'azione |
@@ -201,8 +205,9 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed` |
 | `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier` |
 | `note` | `actor`, `text` |
-| `pipette` | `device` (`carrier` è accettato ma non ancora usato) |
+| `pipette` | `device` sampling o turnstile (`carrier` è accettato ma non ancora usato) |
 | `highlight` | `device` |
+| `rotate` | `device` (turnstile) |
 | `wait` | (solo `duration`) |
 
 ---
@@ -265,6 +270,12 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 ---
 
+## 9b. Scena 02 — `02_turnstile_three_carriers.toml`
+
+Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento; tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40), così non si accumulano sul bordo. Per ogni carrier gli stessi messaggi della scena 01 (Prepare/OK all'NSD, Query/Tests to perform con DMX, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro). Quattro rotazioni: la prima subito dopo l'arrivo di C1 (ruota vuota), le altre dopo ogni Sample Complete. Pipettatura 5 s per C1, 4,5 s per C2 e C3. Durata ≈ 63 s, 24 righe nel sequence diagram (scorre).
+
+---
+
 ## 10. Assunzioni da confermare (scelte non specificate dall'utente)
 
 | # | Assunzione | Stato |
@@ -283,8 +294,8 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 1. **Risposta negativa al Prepare** (campione da non processare): ramo alternativo, con il carrier che attraversa la Pit-Lane senza campionamento.
 2. **Messaggi di stato**: entrambe le modalità, su richiesta dell'Interfaccia o spontanea al cambio di stato.
-3. **Più carrier**, pieni e vuoti, con code nella Pit-Lane. Servirà la gestione delle collisioni o delle distanze minime.
-4. **Scroll del sequence diagram** quando le righe superano lo spazio disponibile.
+3. **Più carrier**, pieni e vuoti, con code nella Pit-Lane. Servirà la gestione delle collisioni o delle distanze minime. (La scena 02 ha tre carrier pieni con il turnstile; code e carrier vuoti restano da fare.)
+4. ~~Scroll del sequence diagram~~ — fatto.
 5. **Versione realistica** del video, se lo schematico non convince.
 
 ---

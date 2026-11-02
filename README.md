@@ -42,7 +42,7 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[video]` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times` |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = [ids], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`), `label` |
+| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color` |
 | `[[step]]` | `action`, `start`, `delay`, `duration` + action keys (below) |
@@ -63,12 +63,47 @@ Steps run in file order. Each step's `start` decides when it begins:
 | `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed` | computed from length and speed |
 | `message` | `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier` | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
-| `pipette` | `device` (a `sampling` device) | 3 s |
+| `pipette` | `device` (a `sampling` or `turnstile` device) | 3 s |
 | `highlight` | `device` | 1.5 s |
+| `rotate` | `device` (a `turnstile`) | 2 s |
 | `wait` | — | `duration` is required |
 
 `{SampleId}` and `{CarrierId}` inside `text` and `params` are replaced with the
 carrier's values.
+
+### Turnstile
+
+A wheel with three pockets, 120° apart, at the end of the Pit-Lane. Its three
+positions are: entry (at Pit-Lane height), under the analyzer needle (top) and
+exit (at Pit-Lane height, on the other side). Each `rotate` moves every pocket
+one position forward: entry → needle → exit → entry.
+
+```toml
+[[device]]
+id = "ts"
+kind = "turnstile"
+x = 440            # wheel center
+y = 505
+r = 70             # center → pocket distance (default 70)
+entry = "right"    # side of the entry position: right (flow right to left) | left
+label = "Turnstile"
+```
+
+It generates the points `ts.in`, `ts.needle` and `ts.out`. Use `ts.in` and
+`ts.out` in lanes, and write them **consecutively** in carrier routes
+(`…, "pit_in", "ts.in", "ts.out", "pit_out", …`). A carrier is moved to `ts.in`
+with a `move`, travels on the wheel only by `rotate`, and leaves with a `move`
+from the exit (e.g. `to = "merge"`). `pipette` on the turnstile works at the
+needle position.
+
+Checked by `--check` (in time order, whatever the order of the steps in the file):
+the entry pocket must be free when a carrier arrives, a carrier can leave only
+from the exit position, a rotation can't start while a carrier is still in the
+exit position, and nothing arrives or leaves while the wheel is turning.
+See `scenes/02_turnstile_three_carriers.toml`.
+
+When the sequence diagram has more rows than fit, it scrolls up as new rows appear.
+If `--check` finds an error, it also prints the timeline up to that point.
 
 Easing tip: `ease = "in"` followed by `ease = "out"` gives one continuous
 motion with no stop at the junction. Scene 01 uses this to pass through the

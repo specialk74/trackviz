@@ -1,0 +1,608 @@
+# Scene 02 — turnstile, three carriers with tubes, happy path
+# The Pit-Lane ends in a turnstile: a wheel with three pockets (120° apart).
+# Positions: entry (right, at Pit-Lane height), under the analyzer needle (top),
+# exit (left, at Pit-Lane height). Each rotation moves entry -> needle -> exit.
+# Carrier flow: right to left, Pit-Lane above the Main-Lane.
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+# Points left of x=30 or right of x=950 are outside the panel (hidden).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "Turnstile with three carriers holding sample tubes — happy path"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+[[point]]
+id = "spawn"
+x = 1010
+y = 740
+[[point]]
+id = "main_in"
+x = 910
+y = 740
+[[point]]
+id = "nsd"
+x = 730
+y = 740
+[[point]]
+id = "pit_in"
+x = 620
+y = 540
+[[point]]
+id = "pit_out"
+x = 260
+y = 540
+[[point]]
+id = "merge"
+x = 160
+y = 740
+[[point]]
+id = "main_out"
+x = 65
+y = 740
+[[point]]
+id = "gone"
+x = -40
+y = 740
+
+# The turnstile generates the points "ts.in", "ts.needle" and "ts.out".
+[[device]]
+id = "ts"
+kind = "turnstile"
+label = "Turnstile"
+x = 440
+y = 505
+r = 70
+entry = "right"
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+label_x = 830
+label_y = 800
+
+[[lane]]
+id = "pit_entry"
+label = "Pit-Lane"
+kind = "pit"
+points = ["pit_in", "ts.in"]
+label_x = 548
+label_y = 594
+
+[[lane]]
+id = "pit_exit"
+kind = "pit"
+points = ["ts.out", "pit_out"]
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 90
+y = 380
+w = 720
+h = 470
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 200
+y = 170
+w = 480
+h = 150
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"]
+speed = 75
+
+[[carrier]]
+id = "C2"
+tube = true
+sample_id = "SID-000124"
+route = ["spawn", "main_in", "nsd", "pit_in", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"]
+speed = 75
+cap_color = "#0EA5E9"
+
+[[carrier]]
+id = "C3"
+tube = true
+sample_id = "SID-000125"
+route = ["spawn", "main_in", "nsd", "pit_in", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"]
+speed = 75
+cap_color = "#DB2777"
+
+# ---------------------------------------------------------------- steps
+# start = "after" (default: when the previous step ends) | "with" (same start
+# as the previous step) | "after_all" (when every previous step has ended).
+# Steps are written in chronological order of their messages, so the rows of
+# the sequence diagram read top to bottom.
+
+# --- C1 arrives ---------------------------------------------------------
+[[step]]
+action = "caption"
+title = "1 · Turnstile"
+text = "The Pit-Lane ends in a turnstile: a wheel with three positions — entry, under the analyzer needle, exit. Three carriers with sample tubes arrive on the Main-Lane."
+
+[[step]]
+action = "move"
+start = "with"
+delay = 1.0
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "caption"
+title = "2 · NSD — Prepare"
+text = "At the NSD the first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+start = "with"
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "move"
+start = "with"
+carrier = "C1"
+to = "ts.in"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+# C2 starts as Prepare(C1) ends, so it reaches the NSD as C1 enters the wheel.
+[[step]]
+action = "move"
+carrier = "C2"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.5
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C1"
+
+[[step]]
+action = "message"
+delay = 0.3
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+delay = 0.5
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C1"
+
+# --- C1 in the entry: the empty wheel rotates at once ----------------------
+[[step]]
+action = "caption"
+start = "after_all"
+title = "3 · Rotation — second carrier at the NSD"
+text = "The wheel is empty, so as soon as the first carrier is in the entry position the turnstile rotates it under the needle. Meanwhile the second carrier passes the NSD: Prepare is sent for it."
+
+[[step]]
+action = "move"
+start = "with"
+carrier = "C2"
+to = "ts.in"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "rotate"
+start = "with"
+delay = 0.3
+device = "ts"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 1.7
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C2"
+
+# --- C1 under the needle ---------------------------------------------------
+[[step]]
+action = "caption"
+start = "with"
+delay = 0.5
+title = "4 · Under the needle — Sample Acquisition"
+text = "The first carrier is under the analyzer needle: the interface sends Sample Acquisition. The analyzer queries DMX for the second sample."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+delay = 0.1
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "caption"
+start = "with"
+delay = 0.4
+title = "5 · Pipetting"
+text = "The analyzer aspirates from the first tube. The second carrier reaches the free entry position of the wheel and waits there."
+
+[[step]]
+action = "pipette"
+start = "with"
+device = "ts"
+duration = 5.0
+
+[[step]]
+action = "note"
+start = "with"
+actor = "AN"
+text = "Pipetting"
+duration = 5.0
+
+# C3 leaves its start so that it reaches the NSD just after C1 is done.
+[[step]]
+action = "move"
+start = "with"
+delay = 0.5
+carrier = "C3"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 1.1
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C2"
+
+# --- C1 done: rotation 2 (C1 -> exit, C2 -> needle); C3 at the NSD -----------
+[[step]]
+action = "caption"
+start = "with"
+delay = 3.6
+title = "6 · Sample Complete — rotation"
+text = "Aspiration is finished: the analyzer sends Sample Complete. The wheel rotates: the first carrier goes to the exit, the second one under the needle. The third carrier passes the NSD."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.2
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+# C3 continues from the NSD without stopping (its previous move ends at 23.294 s).
+[[step]]
+action = "move"
+start = "with"
+delay = 0.97
+carrier = "C3"
+to = "ts.in"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "highlight"
+start = "with"
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "rotate"
+start = "with"
+delay = 0.8
+device = "ts"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 1.2
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C3"
+
+# --- C1 leaves, C2 under the needle -------------------------------------------
+[[step]]
+action = "caption"
+start = "with"
+delay = 0.9
+title = "7 · Exit and next Sample Acquisition"
+text = "The first carrier leaves the wheel towards the Main-Lane. The second carrier is under the needle: Sample Acquisition is sent for it."
+
+[[step]]
+action = "move"
+start = "with"
+carrier = "C1"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+delay = 0.1
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+start = "with"
+device = "ts"
+duration = 4.5
+
+[[step]]
+action = "note"
+start = "with"
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
+
+[[step]]
+action = "message"
+start = "with"
+delay = 1.5
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+reply = true
+carrier = "C3"
+
+# --- C2 done; C1 back on the Main-Lane ----------------------------------------
+[[step]]
+action = "caption"
+start = "with"
+delay = 3.2
+title = "8 · Sample Complete — Release"
+text = "Aspiration of the second sample is finished: Sample Complete. Meanwhile the first carrier is back on the Main-Lane and the interface sends Release for it."
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.1
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "move"
+start = "with"
+delay = 0.48
+carrier = "C1"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+# --- rotation 3 (C2 -> exit, C3 -> needle) ------------------------------------
+[[step]]
+action = "caption"
+start = "with"
+delay = 1.6
+title = "9 · Rotation"
+text = "The wheel rotates: the second carrier goes to the exit and leaves, the third one comes under the needle and Sample Acquisition is sent."
+
+[[step]]
+action = "rotate"
+start = "with"
+delay = 0.2
+device = "ts"
+
+[[step]]
+action = "move"
+delay = 0.2
+carrier = "C2"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "message"
+start = "with"
+delay = 0.3
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+delay = 0.3
+device = "ts"
+duration = 4.5
+
+[[step]]
+action = "note"
+start = "with"
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
+
+# --- C3 done: rotation 4 (C3 -> exit); C2 back on the Main-Lane ---------------
+[[step]]
+action = "caption"
+start = "with"
+delay = 4.8
+title = "10 · Last carrier"
+text = "Sample Complete for the third sample: the wheel rotates it to the exit. The second carrier is back on the Main-Lane (Release), then the third one follows."
+
+[[step]]
+action = "message"
+start = "with"
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "move"
+start = "with"
+delay = 0.28
+carrier = "C2"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "rotate"
+start = "with"
+delay = 1.42
+device = "ts"
+
+[[step]]
+action = "move"
+delay = 0.2
+carrier = "C3"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "move"
+carrier = "C3"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+start = "with"
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C3"

@@ -39,14 +39,32 @@ pub enum DeviceKind {
     Sampling,
     Analyzer,
     Zone,
+    Turnstile,
 }
 
 pub struct Device {
     pub id: String,
     pub kind: DeviceKind,
+    /// Reference point: given for nsd/sampling; for a turnstile it is the
+    /// generated "<id>.needle" point (so pipette/highlight work unchanged).
     pub at: Option<String>,
+    /// Box for analyzer/zone; for a turnstile (cx, cy, r, 0) with r the
+    /// distance from the center to the pocket centers.
     pub rect: (f64, f64, f64, f64),
     pub label: String,
+    /// Turnstile only: the entry position is on the right (flow right to left).
+    pub entry_right: bool,
+}
+
+/// Turnstile geometry. Three pockets 120° apart; positions (slots) are
+/// 0 = entry, 1 = under the needle (top), 2 = exit. Each rotation moves every
+/// pocket one slot forward: entry -> needle -> exit -> entry.
+pub fn turnstile_slot_angle(entry_right: bool, slot: f64) -> f64 {
+    use std::f64::consts::PI;
+    // Screen angles (y grows downwards): entry 30° below the horizontal on its
+    // side, needle straight up, exit 30° below the horizontal on the other side.
+    let (a0, delta) = if entry_right { (PI / 6.0, -2.0 * PI / 3.0) } else { (5.0 * PI / 6.0, 2.0 * PI / 3.0) };
+    a0 + slot * delta
 }
 
 pub struct Actor {
@@ -103,6 +121,7 @@ pub enum Action {
     Note { actor: String, text: String },
     Pipette { device: String, carrier: Option<String> },
     Highlight { device: String },
+    Rotate { device: String },
     Wait,
 }
 
@@ -173,6 +192,57 @@ impl Scene {
                 return Err(format!("{}: duplicate point id '{id}'", t.location()));
             }
         }
+        let mut devices = Vec::new();
+        for t in arr(doc, "device") {
+            let kind = match t.str_req("kind")?.as_str() {
+                "nsd" => DeviceKind::Nsd,
+                "sampling" => DeviceKind::Sampling,
+                "analyzer" => DeviceKind::Analyzer,
+                "zone" => DeviceKind::Zone,
+                "turnstile" => DeviceKind::Turnstile,
+                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone|turnstile)", t.location())),
+            };
+            let id = t.str_req("id")?;
+            let mut at = None;
+            let mut rect = (0.0, 0.0, 0.0, 0.0);
+            let mut entry_right = true;
+            match kind {
+                DeviceKind::Nsd | DeviceKind::Sampling => {
+                    t.check_keys(&["id", "kind", "at", "label"])?;
+                    let a = t.str_req("at")?;
+                    if !points.contains_key(&a) {
+                        return Err(format!("{}: unknown point '{a}'", t.location()));
+                    }
+                    at = Some(a);
+                }
+                DeviceKind::Analyzer | DeviceKind::Zone => {
+                    t.check_keys(&["id", "kind", "x", "y", "w", "h", "label"])?;
+                    rect = (t.num_req("x")?, t.num_req("y")?, t.num_req("w")?, t.num_req("h")?);
+                }
+                DeviceKind::Turnstile => {
+                    t.check_keys(&["id", "kind", "x", "y", "r", "entry", "label"])?;
+                    let (cx, cy, r) = (t.num_req("x")?, t.num_req("y")?, t.num_opt("r")?.unwrap_or(70.0));
+                    entry_right = match t.str_opt("entry")?.as_deref().unwrap_or("right") {
+                        "right" => true,
+                        "left" => false,
+                        o => return Err(format!("{}: unknown entry '{o}' (right|left)", t.location())),
+                    };
+                    rect = (cx, cy, r, 0.0);
+                    // Generated points: <id>.in, <id>.needle, <id>.out (usable in lanes and routes).
+                    for (slot, suffix) in ["in", "needle", "out"].iter().enumerate() {
+                        let a = turnstile_slot_angle(entry_right, slot as f64);
+                        let pid = format!("{id}.{suffix}");
+                        let p = Point { x: (cx + r * a.cos()).round(), y: (cy + r * a.sin()).round() };
+                        if points.insert(pid.clone(), p).is_some() {
+                            return Err(format!("{}: point '{pid}' already exists", t.location()));
+                        }
+                    }
+                    at = Some(format!("{id}.needle"));
+                }
+            }
+            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right });
+        }
+
         let need_point = |id: &str, t: &Table| -> Result<(), String> {
             if points.contains_key(id) {
                 Ok(())
@@ -202,36 +272,6 @@ impl Scene {
                 _ => None,
             };
             lanes.push(Lane { label: t.str_opt("label")?.unwrap_or_default(), points: pts, kind, label_pos });
-        }
-
-        let mut devices = Vec::new();
-        for t in arr(doc, "device") {
-            t.check_keys(&["id", "kind", "at", "x", "y", "w", "h", "label"])?;
-            let kind = match t.str_req("kind")?.as_str() {
-                "nsd" => DeviceKind::Nsd,
-                "sampling" => DeviceKind::Sampling,
-                "analyzer" => DeviceKind::Analyzer,
-                "zone" => DeviceKind::Zone,
-                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone)", t.location())),
-            };
-            let at = t.str_opt("at")?;
-            let mut rect = (0.0, 0.0, 0.0, 0.0);
-            match kind {
-                DeviceKind::Nsd | DeviceKind::Sampling => {
-                    let a = at.as_deref().ok_or_else(|| format!("{}: '{}' needs 'at = <point id>'", t.location(), t.str_req("kind").unwrap()))?;
-                    need_point(a, t)?;
-                }
-                _ => {
-                    rect = (t.num_req("x")?, t.num_req("y")?, t.num_req("w")?, t.num_req("h")?);
-                }
-            }
-            devices.push(Device {
-                id: t.str_req("id")?,
-                kind,
-                at,
-                rect,
-                label: t.str_opt("label")?.unwrap_or_default(),
-            });
         }
 
         let mut actors = Vec::new();
@@ -278,8 +318,9 @@ impl Scene {
                 "note" => &["actor", "text"],
                 "pipette" => &["device", "carrier"],
                 "highlight" => &["device"],
+                "rotate" => &["device"],
                 "wait" => &[],
-                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|wait)", t.location())),
+                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|wait)", t.location())),
             };
             let allowed: Vec<&str> = common.iter().chain(extra.iter()).copied().collect();
             t.check_keys(&allowed)?;
@@ -308,6 +349,7 @@ impl Scene {
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
                 "pipette" => Action::Pipette { device: t.str_req("device")?, carrier: t.str_opt("carrier")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
+                "rotate" => Action::Rotate { device: t.str_req("device")? },
                 _ => {
                     if t.num_opt("duration")?.is_none() {
                         return Err(format!("{}: 'wait' needs a duration", t.location()));
@@ -365,6 +407,128 @@ pub struct CarrierPath {
     pub cum: Vec<f64>,
     pub start_s: f64,
     pub moves: Vec<MoveSeg>,
+    /// Intervals in which the carrier sits in a turnstile pocket (its position
+    /// then follows the wheel instead of the route).
+    pub attach: Vec<Attach>,
+}
+
+pub struct Attach {
+    pub wheel: usize,
+    pub pocket: usize,
+    pub t0: f64,
+    /// When the carrier leaves the exit position (infinity if it never does).
+    pub t1: f64,
+}
+
+/// Runtime state of a turnstile device.
+pub struct Wheel {
+    pub device: usize,
+    pub cx: f64,
+    pub cy: f64,
+    pub r: f64,
+    pub entry_right: bool,
+    /// Rotations as (t0, t1); each one advances the pockets by one slot.
+    pub rots: Vec<(f64, f64)>,
+}
+
+impl Wheel {
+    /// Rotations done at time t (fractional while turning).
+    pub fn turns(&self, t: f64) -> f64 {
+        self.rots
+            .iter()
+            .map(|&(t0, t1)| if t >= t1 { 1.0 } else if t <= t0 { 0.0 } else { Ease::InOut.apply((t - t0) / (t1 - t0)) })
+            .sum()
+    }
+    /// Angle of pocket p at time t (pocket p starts in slot p).
+    pub fn pocket_angle(&self, p: usize, t: f64) -> f64 {
+        turnstile_slot_angle(self.entry_right, p as f64 + self.turns(t))
+    }
+    pub fn pocket_pos(&self, p: usize, t: f64) -> (f64, f64) {
+        let a = self.pocket_angle(p, t);
+        (self.cx + self.r * a.cos(), self.cy + self.r * a.sin())
+    }
+}
+
+/// Something that happens to a turnstile, checked in time order once all the
+/// steps are laid out (steps are written in file order, which is not always
+/// the time order).
+enum WheelEv {
+    /// A carrier reaches the entry: (carrier, index in its attach list).
+    Arrive(usize, usize),
+    /// A carrier leaves from the exit.
+    Leave(usize, usize),
+    /// A rotation starts; it ends at the given time.
+    Rotate(f64),
+}
+
+struct WheelRec {
+    t: f64,
+    wheel: usize,
+    ev: WheelEv,
+    loc: String,
+}
+
+impl WheelRec {
+    /// At the same instant: leave, then arrive, then rotate.
+    fn order(&self) -> u8 {
+        match self.ev {
+            WheelEv::Leave(..) => 0,
+            WheelEv::Arrive(..) => 1,
+            WheelEv::Rotate(_) => 2,
+        }
+    }
+}
+
+/// Plays the turnstile events in time order: assigns pockets to arriving
+/// carriers and checks that the wheel is used consistently.
+fn simulate_wheels(sc: &Scene, wheels: &[Wheel], carriers: &mut [CarrierPath], mut recs: Vec<WheelRec>) -> Result<(), String> {
+    recs.sort_by(|a, b| a.t.total_cmp(&b.t).then(a.order().cmp(&b.order())));
+    for (wi, w) in wheels.iter().enumerate() {
+        let id = &sc.devices[w.device].id;
+        let mut k = 0usize; // rotations started so far
+        let mut busy_until = f64::NEG_INFINITY;
+        let mut pockets: [Option<usize>; 3] = [None; 3];
+        let slot = |p: usize, k: usize| (p + k) % 3;
+        for r in recs.iter().filter(|r| r.wheel == wi) {
+            let t = r.t;
+            match r.ev {
+                WheelEv::Arrive(ci, ai) => {
+                    let cid = &sc.carriers[ci].id;
+                    if t < busy_until - 1e-9 {
+                        return Err(format!("{}: turnstile '{id}' is rotating when carrier '{cid}' reaches the entry (t={t:.2}s)", r.loc));
+                    }
+                    let p = (3 - k % 3) % 3;
+                    if let Some(o) = pockets[p] {
+                        return Err(format!("{}: the entry of turnstile '{id}' is still occupied by carrier '{}' when carrier '{cid}' arrives (t={t:.2}s)", r.loc, sc.carriers[o].id));
+                    }
+                    pockets[p] = Some(ci);
+                    carriers[ci].attach[ai].pocket = p;
+                }
+                WheelEv::Leave(ci, ai) => {
+                    let cid = &sc.carriers[ci].id;
+                    if t < busy_until - 1e-9 {
+                        return Err(format!("{}: turnstile '{id}' is still rotating when carrier '{cid}' should leave (t={t:.2}s)", r.loc));
+                    }
+                    let p = carriers[ci].attach[ai].pocket;
+                    if slot(p, k) != 2 {
+                        return Err(format!("{}: carrier '{cid}' is in turnstile '{id}' but not in the exit position at t={t:.2}s; rotate it first", r.loc));
+                    }
+                    pockets[p] = None;
+                }
+                WheelEv::Rotate(t_end) => {
+                    if t < busy_until - 1e-9 {
+                        return Err(format!("{}: turnstile '{id}' is still rotating at t={t:.2}s", r.loc));
+                    }
+                    if let Some(ci) = (0..3).find(|&p| slot(p, k) == 2).and_then(|p| pockets[p]) {
+                        return Err(format!("{}: carrier '{}' is still in the exit position of '{id}' at t={t:.2}s; move it out before rotating", r.loc, sc.carriers[ci].id));
+                    }
+                    k += 1;
+                    busy_until = t_end;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 impl CarrierPath {
@@ -418,9 +582,25 @@ pub struct Timed {
 pub struct Timeline {
     pub events: Vec<Timed>,
     pub carriers: Vec<CarrierPath>,
+    pub wheels: Vec<Wheel>,
     pub rows: usize,
     pub duration: f64,
     pub log: Vec<String>,
+}
+
+impl Timeline {
+    pub fn carrier_pos(&self, ci: usize, t: f64) -> (f64, f64) {
+        let c = &self.carriers[ci];
+        for a in &c.attach {
+            if t >= a.t0 && t < a.t1 {
+                return self.wheels[a.wheel].pocket_pos(a.pocket, t);
+            }
+        }
+        c.pos(t)
+    }
+    pub fn wheel_of_device(&self, di: usize) -> Option<&Wheel> {
+        self.wheels.iter().find(|w| w.device == di)
+    }
 }
 
 fn subst(s: &str, sc: &Scene, carrier: Option<usize>) -> String {
@@ -434,7 +614,20 @@ fn subst(s: &str, sc: &Scene, carrier: Option<usize>) -> String {
 }
 
 impl Timeline {
+    /// Lays out the steps in time. On error, the message also lists the
+    /// timeline computed up to that point (useful to fix delays in a scene).
     pub fn build(sc: &Scene) -> Result<Timeline, String> {
+        let mut log = Vec::new();
+        Self::build_inner(sc, &mut log).map_err(|e| {
+            if log.is_empty() {
+                e
+            } else {
+                format!("{e}\nTimeline up to the error:\n  {}", log.join("\n  "))
+            }
+        })
+    }
+
+    fn build_inner(sc: &Scene, log: &mut Vec<String>) -> Result<Timeline, String> {
         let mut carriers = Vec::new();
         let mut cur_idx = Vec::new();
         for c in &sc.carriers {
@@ -446,11 +639,43 @@ impl Timeline {
             }
             let si = c.route.iter().position(|p| *p == c.start).unwrap();
             cur_idx.push(si);
-            carriers.push(CarrierPath { start_s: cum[si], pts, cum, moves: Vec::new() });
+            carriers.push(CarrierPath { start_s: cum[si], pts, cum, moves: Vec::new(), attach: Vec::new() });
         }
 
+        // Turnstiles: map "<id>.in" / "<id>.out" points to (wheel, slot).
+        let mut wheels = Vec::new();
+        let mut wheel_pts: HashMap<String, (usize, usize)> = HashMap::new();
+        for (di, d) in sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Turnstile) {
+            let wi = wheels.len();
+            wheel_pts.insert(format!("{}.in", d.id), (wi, 0));
+            wheel_pts.insert(format!("{}.needle", d.id), (wi, 1));
+            wheel_pts.insert(format!("{}.out", d.id), (wi, 2));
+            wheels.push(Wheel { device: di, cx: d.rect.0, cy: d.rect.1, r: d.rect.2, entry_right: d.entry_right, rots: Vec::new() });
+        }
+        // Routes cross a turnstile as "<id>.in", "<id>.out" (the wheel carries
+        // the carrier in between); the needle point is not part of a route.
+        for c in &sc.carriers {
+            for (i, p) in c.route.iter().enumerate() {
+                if let Some(&(wi, slot)) = wheel_pts.get(p) {
+                    let id = &sc.devices[wheels[wi].device].id;
+                    let ok = match slot {
+                        0 => c.route.get(i + 1) == Some(&format!("{id}.out")),
+                        2 => i > 0 && c.route[i - 1] == format!("{id}.in"),
+                        _ => false,
+                    };
+                    if !ok {
+                        return Err(format!("carrier '{}': in the route a turnstile is written as \"{id}.in\", \"{id}.out\" (consecutive)", c.id));
+                    }
+                }
+            }
+            if wheel_pts.contains_key(&c.start) {
+                return Err(format!("carrier '{}': it cannot start inside a turnstile", c.id));
+            }
+        }
+        let mut attached: Vec<Option<usize>> = vec![None; sc.carriers.len()];
+        let mut wheel_recs: Vec<WheelRec> = Vec::new();
+
         let mut events = Vec::new();
-        let mut log = Vec::new();
         let (mut prev_start, mut prev_end, mut max_end) = (0.0f64, 0.0f64, 0.0f64);
         let mut row = 0usize;
         let mut first = true;
@@ -474,9 +699,21 @@ impl Timeline {
                 Action::Move { carrier, to, ease, speed } => {
                     let ci = sc.carrier_idx(carrier).ok_or_else(|| format!("{}: unknown carrier '{carrier}'", st.loc))?;
                     let c = &sc.carriers[ci];
-                    let from = cur_idx[ci];
+                    let mut from = cur_idx[ci];
+                    // Leaving a turnstile (from the exit position: checked by simulate_wheels).
+                    if let Some(ai) = attached[ci] {
+                        let wheel = carriers[ci].attach[ai].wheel;
+                        wheel_recs.push(WheelRec { t: t0, wheel, ev: WheelEv::Leave(ci, ai), loc: st.loc.clone() });
+                        carriers[ci].attach[ai].t1 = t0;
+                        attached[ci] = None;
+                        from += 1; // the route point after "<id>.in" is "<id>.out"
+                        cur_idx[ci] = from;
+                    }
                     let ti = c.route.iter().enumerate().skip(from + 1).find(|(_, p)| *p == to).map(|(i, _)| i)
                         .ok_or_else(|| format!("{}: point '{to}' is not ahead of carrier '{carrier}' on its route", st.loc))?;
+                    if let Some(p) = c.route[from..ti].iter().find(|p| wheel_pts.get(*p).is_some_and(|w| w.1 == 0)) {
+                        return Err(format!("{}: carrier '{carrier}' would drive through the turnstile; move it to '{p}' and use 'rotate'", st.loc));
+                    }
                     let path = &mut carriers[ci];
                     let (s0, s1) = (path.cum[from], path.cum[ti]);
                     if let Some(last) = path.moves.last() {
@@ -487,6 +724,15 @@ impl Timeline {
                     let d = st.duration.unwrap_or((s1 - s0) / speed.unwrap_or(c.speed) * ease.factor());
                     path.moves.push(MoveSeg { t0, t1: t0 + d, s0, s1, ease: *ease });
                     cur_idx[ci] = ti;
+                    // Entering a turnstile: the carrier drops into the pocket at the entry.
+                    // The pocket is assigned later, in time order (simulate_wheels).
+                    if let Some(&(wi, 0)) = wheel_pts.get(to) {
+                        let t_in = t0 + d;
+                        carriers[ci].attach.push(Attach { wheel: wi, pocket: 0, t0: t_in, t1: f64::INFINITY });
+                        let ai = carriers[ci].attach.len() - 1;
+                        attached[ci] = Some(ai);
+                        wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
+                    }
                     (d, Ev::Wait, format!("move      {carrier} -> {to}"))
                 }
                 Action::Message { from, to, text, params, reply, carrier } => {
@@ -514,8 +760,8 @@ impl Timeline {
                 }
                 Action::Pipette { device, .. } => {
                     let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    if sc.devices[di].kind != DeviceKind::Sampling {
-                        return Err(format!("{}: pipette needs a device of kind 'sampling'", st.loc));
+                    if !matches!(sc.devices[di].kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
+                        return Err(format!("{}: pipette needs a device of kind 'sampling' or 'turnstile'", st.loc));
                     }
                     if !sc.devices.iter().any(|d| d.kind == DeviceKind::Analyzer) {
                         return Err(format!("{}: pipette needs an 'analyzer' device", st.loc));
@@ -526,6 +772,15 @@ impl Timeline {
                     let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
                     (st.duration.unwrap_or(1.5), Ev::Highlight { device: di }, format!("highlight {device}"))
                 }
+                Action::Rotate { device } => {
+                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
+                    let wi = wheels.iter().position(|w| w.device == di)
+                        .ok_or_else(|| format!("{}: rotate needs a device of kind 'turnstile'", st.loc))?;
+                    let d = st.duration.unwrap_or(2.0);
+                    wheels[wi].rots.push((t0, t0 + d));
+                    wheel_recs.push(WheelRec { t: t0, wheel: wi, ev: WheelEv::Rotate(t0 + d), loc: st.loc.clone() });
+                    (d, Ev::Wait, format!("rotate    {device}"))
+                }
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
             };
             let t1 = t0 + dur;
@@ -535,6 +790,7 @@ impl Timeline {
             prev_end = t1;
             max_end = max_end.max(t1);
         }
-        Ok(Timeline { events, carriers, rows: row, duration: max_end + sc.video.tail, log })
+        simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
+        Ok(Timeline { events, carriers, wheels, rows: row, duration: max_end + sc.video.tail, log: std::mem::take(log) })
     }
 }

@@ -15,6 +15,12 @@ const ACCENT: &str = "#F59E0B";
 const TRACK: (f64, f64, f64, f64) = (30.0, 120.0, 920.0, 765.0);
 const SEQ: (f64, f64, f64, f64) = (970.0, 120.0, 920.0, 765.0);
 const CAPTION_Y: f64 = 905.0;
+/// Turnstile: distance from the pocket centers to the rim of the wheel.
+const TS_RIM: f64 = 32.0;
+/// Sequence diagram: below this row height the diagram scrolls instead of
+/// shrinking, with rows of SCROLL_ROW_H.
+const MIN_ROW_H: f64 = 38.0;
+const SCROLL_ROW_H: f64 = 46.0;
 
 pub fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
@@ -162,13 +168,39 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                     y + 56.0, esc(&d.label)
                 );
             }
+            DeviceKind::Turnstile => {
+                let w = tl.wheel_of_device(di).unwrap();
+                let (cx, cy, r) = (w.cx, w.cy, w.r);
+                let disk = r + TS_RIM;
+                if let Some(a) = glow {
+                    let _ = write!(o, r#"<circle cx="{cx}" cy="{cy}" r="{}" fill="none" stroke="{ACCENT}" stroke-width="10" opacity="{a:.2}"/>"#, disk + 6.0);
+                }
+                let _ = write!(o, r##"<circle cx="{cx}" cy="{cy}" r="{disk}" fill="#E2E8F0" stroke="#64748B" stroke-width="2.5"/>"##);
+                for p in 0..3 {
+                    let (px, py) = w.pocket_pos(p, t);
+                    let _ = write!(o, r##"<line x1="{cx}" y1="{cy}" x2="{px:.1}" y2="{py:.1}" stroke="#94A3B8" stroke-width="6" stroke-linecap="round"/>"##);
+                }
+                for p in 0..3 {
+                    let (px, py) = w.pocket_pos(p, t);
+                    let _ = write!(o, r##"<circle cx="{px:.1}" cy="{py:.1}" r="27" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>"##);
+                }
+                let _ = write!(o, r##"<circle cx="{cx}" cy="{cy}" r="12" fill="#64748B"/>"##);
+                // The sampling position (under the needle) is fixed.
+                let (nx, ny) = sc.pt(d.at.as_deref().unwrap());
+                let _ = write!(o, r##"<circle cx="{nx}" cy="{ny}" r="31" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-dasharray="6 5"/>"##);
+                let col = if glow.is_some() { ACCENT } else { "#475569" };
+                let _ = write!(o, r##"<text x="{cx}" y="{}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##, cy + disk + 26.0, esc(&d.label));
+            }
             DeviceKind::Zone => {}
         }
     }
 
-    // Carriers
+    // Carriers. SampleId tags go right of the carrier if there is room,
+    // otherwise left, below or above: whichever doesn't cover other carriers or tags.
+    let pos: Vec<(f64, f64)> = (0..sc.carriers.len()).map(|ci| tl.carrier_pos(ci, t)).collect();
+    let mut taken: Vec<(f64, f64, f64, f64)> = pos.iter().map(|&(x, y)| (x - 24.0, y - 24.0, x + 24.0, y + 24.0)).collect();
     for (ci, c) in sc.carriers.iter().enumerate() {
-        let (x, y) = tl.carriers[ci].pos(t);
+        let (x, y) = pos[ci];
         let _ = write!(
             o,
             r##"<circle cx="{:.1}" cy="{:.1}" r="23" fill="#0F172A" opacity="0.18"/><circle cx="{x:.1}" cy="{y:.1}" r="22" fill="#334155" stroke="#1E293B" stroke-width="2"/>"##,
@@ -183,14 +215,28 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         } else {
             let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="12" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>"##);
         }
+        // No tag for a carrier outside the panel (not yet arrived / already gone).
+        if x < TRACK.0 || x > TRACK.0 + TRACK.2 {
+            continue;
+        }
         let tag = if c.tube && !c.sample_id.is_empty() { c.sample_id.clone() } else { format!("{} (empty)", c.id) };
         let w = 16.0 + tag.chars().count() as f64 * 9.0;
-        let right_ok = x + 30.0 + w < TRACK.0 + TRACK.2 - 8.0;
-        let tx = if right_ok { x + 30.0 } else { x - 30.0 - w };
+        let cands = [(x + 30.0, y - 13.0), (x - 30.0 - w, y - 13.0), (x - w / 2.0, y + 30.0), (x - w / 2.0, y - 56.0)];
+        let inside = |(tx, ty): (f64, f64)| tx > TRACK.0 + 8.0 && tx + w < TRACK.0 + TRACK.2 - 8.0 && ty > TRACK.1 && ty + 26.0 < TRACK.1 + TRACK.3;
+        let free = |(tx, ty): (f64, f64)| {
+            taken.iter().enumerate().all(|(k, b)| k == ci || tx >= b.2 || tx + w <= b.0 || ty >= b.3 || ty + 26.0 <= b.1)
+        };
+        let (tx, ty) = cands
+            .iter()
+            .copied()
+            .find(|&p| inside(p) && free(p))
+            .or_else(|| cands.iter().copied().find(|&p| inside(p)))
+            .unwrap_or(cands[0]);
+        taken.push((tx, ty, tx + w, ty + 26.0));
         let _ = write!(
             o,
             r##"<rect x="{:.1}" y="{:.1}" width="{w:.1}" height="26" rx="6" fill="#FFFFFF" stroke="#94A3B8"/><text x="{:.1}" y="{:.1}" font-size="15" font-family="{MONO}" fill="{INK}">{}</text>"##,
-            tx, y - 13.0, tx + 8.0, y + 5.5, esc(&tag)
+            tx, ty, tx + 8.0, ty + 18.5, esc(&tag)
         );
     }
 
@@ -223,7 +269,13 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                         16.0 + ph * 26.0, 0.8 * (1.0 - ph)
                     );
                 }
-                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="#1D4ED8">Aspirating…</text>"##, sx + 22.0, top + 105.0);
+                if let Some(w) = tl.wheel_of_device(device) {
+                    // Turnstile: left of the probe, between the analyzer and the wheel.
+                    let rim_top = w.cy - w.r - TS_RIM;
+                    let _ = write!(o, r##"<text x="{}" y="{:.1}" font-size="17" font-weight="600" text-anchor="end" fill="#1D4ED8">Aspirating…</text>"##, sx - 18.0, (top + rim_top) / 2.0 + 6.0);
+                } else {
+                    let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="#1D4ED8">Aspirating…</text>"##, sx + 22.0, top + 105.0);
+                }
             }
         }
     }
@@ -247,8 +299,28 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 
     let rows = tl.rows.max(1) as f64;
     let first_y = life_top + 46.0;
-    let row_h = ((life_bot - 20.0 - first_y) / rows).min(70.0);
+    let avail = life_bot - 20.0 - first_y;
+    let row_h = if avail / rows >= MIN_ROW_H { (avail / rows).min(70.0) } else { SCROLL_ROW_H };
     let row_y = |r: usize| first_y + row_h * r as f64;
+
+    // When the rows don't fit, scroll up so that each new row is visible when
+    // it appears (the scroll ends exactly as the row starts).
+    let scroll = tl
+        .events
+        .iter()
+        .filter_map(|e| match e.ev {
+            Ev::Message { row, .. } | Ev::Note { row, .. } => {
+                let need = ((row + 1) as f64 * row_h - avail).max(0.0);
+                Some(need * Ease::InOut.apply((t - e.t0 + 0.6) / 0.6))
+            }
+            _ => None,
+        })
+        .fold(0.0, f64::max);
+    let _ = write!(
+        o,
+        r#"<clipPath id="seq"><rect x="{}" y="{life_top}" width="{}" height="{}"/></clipPath><g clip-path="url(#seq)"><g transform="translate(0,{:.1})">"#,
+        SEQ.0, SEQ.2, life_bot - life_top, -scroll
+    );
 
     for e in &tl.events {
         if t < e.t0 {
@@ -309,6 +381,7 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             _ => {}
         }
     }
+    o.push_str("</g></g>");
 }
 
 fn caption(o: &mut String, tl: &Timeline, t: f64) {
