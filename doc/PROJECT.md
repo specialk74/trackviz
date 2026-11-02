@@ -207,20 +207,20 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 ## 9. Scena 01 — `01_prepare_sample_release.toml`
 
-**Geometria:**
+**Geometria:** flusso dei carrier da destra verso sinistra, Pit-Lane in alto (sopra la Main-Lane).
 
 | Punto | x | y |
 |---|---|---|
-| main_in | 70 | 740 |
-| nsd | 250 | 740 |
-| pit_in | 360 | 540 |
-| sampling | 540 | 540 |
-| pit_out | 690 | 540 |
-| merge | 800 | 740 |
-| main_out | 915 | 740 |
+| main_in | 910 | 740 |
+| nsd | 730 | 740 |
+| pit_in | 620 | 540 |
+| sampling | 440 | 540 |
+| pit_out | 290 | 540 |
+| merge | 180 | 740 |
+| main_out | 65 | 740 |
 
-- **Corsie:** Main-Lane [main_in, nsd, merge, main_out], con etichetta in (56, 800). Pit-Lane [pit_in, sampling, pit_out], con etichetta in (650, 500). Link "divert" [nsd, pit_in] e link "return" [pit_out, merge].
-- **Device:** zona "Interface module" (170, 425, 720×420), Analyzer (300, 185, 480×175), NSD su `nsd`, "Sampling point" su `sampling`.
+- **Corsie:** Main-Lane [main_in, nsd, merge, main_out], con etichetta in (830, 800). Pit-Lane [pit_in, sampling, pit_out], con etichetta in (250, 500). Link "divert" [nsd, pit_in] e link "return" [pit_out, merge].
+- **Device:** zona "Interface module" (90, 425, 720×420), Analyzer (200, 185, 480×175), NSD su `nsd`, "Sampling point" su `sampling`.
 - **Carrier:** C1 con tubo, SampleId `SID-000123` (segnaposto), route completa, speed 75.
 - **Video:** 1920×1080, 30 fps, tail 3,5 s. **Durata totale ≈ 47,7 s.**
 
