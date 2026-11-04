@@ -1,0 +1,640 @@
+# Scene 04 — a carrier expected in the Pit-Lane never arrives: Clear (turnstile)
+# Same situation as scene 03, with the turnstile, gate and antenna of scene 02.
+# C2 is believed to be diverted (Prepare is sent) but physically goes straight
+# on the Main-Lane; its logical position is a dashed ghost ("C2L"). C3 stops at
+# the antenna on top of the ghost while C1 is being sampled. As soon as the
+# antenna reads C3, the interface sends Clear for C2; after the analyzer's reply
+# it sends Prepare again (purple) for C3, which then waits at the gate for
+# Sample Complete as usual.
+# Carrier flow: right to left, Pit-Lane above the Main-Lane.
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+# Points left of x=30 or right of x=950 are outside the panel (hidden).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "A carrier expected in the Pit-Lane is missing — Clear (turnstile with gate and antenna)"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+[[point]]
+id = "spawn"
+x = 1010
+y = 740
+[[point]]
+id = "main_in"
+x = 910
+y = 740
+[[point]]
+id = "nsd"
+x = 790
+y = 740
+[[point]]
+id = "pit_in"
+x = 700
+y = 540
+# Where carriers stop to be read by the antenna, just before the gate.
+[[point]]
+id = "pit_wait"
+x = 640
+y = 540
+[[point]]
+id = "gate"
+x = 596
+y = 540
+[[point]]
+id = "pit_out"
+x = 260
+y = 540
+[[point]]
+id = "merge"
+x = 160
+y = 740
+[[point]]
+id = "main_out"
+x = 65
+y = 740
+[[point]]
+id = "gone"
+x = -40
+y = 740
+
+# The turnstile generates the points "ts.in", "ts.needle" and "ts.out".
+[[device]]
+id = "ts"
+kind = "turnstile"
+label = "Turnstile"
+x = 440
+y = 505
+r = 70
+entry = "right"
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+label_x = 470
+label_y = 800
+
+[[lane]]
+id = "pit_entry"
+label = "Pit-Lane"
+kind = "pit"
+points = ["pit_in", "ts.in"]
+label_x = 262
+label_y = 594
+
+[[lane]]
+id = "pit_exit"
+kind = "pit"
+points = ["ts.out", "pit_out"]
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 90
+y = 380
+w = 790
+h = 470
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 200
+y = 170
+w = 480
+h = 150
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+[[device]]
+id = "antenna"
+kind = "antenna"
+at = "pit_wait"
+label = "Antenna"
+
+# Opens by itself while a carrier drives through it.
+[[device]]
+id = "gate"
+kind = "gate"
+at = "gate"
+label = "Gate"
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "pit_wait", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"]
+speed = 75
+
+# The real C2: it is not diverted and goes straight on the Main-Lane.
+[[carrier]]
+id = "C2"
+tube = true
+sample_id = "SID-000124"
+route = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+speed = 75
+cap_color = "#0EA5E9"
+
+# Where the interface believes C2 is: diverted into the Pit-Lane, up to the antenna.
+[[carrier]]
+id = "C2L"
+ghost = true
+visible = false
+tube = true
+sample_id = "SID-000124"
+tag = "SID-000124 (expected)"
+route = ["nsd", "pit_in", "pit_wait"]
+speed = 75
+cap_color = "#0EA5E9"
+
+[[carrier]]
+id = "C3"
+tube = true
+sample_id = "SID-000125"
+route = ["spawn", "main_in", "nsd", "pit_in", "pit_wait", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"]
+speed = 75
+cap_color = "#DB2777"
+
+# ---------------------------------------------------------------- steps
+# Messages, captions and rotations use `at` (absolute start, seconds) so the
+# rows of the sequence diagram stay in time order. The second Prepare (sent at
+# the antenna) is drawn in purple.
+
+[[step]]
+action = "caption"
+at = 0
+title = "1 · Turnstile with gate and antenna"
+text = "Three carriers holding sample tubes travel towards the interface. Every carrier diverted into the Pit-Lane stops at the antenna in front of the gate and the turnstile."
+
+[[step]]
+action = "move"
+at = 2.26
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "pit_wait"
+ease = "out"
+
+[[step]]
+action = "move"
+at = 9.07
+carrier = "C2"
+to = "gone"
+ease = "linear"
+
+[[step]]
+action = "move"
+at = 11.57
+carrier = "C3"
+to = "nsd"
+ease = "linear"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C3"
+to = "pit_wait"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 4.77
+title = "2 · NSD — Prepare"
+text = "At the NSD the first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+at = 4.77
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "message"
+at = 4.77
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 6.77
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "message"
+at = 8.57
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "caption"
+at = 10.62
+title = "3 · Antenna — Prepare again"
+text = "The first carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle."
+
+[[step]]
+action = "highlight"
+at = 10.62
+device = "antenna"
+duration = 1.5
+
+[[step]]
+action = "message"
+at = 10.82
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+color = "#9333EA"
+
+[[step]]
+action = "message"
+at = 11.1
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "caption"
+at = 12.0
+title = "4 · Physically straight, logically diverted"
+text = "The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is."
+
+[[step]]
+action = "highlight"
+at = 12.0
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "show"
+at = 12.0
+carrier = "C2L"
+duration = 0.4
+
+[[step]]
+action = "move"
+at = 12.0
+carrier = "C2L"
+to = "pit_wait"
+ease = "out"
+
+[[step]]
+action = "message"
+at = 12.0
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "move"
+at = 12.4
+carrier = "C1"
+to = "ts.in"
+ease = "inout"
+duration = 2.0
+
+[[step]]
+action = "message"
+at = 13.6
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "rotate"
+at = 14.55
+device = "ts"
+
+[[step]]
+action = "caption"
+at = 14.5
+title = "5 · Third carrier — Prepare"
+text = "The third carrier is diverted into the Pit-Lane: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
+
+[[step]]
+action = "highlight"
+at = 14.5
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "message"
+at = 14.5
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "message"
+at = 15.2
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+at = 16.1
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
+
+[[step]]
+action = "caption"
+at = 16.8
+title = "6 · Sample Acquisition"
+text = "The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates. The second (expected) carrier reaches the antenna: nothing is read, it is not physically there."
+
+[[step]]
+action = "message"
+at = 16.8
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 17.4
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "pipette"
+at = 18.4
+device = "ts"
+duration = 6.6
+
+[[step]]
+action = "note"
+at = 18.4
+actor = "AN"
+text = "Pipetting"
+duration = 6.6
+
+[[step]]
+action = "message"
+at = 18.7
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "caption"
+at = 20.35
+title = "7 · Antenna reads the third carrier — Clear"
+text = "The third carrier stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second."
+
+[[step]]
+action = "highlight"
+at = 20.35
+device = "antenna"
+duration = 1.5
+
+[[step]]
+action = "message"
+at = 20.2
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
+
+[[step]]
+action = "message"
+at = 20.55
+from = "IF"
+to = "AN"
+text = "Clear"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+at = 22.1
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "hide"
+at = 23.6
+carrier = "C2L"
+duration = 0.6
+
+[[step]]
+action = "caption"
+at = 23.6
+title = "8 · Prepare again for the third carrier"
+text = "Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete."
+
+[[step]]
+action = "message"
+at = 23.8
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C3"
+color = "#9333EA"
+
+[[step]]
+action = "caption"
+at = 25.2
+title = "9 · Sample Complete — enter — rotate"
+text = "Sample Complete for the first sample. The gate opens, the third carrier enters the wheel, then the wheel rotates: the third sample goes under the needle, the first one to the exit."
+
+[[step]]
+action = "message"
+at = 25.2
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "move"
+at = 26.6
+carrier = "C3"
+to = "ts.in"
+ease = "inout"
+duration = 2.0
+
+[[step]]
+action = "rotate"
+at = 28.75
+device = "ts"
+
+[[step]]
+action = "move"
+at = 30.9
+carrier = "C1"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+at = 31.0
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+at = 32.6
+device = "ts"
+duration = 4.5
+
+[[step]]
+action = "note"
+at = 32.6
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
+
+[[step]]
+action = "caption"
+at = 37.3
+title = "10 · Back to normal"
+text = "The first carrier is back on the Main-Lane: Release. Sample Complete for the third sample: the wheel brings it to the exit, and back on the Main-Lane the interface sends Release."
+
+[[step]]
+action = "message"
+at = 37.3
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "message"
+at = 38.08
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "rotate"
+at = 38.9
+device = "ts"
+
+[[step]]
+action = "move"
+at = 41.1
+carrier = "C3"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C3"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+at = 48.28
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C3"
+

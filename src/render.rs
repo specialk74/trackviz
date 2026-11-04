@@ -223,6 +223,9 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 let (ax, ay) = sc.pt(d.at.as_deref().unwrap());
                 let by = ay - 36.0;
                 let reading = (0..sc.carriers.len()).any(|ci| {
+                    if !tl.carriers[ci].physical(t) {
+                        return false;
+                    }
                     let (x, y) = tl.carrier_pos(ci, t);
                     ((x - ax).powi(2) + (y - ay).powi(2)).sqrt() < 3.0 && !tl.carriers[ci].moving(t)
                 });
@@ -257,34 +260,64 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 
     // Carriers. SampleId tags go right of the carrier if there is room,
     // otherwise left, below or above: whichever doesn't cover other carriers or tags.
+    // Ghosts (logical positions) are drawn first, so real carriers cover them.
     let pos: Vec<(f64, f64)> = (0..sc.carriers.len()).map(|ci| tl.carrier_pos(ci, t)).collect();
-    let mut taken: Vec<(f64, f64, f64, f64)> = pos.iter().map(|&(x, y)| (x - 24.0, y - 24.0, x + 24.0, y + 24.0)).collect();
-    for (ci, c) in sc.carriers.iter().enumerate() {
+    let op: Vec<f64> = tl.carriers.iter().map(|c| c.opacity(t)).collect();
+    let mut order: Vec<usize> = (0..sc.carriers.len()).filter(|&ci| op[ci] > 0.0).collect();
+    order.sort_by_key(|&ci| !sc.carriers[ci].ghost);
+    let mut taken: Vec<(usize, (f64, f64, f64, f64))> = order.iter().map(|&ci| (ci, (pos[ci].0 - 24.0, pos[ci].1 - 24.0, pos[ci].0 + 24.0, pos[ci].1 + 24.0))).collect();
+    for &ci in &order {
+        let c = &sc.carriers[ci];
         let (x, y) = pos[ci];
-        let _ = write!(
-            o,
-            r##"<circle cx="{:.1}" cy="{:.1}" r="23" fill="#0F172A" opacity="0.18"/><circle cx="{x:.1}" cy="{y:.1}" r="22" fill="#334155" stroke="#1E293B" stroke-width="2"/>"##,
-            x + 2.0, y + 3.0
-        );
-        if c.tube {
+        let _ = write!(o, r#"<g opacity="{:.2}">"#, op[ci]);
+        if c.ghost {
             let _ = write!(
                 o,
-                r##"<circle cx="{x:.1}" cy="{y:.1}" r="13" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/><circle cx="{x:.1}" cy="{y:.1}" r="9.5" fill="{}"/>"##,
-                c.cap_color
+                r##"<circle cx="{x:.1}" cy="{y:.1}" r="26" fill="#FFFFFF" fill-opacity="0.6" stroke="#475569" stroke-width="2.5" stroke-dasharray="6 4"/>"##
             );
+            if c.tube {
+                let _ = write!(
+                    o,
+                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="11" fill="none" stroke="{}" stroke-width="2.5" stroke-dasharray="4 3"/>"##,
+                    c.cap_color
+                );
+            }
         } else {
-            let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="12" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>"##);
+            let _ = write!(
+                o,
+                r##"<circle cx="{:.1}" cy="{:.1}" r="23" fill="#0F172A" opacity="0.18"/><circle cx="{x:.1}" cy="{y:.1}" r="22" fill="#334155" stroke="#1E293B" stroke-width="2"/>"##,
+                x + 2.0, y + 3.0
+            );
+            if c.tube {
+                let _ = write!(
+                    o,
+                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="13" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/><circle cx="{x:.1}" cy="{y:.1}" r="9.5" fill="{}"/>"##,
+                    c.cap_color
+                );
+            } else {
+                let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="12" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>"##);
+            }
         }
+        o.push_str("</g>");
+    }
+    // Tags after all carriers, so that no carrier covers a tag.
+    for &ci in &order {
+        let c = &sc.carriers[ci];
+        let (x, y) = pos[ci];
         // No tag for a carrier outside the panel (not yet arrived / already gone).
         if x < TRACK.0 || x > TRACK.0 + TRACK.2 {
             continue;
         }
-        let tag = if c.tube && !c.sample_id.is_empty() { c.sample_id.clone() } else { format!("{} (empty)", c.id) };
+        let tag = match &c.tag {
+            Some(tag) => tag.clone(),
+            None if c.tube && !c.sample_id.is_empty() => c.sample_id.clone(),
+            None => format!("{} (empty)", c.id),
+        };
         let w = 16.0 + tag.chars().count() as f64 * 9.0;
         let cands = [(x + 30.0, y - 13.0), (x - 30.0 - w, y - 13.0), (x - w / 2.0, y + 30.0), (x - w / 2.0, y - 56.0)];
         let inside = |(tx, ty): (f64, f64)| tx > TRACK.0 + 8.0 && tx + w < TRACK.0 + TRACK.2 - 8.0 && ty > TRACK.1 && ty + 26.0 < TRACK.1 + TRACK.3;
         let free = |(tx, ty): (f64, f64)| {
-            taken.iter().enumerate().all(|(k, b)| k == ci || tx >= b.2 || tx + w <= b.0 || ty >= b.3 || ty + 26.0 <= b.1)
+            taken.iter().all(|&(k, b)| k == ci || tx >= b.2 || tx + w <= b.0 || ty >= b.3 || ty + 26.0 <= b.1)
         };
         let (tx, ty) = cands
             .iter()
@@ -292,11 +325,16 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             .find(|&p| inside(p) && free(p))
             .or_else(|| cands.iter().copied().find(|&p| inside(p)))
             .unwrap_or(cands[0]);
-        taken.push((tx, ty, tx + w, ty + 26.0));
+        taken.push((usize::MAX, (tx, ty, tx + w, ty + 26.0)));
+        let (fill, stroke, dash, style) = if c.ghost {
+            ("#F8FAFC", "#64748B", r#" stroke-dasharray="5 4""#, r#" font-style="italic""#)
+        } else {
+            ("#FFFFFF", "#94A3B8", "", "")
+        };
         let _ = write!(
             o,
-            r##"<rect x="{:.1}" y="{:.1}" width="{w:.1}" height="26" rx="6" fill="#FFFFFF" stroke="#94A3B8"/><text x="{:.1}" y="{:.1}" font-size="15" font-family="{MONO}" fill="{INK}">{}</text>"##,
-            tx, ty, tx + 8.0, ty + 18.5, esc(&tag)
+            r##"<g opacity="{:.2}"><rect x="{:.1}" y="{:.1}" width="{w:.1}" height="26" rx="6" fill="{fill}" stroke="{stroke}"{dash}/><text x="{:.1}" y="{:.1}" font-size="15" font-family="{MONO}" fill="{INK}"{style}>{}</text></g>"##,
+            op[ci], tx, ty, tx + 8.0, ty + 18.5, esc(&tag)
         );
     }
 

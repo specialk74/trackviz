@@ -1,7 +1,7 @@
 //! trackviz — renders scenario files (track + message sequence) to MP4.
 //!
 //! Usage:
-//!   trackviz <scene.toml> [-o out.mp4] [-j jobs]
+//!   trackviz <scene.toml> [-o out.mp4] [-j jobs]   (default: out/<scene name>.mp4)
 //!   trackviz <scene.toml> --still <seconds> [-o frame.png]
 //!   trackviz <scene.toml> --check            (validate + print the timeline)
 //!
@@ -111,7 +111,15 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let out = out.unwrap_or_else(|| "out.mp4".into());
+    // Default: out/<scene file name>.mp4
+    let out = match out {
+        Some(o) => o,
+        None => {
+            let stem = std::path::Path::new(&scene_path).file_stem().and_then(|s| s.to_str()).unwrap_or("out");
+            std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
+            format!("out/{stem}.mp4")
+        }
+    };
     let n = (tl.duration * fps as f64).ceil() as usize;
     let mut ff = Command::new("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba"])

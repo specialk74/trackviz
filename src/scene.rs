@@ -86,6 +86,14 @@ pub struct Carrier {
     pub start: String,
     pub speed: f64,
     pub cap_color: String,
+    /// Logical carrier only: where the interface believes a carrier is, while
+    /// physically it is somewhere else. Drawn as a dashed outline; it is not
+    /// read by antennas and does not open gates.
+    pub ghost: bool,
+    /// Visible from the start (otherwise it appears with a `show` step).
+    pub visible: bool,
+    /// Text of the tag next to the carrier (default: the SampleId).
+    pub tag: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -126,6 +134,8 @@ pub enum Action {
     Pipette { device: String, carrier: Option<String> },
     Highlight { device: String },
     Rotate { device: String },
+    /// Fades a carrier in (`show`) or out (`hide`).
+    Visibility { carrier: String, show: bool },
     Wait,
 }
 
@@ -295,7 +305,7 @@ impl Scene {
 
         let mut carriers = Vec::new();
         for t in arr(doc, "carrier") {
-            t.check_keys(&["id", "tube", "sample_id", "route", "start", "speed", "cap_color"])?;
+            t.check_keys(&["id", "tube", "sample_id", "route", "start", "speed", "cap_color", "ghost", "visible", "tag"])?;
             let route = t.str_list("route")?;
             for p in &route {
                 need_point(p, t)?;
@@ -312,6 +322,9 @@ impl Scene {
                 start,
                 speed: t.num_opt("speed")?.unwrap_or(100.0),
                 cap_color: t.str_opt("cap_color")?.unwrap_or_else(|| "#7C3AED".into()),
+                ghost: t.bool_opt("ghost")?.unwrap_or(false),
+                visible: t.bool_opt("visible")?.unwrap_or(true),
+                tag: t.str_opt("tag")?,
             });
         }
 
@@ -327,8 +340,9 @@ impl Scene {
                 "pipette" => &["device", "carrier"],
                 "highlight" => &["device"],
                 "rotate" => &["device"],
+                "show" | "hide" => &["carrier"],
                 "wait" => &[],
-                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|wait)", t.location())),
+                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|wait)", t.location())),
             };
             let allowed: Vec<&str> = common.iter().chain(extra.iter()).copied().collect();
             t.check_keys(&allowed)?;
@@ -359,6 +373,7 @@ impl Scene {
                 "pipette" => Action::Pipette { device: t.str_req("device")?, carrier: t.str_opt("carrier")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
                 "rotate" => Action::Rotate { device: t.str_req("device")? },
+                "show" | "hide" => Action::Visibility { carrier: t.str_req("carrier")?, show: action_name == "show" },
                 _ => {
                     if t.num_opt("duration")?.is_none() {
                         return Err(format!("{}: 'wait' needs a duration", t.location()));
@@ -423,6 +438,10 @@ pub struct CarrierPath {
     /// Intervals in which the carrier sits in a turnstile pocket (its position
     /// then follows the wheel instead of the route).
     pub attach: Vec<Attach>,
+    pub ghost: bool,
+    pub visible: bool,
+    /// Fades from `show`/`hide` steps: (t0, t1, visible afterwards), in time order.
+    pub fades: Vec<(f64, f64, bool)>,
 }
 
 pub struct Attach {
@@ -580,6 +599,28 @@ impl CarrierPath {
     pub fn moving(&self, t: f64) -> bool {
         self.moves.iter().any(|m| t > m.t0 && t < m.t1)
     }
+    /// 0 = hidden, 1 = fully visible (fading in between).
+    pub fn opacity(&self, t: f64) -> f64 {
+        let mut vis = if self.visible { 1.0 } else { 0.0 };
+        for &(t0, t1, show) in &self.fades {
+            if t < t0 {
+                break;
+            }
+            let target = if show { 1.0 } else { 0.0 };
+            if t >= t1 {
+                vis = target;
+            } else {
+                let u = Ease::InOut.apply((t - t0) / (t1 - t0).max(1e-6));
+                vis += (target - vis) * u;
+                break;
+            }
+        }
+        vis
+    }
+    /// Physically present (not a ghost) and visible: seen by antennas, opens gates.
+    pub fn physical(&self, t: f64) -> bool {
+        !self.ghost && self.opacity(t) > 0.0
+    }
     /// Distance along the route of point p, if p lies on the route (within 3 px).
     fn project(&self, p: (f64, f64)) -> Option<f64> {
         for i in 1..self.pts.len() {
@@ -690,7 +731,7 @@ impl Timeline {
             }
             let si = c.route.iter().position(|p| *p == c.start).unwrap();
             cur_idx.push(si);
-            carriers.push(CarrierPath { start_s: cum[si], pts, cum, moves: Vec::new(), attach: Vec::new() });
+            carriers.push(CarrierPath { start_s: cum[si], pts, cum, moves: Vec::new(), attach: Vec::new(), ghost: c.ghost, visible: c.visible, fades: Vec::new() });
         }
 
         // Turnstiles: map "<id>.in" / "<id>.out" points to (wheel, slot).
@@ -830,6 +871,19 @@ impl Timeline {
                     wheel_recs.push(WheelRec { t: t0, wheel: wi, ev: WheelEv::Rotate(t0 + d), loc: st.loc.clone() });
                     (d, Ev::Wait, format!("rotate    {device}"))
                 }
+                Action::Visibility { carrier, show } => {
+                    let ci = sc.carrier_idx(carrier).ok_or_else(|| format!("{}: unknown carrier '{carrier}'", st.loc))?;
+                    let d = st.duration.unwrap_or(0.5);
+                    let fades = &mut carriers[ci].fades;
+                    if let Some(last) = fades.last() {
+                        if t0 < last.1 - 1e-9 {
+                            return Err(format!("{}: carrier '{carrier}' is still fading at t={t0:.2}s (show/hide steps of a carrier must be in time order)", st.loc));
+                        }
+                    }
+                    fades.push((t0, t0 + d, *show));
+                    let verb = if *show { "show" } else { "hide" };
+                    (d, Ev::Wait, format!("{verb:<9} {carrier}"))
+                }
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
             };
             let t1 = t0 + dur;
@@ -862,7 +916,7 @@ impl Timeline {
         for (di, d) in sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Gate) {
             let g = sc.pt(d.at.as_deref().unwrap());
             let mut iv = Vec::new();
-            for c in &carriers {
+            for c in carriers.iter().filter(|c| !c.ghost) {
                 if let Some(sg) = c.project(g) {
                     for m in c.moves.iter().filter(|m| m.s0 < sg && m.s1 > sg) {
                         iv.push((c.time_at_s(m, sg - 60.0), c.time_at_s(m, sg + 45.0)));

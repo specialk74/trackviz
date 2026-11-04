@@ -26,8 +26,11 @@ B=./target/release/trackviz
 
 $B scenes/01_prepare_sample_release.toml --check            # validate + print timeline
 $B scenes/01_prepare_sample_release.toml --still 17 -o f.png # one frame at t=17 s
-$B scenes/01_prepare_sample_release.toml -o out/01.mp4       # full video
+$B scenes/01_prepare_sample_release.toml                    # full video → out/01_prepare_sample_release.mp4
+$B scenes/01_prepare_sample_release.toml -o other.mp4        # full video, chosen file name
 ```
+
+Without `-o` the video goes to `out/<scene file name>.mp4` (`out/` is created if missing).
 
 `--check` prints every step with its start and end time. Use it as the event
 log when tuning timings.
@@ -44,7 +47,7 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[[lane]]` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = [ids], `label_x`, `label_y` |
 | `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
-| `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color` |
+| `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color`, `ghost` (bool, see below), `visible` (bool, default true), `tag` (tag text, default the SampleId) |
 | `[[step]]` | `action`, `start` or `at`, `delay`, `duration` + action keys (below) |
 
 ### Steps
@@ -67,6 +70,7 @@ Steps run in file order. Each step's `start` decides when it begins:
 | `pipette` | `device` (a `sampling` or `turnstile` device) | 3 s |
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
+| `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
 | `wait` | — | `duration` is required |
 
 `{SampleId}` and `{CarrierId}` inside `text` and `params` are replaced with the
@@ -102,6 +106,16 @@ the entry pocket must be free when a carrier arrives, a carrier can leave only
 from the exit position, a rotation can't start while a carrier is still in the
 exit position, and nothing arrives or leaves while the wheel is turning.
 See `scenes/02_turnstile_three_carriers.toml`.
+
+### Ghost carriers (logical position)
+
+A carrier with `ghost = true` shows where the interface *believes* a carrier is,
+while physically it is somewhere else (e.g. Prepare was sent at the NSD, but the
+carrier went straight on). It is drawn as a dashed outline under the real
+carriers, with a dashed tag; antennas don't read it and gates don't open for it.
+Use it together with the real carrier (same `sample_id`, different `id`):
+`visible = false` + `show` to make it appear at the NSD, `hide` when it is
+cleared. See scenes 03 and 04.
 
 ### Gate and antenna
 
