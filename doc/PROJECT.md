@@ -159,6 +159,8 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Stato dell'analizzatore e ago:** `status` colora l'analizzatore (error: rosso con "ERROR"; ready: verde con "READY"; pulsa per 1,5 s al cambio). `needle` porta giù o su l'ago e lo lascia lì; con l'ago giù e lo strumento non in errore compare "Aspirating…", in errore l'ago diventa rosso con "Needle down". `--check` rifiuta una rotazione della ruota, o un carrier che lascia il punto di campionamento, tra l'inizio di un `needle down` e la fine del `needle up` successivo.
 
+**Operatore** (`operator`): operatore di laboratorio stilizzato (camice bianco lungo, guanti blu sottili, capelli scuri, chiave inglese) che entra a piedi dal bordo destro del pannello, si ferma a destra dell'analizzatore, lavora (braccio che oscilla e scintille ambra sul bordo) e se ne va. Ogni camminata dura min(2 s, durata/3).
+
 **Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata nell'ordine del file.
 
 **Segnaposto:** `{SampleId}` e `{CarrierId}` in `text`/`params` vengono sostituiti con i valori del carrier indicato in `carrier`, o del primo carrier se non è indicato.
@@ -226,6 +228,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
 | `status` | `device` (analyzer), `state` = error\|ready\|normal (vale fino al `status` successivo) |
 | `needle` | `device` (sampling o turnstile), `to` = down\|up (default 0,9 s) |
+| `operator` | `device` (analyzer); default 7 s, minimo 2 s |
 | `wait` | (solo `duration`) |
 
 ---
@@ -310,7 +313,7 @@ Un solo carrier; 05 con il punto di campionamento semplice (geometria della scen
 
 - Flusso normale fino alla Sample Acquisition (nella 06 anche il Prepare viola all'antenna, l'ingresso e la rotazione).
 - Durante l'aspirazione l'analizzatore va in errore lasciando l'ago nel tubo: diventa rosso e manda subito **Status `State=Error`** e **Sample Complete** (con SampleId); l'Interfaccia risponde **OK** allo Status (senza parametri). Il Sample Complete **non** basta per rilasciare: con lo strumento in errore il carrier resta fermo (nella 06 la ruota non gira).
-- L'operatore esegue la recovery (nota "Operator recovery"): l'ago risale.
+- L'operatore arriva allo strumento (azione `operator`, 7 s, insieme alla nota "Operator recovery") ed esegue la recovery: mentre lavora l'ago risale.
 - Lo strumento torna verde e manda **Status `State=Ready`**; l'Interfaccia risponde **OK** e solo ora rilascia il carrier (nella 06 prima la ruota lo porta all'uscita).
 - Sulla Main-Lane l'Interfaccia manda **Release**.
 - I messaggi Status e i relativi OK non hanno SampleId (è lo stato dello strumento).

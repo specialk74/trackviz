@@ -344,7 +344,7 @@ reply = true
 action = "caption"
 at = 24.6
 title = "6 · Operator recovery"
-text = "Sample Complete is not enough: with the analyzer in error the wheel does not rotate, the needle is still in the tube. An operator performs a recovery and the needle goes back up."
+text = "Sample Complete is not enough: with the analyzer in error the wheel does not rotate, the needle is still in the tube. An operator comes to the instrument for a recovery: the needle goes back up."
 
 [[step]]
 action = "note"
@@ -352,6 +352,12 @@ at = 24.6
 actor = "AN"
 text = "Operator recovery"
 duration = 6.0
+
+[[step]]
+action = "operator"
+at = 24.6
+device = "analyzer"
+duration = 7.0
 
 [[step]]
 action = "needle"

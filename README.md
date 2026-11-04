@@ -72,6 +72,7 @@ Steps run in file order. Each step's `start` decides when it begins:
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
 | `status` | `device` (an `analyzer`), `state` = `error` (red, ERROR) \| `ready` (green, READY) \| `normal`; lasts until the next `status` | 0 s |
+| `operator` | `device` (an `analyzer`): a stylized lab operator (white coat, thin blue gloves) walks in from the right edge of the panel, works on the analyzer with a wrench, then walks away (walks take up to 2 s each) | 7 s |
 | `needle` | `device` (a `sampling` or `turnstile`), `to` = `down` \| `up`: the needle goes down and stays there until `up` | 0.9 s |
 | `wait` | — | `duration` is required |
 

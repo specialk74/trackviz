@@ -140,6 +140,8 @@ pub enum Action {
     Status { device: String, state: AnalyzerState },
     /// The analyzer needle goes down into the tube (and stays) or back up.
     Needle { device: String, down: bool },
+    /// An operator walks to the analyzer, works on it and walks away.
+    Operator { device: String },
     Wait,
 }
 
@@ -354,8 +356,9 @@ impl Scene {
                 "show" | "hide" => &["carrier"],
                 "status" => &["device", "state"],
                 "needle" => &["device", "to"],
+                "operator" => &["device"],
                 "wait" => &[],
-                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|status|needle|wait)", t.location())),
+                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|status|needle|operator|wait)", t.location())),
             };
             let allowed: Vec<&str> = common.iter().chain(extra.iter()).copied().collect();
             t.check_keys(&allowed)?;
@@ -396,6 +399,7 @@ impl Scene {
                         o => return Err(format!("{}: unknown state '{o}' (normal|error|ready)", t.location())),
                     },
                 },
+                "operator" => Action::Operator { device: t.str_req("device")? },
                 "needle" => Action::Needle {
                     device: t.str_req("device")?,
                     down: match t.str_req("to")?.as_str() {
@@ -693,6 +697,7 @@ pub enum Ev {
     Status { device: usize, state: AnalyzerState },
     /// Needle of the analyzer at a sampling/turnstile device going down or up.
     Needle { device: usize, down: bool },
+    Operator { device: usize },
     Wait,
 }
 
@@ -939,6 +944,17 @@ impl Timeline {
                     }
                     let dir = if *down { "down" } else { "up" };
                     (st.duration.unwrap_or(0.9), Ev::Needle { device: di, down: *down }, format!("needle    {device} {dir}"))
+                }
+                Action::Operator { device } => {
+                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
+                    if sc.devices[di].kind != DeviceKind::Analyzer {
+                        return Err(format!("{}: operator needs a device of kind 'analyzer'", st.loc));
+                    }
+                    let d = st.duration.unwrap_or(7.0);
+                    if d < 2.0 {
+                        return Err(format!("{}: operator needs a duration of at least 2 s (walk in and out)", st.loc));
+                    }
+                    (d, Ev::Operator { device: di }, format!("operator  at {device}"))
                 }
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
             };
