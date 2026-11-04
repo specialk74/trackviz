@@ -343,7 +343,7 @@ impl Scene {
 
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
-            let common = ["action", "start", "at", "delay", "duration"];
+            let common = ["action", "start", "at", "after_start", "after_end", "delay", "duration"];
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
@@ -415,20 +415,40 @@ impl Scene {
                     Action::Wait
                 }
             };
-            let start = match (t.num_opt("at")?, t.str_opt("start")?) {
-                (Some(_), Some(_)) => return Err(format!("{}: use either 'at' or 'start', not both", t.location())),
-                (Some(at), None) => StartMode::At(at),
-                (None, s) => match s.as_deref().unwrap_or("after") {
+            // When the step starts: `at` (absolute), `after_start` / `after_end`
+            // (seconds after the start / end of the previous step) or `start`.
+            let (at, after_start, after_end) = (t.num_opt("at")?, t.num_opt("after_start")?, t.num_opt("after_end")?);
+            let start_key = t.str_opt("start")?;
+            let given = [at.is_some(), after_start.is_some(), after_end.is_some(), start_key.is_some()].iter().filter(|b| **b).count();
+            if given > 1 {
+                return Err(format!("{}: use only one of 'at', 'after_start', 'after_end', 'start'", t.location()));
+            }
+            for (k, v) in [("after_start", after_start), ("after_end", after_end)] {
+                if v.is_some_and(|v| v < 0.0) {
+                    return Err(format!("{}: '{k}' must not be negative", t.location()));
+                }
+            }
+            let mut delay = t.num_opt("delay")?.unwrap_or(0.0);
+            let start = if let Some(at) = at {
+                StartMode::At(at)
+            } else if let Some(d) = after_start {
+                delay += d;
+                StartMode::With
+            } else if let Some(d) = after_end {
+                delay += d;
+                StartMode::After
+            } else {
+                match start_key.as_deref().unwrap_or("after") {
                     "after" => StartMode::After,
                     "with" => StartMode::With,
                     "after_all" => StartMode::AfterAll,
                     o => return Err(format!("{}: unknown start '{o}' (after|with|after_all)", t.location())),
-                },
+                }
             };
             steps.push(Step {
                 action,
                 start,
-                delay: t.num_opt("delay")?.unwrap_or(0.0),
+                delay,
                 duration: t.num_opt("duration")?,
                 loc: t.location(),
             });

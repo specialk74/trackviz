@@ -48,7 +48,7 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color`, `ghost` (bool, see below), `visible` (bool, default true), `tag` (tag text, default the SampleId) |
-| `[[step]]` | `action`, `start` or `at`, `delay`, `duration` + action keys (below) |
+| `[[step]]` | `action`, one of `start` / `at` / `after_start` / `after_end`, `delay`, `duration` + action keys (below) |
 
 ### Steps
 
@@ -58,8 +58,21 @@ Steps run in file order. Each step's `start` decides when it begins:
 - `with`: at the same time as the previous step
 - `after_all`: when every previous step has ended
 
-`at = <seconds>` instead of `start` starts the step at an absolute time.
-`delay` adds seconds on top of either.
+Instead of `start` (only one of these keys per step):
+
+- `at = <seconds>`: absolute time
+- `after_start = <seconds>`: that many seconds after the **start** of the previous step
+- `after_end = <seconds>`: that many seconds after the **end** of the previous step
+
+`delay` adds seconds on top of any of them. The previous step is the one
+before in the file. Example: a message `at = 10` (1.5 s long), then
+`after_start = 3` starts at 13 s, while `after_end = 3` would start at 14.5 s.
+
+**With none of these keys** (no `start`, `at`, `after_start`, `after_end`) a step
+starts when the previous step ends, i.e. steps run one after the other. The first
+step of the file starts at 0 s. To start a step together with the previous one use
+`start = "with"` (same as `after_start = 0`). Note that `caption` and `status` last
+0 s, so a step right after them starts at the same instant.
 
 | action | keys | default duration |
 |---|---|---|

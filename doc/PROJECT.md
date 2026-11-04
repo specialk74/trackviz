@@ -140,6 +140,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 - `start = "with"`: inizia insieme allo step precedente.
 - `start = "after_all"`: inizia quando tutti gli step precedenti sono finiti.
 - A questi si somma `delay`. Il primo step parte da 0 (+ delay).
+- Senza nessuna chiave di tempo (`start`, `at`, `after_start`, `after_end`) vale `after`: gli step sono in sequenza, non contemporanei. Per farli partire insieme serve `start = "with"` (o `after_start = 0`). `caption` e `status` durano 0 s, quindi lo step che li segue parte nello stesso istante.
 
 **Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, rotate 2 s, move calcolata (vedi sotto).
 
@@ -147,7 +148,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Gate e antenna** (`gate`, `antenna`, con `at`): nessuno step dedicato. Il gate è aperto negli intervalli in cui un carrier lo attraversa (calcolati in `Timeline::gates` proiettando il punto del gate sulla route di ogni carrier: da 60 px prima a 45 px dopo, con apertura/chiusura di 0,4 s). L'antenna mostra la lettura quando un carrier è fermo sul suo punto.
 
-**`at`:** uno step con `at = <secondi>` parte a un istante assoluto (più `delay`); non si può usare insieme a `start`.
+**`at`, `after_start`, `after_end`:** uno step con `at = <secondi>` parte a un istante assoluto; con `after_start = <secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start = "with"` + `delay`), con `after_end = <secondi>` dopo la sua **fine** (equivale a `start = "after"` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end` e `start`; valori negativi di `after_*` sono rifiutati.
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
@@ -214,7 +215,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
-| `[[step]]` | `action`, `start` = after\|with\|after_all oppure `at` (secondi assoluti), `delay`, `duration` + le chiavi specifiche dell'azione |
+| `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `delay`, `duration` + le chiavi specifiche dell'azione |
 
 | action | Chiavi specifiche |
 |---|---|
