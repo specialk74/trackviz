@@ -125,13 +125,12 @@ impl Ease {
     }
 }
 
-#[allow(dead_code)]
 pub enum Action {
     Caption { title: String, text: String },
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64> },
     Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String> },
     Note { actor: String, text: String },
-    Pipette { device: String, carrier: Option<String> },
+    Pipette { device: String },
     Highlight { device: String },
     Rotate { device: String },
     /// Fades a carrier in (`show`) or out (`hide`).
@@ -145,11 +144,21 @@ pub enum Action {
     Wait,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AnalyzerState {
     Normal,
     Error,
     Ready,
+}
+
+impl AnalyzerState {
+    fn name(self) -> &'static str {
+        match self {
+            AnalyzerState::Normal => "normal",
+            AnalyzerState::Error => "error",
+            AnalyzerState::Ready => "ready",
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -350,7 +359,7 @@ impl Scene {
                 "move" => &["carrier", "to", "ease", "speed"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color"],
                 "note" => &["actor", "text"],
-                "pipette" => &["device", "carrier"],
+                "pipette" => &["device"],
                 "highlight" => &["device"],
                 "rotate" => &["device"],
                 "show" | "hide" => &["carrier"],
@@ -386,17 +395,18 @@ impl Scene {
                     color: t.str_opt("color")?,
                 },
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
-                "pipette" => Action::Pipette { device: t.str_req("device")?, carrier: t.str_opt("carrier")? },
+                "pipette" => Action::Pipette { device: t.str_req("device")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
                 "rotate" => Action::Rotate { device: t.str_req("device")? },
                 "show" | "hide" => Action::Visibility { carrier: t.str_req("carrier")?, show: action_name == "show" },
                 "status" => Action::Status {
                     device: t.str_req("device")?,
-                    state: match t.str_req("state")?.as_str() {
-                        "normal" => AnalyzerState::Normal,
-                        "error" => AnalyzerState::Error,
-                        "ready" => AnalyzerState::Ready,
-                        o => return Err(format!("{}: unknown state '{o}' (normal|error|ready)", t.location())),
+                    state: {
+                        let v = t.str_req("state")?;
+                        [AnalyzerState::Normal, AnalyzerState::Error, AnalyzerState::Ready]
+                            .into_iter()
+                            .find(|s| s.name() == v)
+                            .ok_or_else(|| format!("{}: unknown state '{v}' (normal|error|ready)", t.location()))?
                     },
                 },
                 "operator" => Action::Operator { device: t.str_req("device")? },
@@ -467,6 +477,30 @@ impl Scene {
     }
     pub fn carrier_idx(&self, id: &str) -> Option<usize> {
         self.carriers.iter().position(|c| c.id == id)
+    }
+    fn need_actor(&self, id: &str, loc: &str) -> Result<usize, String> {
+        self.actor_idx(id).ok_or_else(|| format!("{loc}: unknown actor '{id}'"))
+    }
+    fn need_carrier(&self, id: &str, loc: &str) -> Result<usize, String> {
+        self.carrier_idx(id).ok_or_else(|| format!("{loc}: unknown carrier '{id}'"))
+    }
+    /// Device `id` for `action`; with `kinds` non-empty it must be one of them.
+    fn need_device(&self, id: &str, loc: &str, action: &str, kinds: &[(DeviceKind, &str)]) -> Result<usize, String> {
+        let di = self.device_idx(id).ok_or_else(|| format!("{loc}: unknown device '{id}'"))?;
+        if !kinds.is_empty() && !kinds.iter().any(|k| k.0 == self.devices[di].kind) {
+            let names: Vec<String> = kinds.iter().map(|k| format!("'{}'", k.1)).collect();
+            return Err(format!("{loc}: {action} needs a device of kind {}", names.join(" or ")));
+        }
+        Ok(di)
+    }
+    /// Sampling position of the analyzer needle (pipette, needle): a sampling
+    /// point or a turnstile, and the scene must have an analyzer.
+    fn need_probe(&self, id: &str, loc: &str, action: &str) -> Result<usize, String> {
+        let di = self.need_device(id, loc, action, &[(DeviceKind::Sampling, "sampling"), (DeviceKind::Turnstile, "turnstile")])?;
+        if !self.devices.iter().any(|d| d.kind == DeviceKind::Analyzer) {
+            return Err(format!("{loc}: {action} needs an 'analyzer' device"));
+        }
+        Ok(di)
     }
     pub fn pt(&self, id: &str) -> (f64, f64) {
         let p = &self.points[id];
@@ -845,7 +879,7 @@ impl Timeline {
                     (st.duration.unwrap_or(0.0), Ev::Caption { title: title.clone(), text: text.clone() }, format!("caption   {title}"))
                 }
                 Action::Move { carrier, to, ease, speed } => {
-                    let ci = sc.carrier_idx(carrier).ok_or_else(|| format!("{}: unknown carrier '{carrier}'", st.loc))?;
+                    let ci = sc.need_carrier(carrier, &st.loc)?;
                     let c = &sc.carriers[ci];
                     let mut from = cur_idx[ci];
                     // Leaving a turnstile (from the exit position: checked by simulate_wheels).
@@ -884,15 +918,11 @@ impl Timeline {
                     (d, Ev::Wait, format!("move      {carrier} -> {to}"))
                 }
                 Action::Message { from, to, text, params, reply, carrier, color } => {
-                    let fi = sc.actor_idx(from).ok_or_else(|| format!("{}: unknown actor '{from}'", st.loc))?;
-                    let ti = sc.actor_idx(to).ok_or_else(|| format!("{}: unknown actor '{to}'", st.loc))?;
+                    let (fi, ti) = (sc.need_actor(from, &st.loc)?, sc.need_actor(to, &st.loc)?);
                     if fi == ti {
                         return Err(format!("{}: message from an actor to itself is not supported; use a note", st.loc));
                     }
-                    let ci = match carrier {
-                        Some(c) => Some(sc.carrier_idx(c).ok_or_else(|| format!("{}: unknown carrier '{c}'", st.loc))?),
-                        None => None,
-                    };
+                    let ci = carrier.as_deref().map(|c| sc.need_carrier(c, &st.loc)).transpose()?;
                     let text = subst(text, sc, ci);
                     let params = subst(params, sc, ci);
                     let desc = format!("message   {from} -> {to}  {text}  {params}");
@@ -901,36 +931,29 @@ impl Timeline {
                     (st.duration.unwrap_or(1.5), ev, desc)
                 }
                 Action::Note { actor, text } => {
-                    let ai = sc.actor_idx(actor).ok_or_else(|| format!("{}: unknown actor '{actor}'", st.loc))?;
+                    let ai = sc.need_actor(actor, &st.loc)?;
                     let ev = Ev::Note { actor: ai, text: text.clone(), row };
                     row += 1;
                     (st.duration.unwrap_or(1.5), ev, format!("note      {actor}: {text}"))
                 }
-                Action::Pipette { device, .. } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    if !matches!(sc.devices[di].kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
-                        return Err(format!("{}: pipette needs a device of kind 'sampling' or 'turnstile'", st.loc));
-                    }
-                    if !sc.devices.iter().any(|d| d.kind == DeviceKind::Analyzer) {
-                        return Err(format!("{}: pipette needs an 'analyzer' device", st.loc));
-                    }
+                Action::Pipette { device } => {
+                    let di = sc.need_probe(device, &st.loc, "pipette")?;
                     (st.duration.unwrap_or(3.0), Ev::Pipette { device: di }, format!("pipette   at {device}"))
                 }
                 Action::Highlight { device } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
+                    let di = sc.need_device(device, &st.loc, "highlight", &[])?;
                     (st.duration.unwrap_or(1.5), Ev::Highlight { device: di }, format!("highlight {device}"))
                 }
                 Action::Rotate { device } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    let wi = wheels.iter().position(|w| w.device == di)
-                        .ok_or_else(|| format!("{}: rotate needs a device of kind 'turnstile'", st.loc))?;
+                    let di = sc.need_device(device, &st.loc, "rotate", &[(DeviceKind::Turnstile, "turnstile")])?;
+                    let wi = wheels.iter().position(|w| w.device == di).unwrap();
                     let d = st.duration.unwrap_or(2.0);
                     wheels[wi].rots.push((t0, t0 + d));
                     wheel_recs.push(WheelRec { t: t0, wheel: wi, ev: WheelEv::Rotate(t0 + d), loc: st.loc.clone() });
                     (d, Ev::Wait, format!("rotate    {device}"))
                 }
                 Action::Visibility { carrier, show } => {
-                    let ci = sc.carrier_idx(carrier).ok_or_else(|| format!("{}: unknown carrier '{carrier}'", st.loc))?;
+                    let ci = sc.need_carrier(carrier, &st.loc)?;
                     let d = st.duration.unwrap_or(0.5);
                     let fades = &mut carriers[ci].fades;
                     if let Some(last) = fades.last() {
@@ -943,33 +966,16 @@ impl Timeline {
                     (d, Ev::Wait, format!("{verb:<9} {carrier}"))
                 }
                 Action::Status { device, state } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    if sc.devices[di].kind != DeviceKind::Analyzer {
-                        return Err(format!("{}: status needs a device of kind 'analyzer'", st.loc));
-                    }
-                    let name = match state {
-                        AnalyzerState::Normal => "normal",
-                        AnalyzerState::Error => "error",
-                        AnalyzerState::Ready => "ready",
-                    };
-                    (st.duration.unwrap_or(0.0), Ev::Status { device: di, state: *state }, format!("status    {device} {name}"))
+                    let di = sc.need_device(device, &st.loc, "status", &[(DeviceKind::Analyzer, "analyzer")])?;
+                    (st.duration.unwrap_or(0.0), Ev::Status { device: di, state: *state }, format!("status    {device} {}", state.name()))
                 }
                 Action::Needle { device, down } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    if !matches!(sc.devices[di].kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
-                        return Err(format!("{}: needle needs a device of kind 'sampling' or 'turnstile'", st.loc));
-                    }
-                    if !sc.devices.iter().any(|d| d.kind == DeviceKind::Analyzer) {
-                        return Err(format!("{}: needle needs an 'analyzer' device", st.loc));
-                    }
+                    let di = sc.need_probe(device, &st.loc, "needle")?;
                     let dir = if *down { "down" } else { "up" };
                     (st.duration.unwrap_or(0.9), Ev::Needle { device: di, down: *down }, format!("needle    {device} {dir}"))
                 }
                 Action::Operator { device } => {
-                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
-                    if sc.devices[di].kind != DeviceKind::Analyzer {
-                        return Err(format!("{}: operator needs a device of kind 'analyzer'", st.loc));
-                    }
+                    let di = sc.need_device(device, &st.loc, "operator", &[(DeviceKind::Analyzer, "analyzer")])?;
                     let d = st.duration.unwrap_or(7.0);
                     if d < 2.0 {
                         return Err(format!("{}: operator needs a duration of at least 2 s (walk in and out)", st.loc));
@@ -1051,3 +1057,7 @@ impl Timeline {
         Ok(Timeline { events, carriers, wheels, gates, rows: row, duration: max_end + sc.video.tail, log: std::mem::take(log) })
     }
 }
+
+#[cfg(test)]
+#[path = "scene_tests.rs"]
+pub(crate) mod tests;

@@ -637,7 +637,7 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 }
 
 fn caption(o: &mut String, tl: &Timeline, t: f64) {
-    let cur = tl.events.iter().filter(|e| matches!(e.ev, Ev::Caption { .. }) && e.t0 <= t).last();
+    let cur = tl.events.iter().rev().find(|e| matches!(e.ev, Ev::Caption { .. }) && e.t0 <= t);
     let _ = write!(o, r#"<rect x="30" y="{CAPTION_Y}" width="1860" height="150" rx="16" fill="{INK}"/>"#);
     if let Some(e) = cur {
         if let Ev::Caption { title, text } = &e.ev {
@@ -657,5 +657,67 @@ fn caption(o: &mut String, tl: &Timeline, t: f64) {
             }
             o.push_str("</g>");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::tests::{ok, SAMPLING};
+
+    fn frame_at(steps: &str, t: f64) -> String {
+        let (sc, tl) = ok(SAMPLING, steps);
+        frame(&sc, &tl, t)
+    }
+
+    #[test]
+    fn analyzer_status_badges() {
+        let steps = "[[step]]\naction = \"status\"\nat = 1\ndevice = \"an\"\nstate = \"error\"\n\
+                     [[step]]\naction = \"status\"\nat = 5\ndevice = \"an\"\nstate = \"ready\"\n";
+        assert!(!frame_at(steps, 0.5).contains(">ERROR<"));
+        assert!(frame_at(steps, 2.0).contains(">ERROR<"));
+        let f = frame_at(steps, 6.0);
+        assert!(f.contains(">READY<") && !f.contains(">ERROR<"));
+    }
+
+    #[test]
+    fn needle_label_depends_on_the_analyzer_state() {
+        let steps = "[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp\"\nto = \"down\"\n\
+                     [[step]]\naction = \"status\"\nat = 3\ndevice = \"an\"\nstate = \"error\"\n";
+        assert!(frame_at(steps, 2.0).contains("Aspirating…"));
+        let f = frame_at(steps, 4.0);
+        assert!(f.contains("Needle down") && !f.contains("Aspirating…"));
+    }
+
+    #[test]
+    fn ghost_is_drawn_only_while_visible_with_a_custom_tag() {
+        let base_tag = SAMPLING.replace("ghost = true", "ghost = true\ntag = \"SID-2 (expected)\"");
+        let steps = "[[step]]\naction = \"show\"\nat = 1\ncarrier = \"G\"\n";
+        let (sc, tl) = ok(&base_tag, steps);
+        assert!(!frame(&sc, &tl, 0.5).contains("(expected)"));
+        assert!(frame(&sc, &tl, 2.0).contains("(expected)"));
+    }
+
+    #[test]
+    fn operator_is_drawn_only_during_its_step() {
+        let steps = "[[step]]\naction = \"operator\"\nat = 1\ndevice = \"an\"\n";
+        assert!(!frame_at(steps, 0.5).contains(">Operator<"));
+        assert!(frame_at(steps, 4.0).contains(">Operator<"));
+        assert!(!frame_at(steps, 9.0).contains(">Operator<"));
+    }
+
+    #[test]
+    fn the_last_started_caption_is_shown() {
+        let steps = "[[step]]\naction = \"caption\"\nat = 0\ntitle = \"first\"\ntext = \"x\"\n\
+                     [[step]]\naction = \"caption\"\nat = 2\ntitle = \"second\"\ntext = \"y\"\n";
+        assert!(frame_at(steps, 1.0).contains("FIRST"));
+        let f = frame_at(steps, 3.0);
+        assert!(f.contains("SECOND") && !f.contains("FIRST"));
+    }
+
+    #[test]
+    fn wrap_splits_on_words() {
+        assert_eq!(wrap("aa bb cc", 5), vec!["aa bb", "cc"]);
+        assert_eq!(wrap("a\nb", 10), vec!["a", "b"]);
     }
 }

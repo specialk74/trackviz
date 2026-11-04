@@ -22,6 +22,7 @@ scene, not new code.
 
 ```sh
 cargo build --release
+cargo test --release      # unit tests (parser, timeline rules, rendering, all scenes)
 B=./target/release/trackviz
 
 $B scenes/01_prepare_sample_release.toml --check            # validate + print timeline

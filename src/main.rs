@@ -174,7 +174,7 @@ fn run() -> Result<(), String> {
             while let Some(rgba) = pending.remove(&written) {
                 ff_in.write_all(&rgba).map_err(|e| format!("ffmpeg pipe: {e}"))?;
                 written += 1;
-                if written % (fps as usize * 5) == 0 || written == n {
+                if written.is_multiple_of(fps as usize * 5) || written == n {
                     eprint!("\rframes {written}/{n}");
                 }
             }

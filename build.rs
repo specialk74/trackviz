@@ -4,6 +4,7 @@
 //!   1. fonts/Inter.ttf, if present (for offline builds: put the file there by hand);
 //!   2. a copy already downloaded into OUT_DIR by a previous build;
 //!   3. a download with `curl` (macOS, Linux, Windows 10+) from a pinned URL.
+//!
 //! The SHA-256 is always checked, so a different or corrupted file fails the build.
 //!
 //! DejaVu Sans Mono doesn't need this: it comes from the `dejavu` crate.

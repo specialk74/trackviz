@@ -269,3 +269,57 @@ impl Table {
         self.ctx()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_tables_arrays_and_values() {
+        let doc = parse(
+            r#"
+# comment
+[video]
+title = "a # not a comment \"q\" \\ x" # trailing comment
+fps = 1_000
+tail = -2.5
+show = true
+
+[[point]]
+id = "p1"
+list = ["a",
+        "b"]
+
+[[point]]
+id = "p2"
+"#,
+        )
+        .unwrap();
+        let v = &doc.tables["video"];
+        assert_eq!(v.str_req("title").unwrap(), r#"a # not a comment "q" \ x"#);
+        assert_eq!(v.num_req("fps").unwrap(), 1000.0);
+        assert_eq!(v.num_req("tail").unwrap(), -2.5);
+        assert_eq!(v.bool_opt("show").unwrap(), Some(true));
+        let pts = &doc.arrays["point"];
+        assert_eq!(pts.len(), 2);
+        assert_eq!(pts[0].str_list("list").unwrap(), vec!["a", "b"]);
+        assert_eq!(pts[1].str_req("id").unwrap(), "p2");
+    }
+
+    #[test]
+    fn duplicate_key_reports_the_line() {
+        let e = parse("[video]\nfps = 1\nfps = 2\n").unwrap_err();
+        assert!(e.contains("line 3"), "{e}");
+    }
+
+    #[test]
+    fn typed_accessors_and_unknown_keys() {
+        let doc = parse("[video]\nfps = \"x\"\ntitel = \"typo\"\n").unwrap();
+        let v = &doc.tables["video"];
+        assert!(v.num_opt("fps").is_err());
+        assert!(v.str_req("missing").is_err());
+        assert_eq!(v.num_opt("missing").unwrap(), None);
+        let e = v.check_keys(&["title", "fps"]).unwrap_err();
+        assert!(e.contains("titel"), "{e}");
+    }
+}

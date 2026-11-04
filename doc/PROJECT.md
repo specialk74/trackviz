@@ -104,7 +104,8 @@ trackviz/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── toml.rs           # parser del sottoinsieme TOML
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
-    └── render.rs         # generazione dell'SVG di un fotogramma
+    ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
+    └── render.rs         # generazione dell'SVG di un fotogramma (con i suoi test)
 ```
 
 ### CLI
@@ -223,7 +224,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed` |
 | `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
-| `pipette` | `device` sampling o turnstile (`carrier` è accettato ma non ancora usato) |
+| `pipette` | `device` sampling o turnstile |
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
@@ -349,6 +350,8 @@ Un solo carrier; 05 con il punto di campionamento semplice (geometria della scen
 ---
 
 ## 12. Limiti noti e note per chi riparte
+
+- **Test:** `cargo test` esegue gli unit test del parser (`toml.rs`), della timeline (`scene_tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
 
 - Il parser TOML è un sottoinsieme: niente tabelle inline `{}`, chiavi puntate, date o stringhe multilinea `"""`. Se la rete lo permette, si possono adottare `serde` + `toml`.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
