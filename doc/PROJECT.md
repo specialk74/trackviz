@@ -28,6 +28,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Punto di campionamento** | Posizione sulla Pit-Lane in cui il carrier si ferma e l'analizzatore aspira (pipetta) il campione. |
 | **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
 | **Gate + antenna** | Davanti alla ruota. Il carrier si ferma **sempre** all'antenna, che lo legge: l'Interfaccia manda **di nuovo Prepare** (in futuro con un'informazione in più; per ora è disegnato in viola). Se sotto l'ago non c'è un campionamento in corso il gate si apre e il carrier entra nella tasca d'ingresso; altrimenti aspetta il Sample Complete. Solo dopo che il carrier in attesa è entrato la ruota gira (in ingresso → ago, campionato → uscita). |
+| **Spur** | Ramo a U **perpendicolare** alla Main-Lane (come nell'NCCLS). L'NSD devia il carrier, senza fermarlo, in un breve tratto di pit-lane che gira di 90° nel ramo d'andata; sul ramo d'andata c'è il punto di campionamento con l'**analizzatore alla sua destra**; in cima il carrier attraversa e scende dal ramo di ritorno fino alla Main-Lane. |
 | **Interfaccia** | Il modulo di automazione Inpeco davanti all'analizzatore (NSD + Pit-Lane + rientro). È anche l'attore che scambia i messaggi con l'analizzatore. |
 | **Analizzatore / strumento** | Lo strumento di terze parti che esegue i test. |
 | **DMX** | Il nome Inpeco del **LIS**. Comunica con lo strumento: gli dice quali test eseguire e ne riceve i risultati. |
@@ -100,7 +101,11 @@ trackviz/
 │   ├── 05_analyzer_error_recovery.toml
 │   ├── 06_analyzer_error_recovery_turnstile.toml
 │   ├── 07_carrier_runaway.toml
-│   └── 08_carrier_runaway_turnstile.toml
+│   ├── 08_carrier_runaway_turnstile.toml
+│   ├── 09_spur_happy_path.toml
+│   ├── 10_spur_clear_missing_carrier.toml
+│   ├── 11_spur_analyzer_error_recovery.toml
+│   └── 12_spur_carrier_runaway.toml
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -191,7 +196,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
    Gate: paletto sopra la corsia e sbarra rossa/bianca che attraversa la corsia; aprendosi si accorcia (vista dall'alto della sbarra che si alza). Antenna: lettore sopra la corsia con due archi per lato, che pulsano in blu con una linea tratteggiata verso il carrier durante la lettura.
    Turnstile: disco grigio con tre tasche e razzi che ruotano (ease in-out), mozzo centrale, posizione sotto l'ago segnata da un cerchio rosso tratteggiato fisso, etichetta sotto la ruota. Con la pipetta sul turnstile, "Aspirating…" va a sinistra del braccio.
 6. Carrier: prima i fantasmi (cerchio tratteggiato r 26 semitrasparente, tappo tratteggiato, cartellino tratteggiato in corsivo), poi i carrier reali, poi tutti i cartellini. Carrier reale: disco scuro (r 22) con ombra. Se ha il tubo, cerchio bianco con tappo colorato (`cap_color`); se è vuoto, alloggiamento scuro. Accanto c'è il **cartellino con il SampleId** (o `tag`, o "C1 (empty)"): a destra se c'è spazio, altrimenti a sinistra, sotto o sopra, scegliendo la prima posizione che non copre altri carrier o cartellini. Nessun cartellino per i carrier fuori dal pannello.
-7. Pipetta (durante `pipette`): braccio che scende dal fondo dell'analizzatore fino al tubo (20% discesa, 60% aspirazione, 20% risalita). Durante l'aspirazione compaiono onde blu e la scritta "Aspirating…".
+7. Pipetta (durante `pipette`): braccio che esce dal lato dell'analizzatore più vicino al punto di campionamento (il fondo se l'analizzatore è sopra la corsia, un fianco nello spur) fino al tubo (20% discesa, 60% aspirazione, 20% risalita). Durante l'aspirazione compaiono onde blu e la scritta "Aspirating…"; con l'ago di lato "Aspirating…" e "Needle down" sono scritti dentro l'analizzatore. I cartellini dei carrier non coprono mai l'analizzatore. Se a destra dell'analizzatore non c'è spazio, l'operatore lavora da sotto (braccio alzato).
 
 **Sequence diagram:**
 - Riquadri degli attori distribuiti uniformemente, con la banda superiore del colore dell'attore. Linee della vita tratteggiate.
@@ -215,7 +220,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
+| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
 | `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `delay`, `duration` + le chiavi specifiche dell'azione |
@@ -333,6 +338,15 @@ Tre carrier deviati (Prepare/OK, Query/Tests to perform per ciascuno); 07 con il
 - L'**interfaccia** (zona "Interface module") diventa **rossa** al momento della fuga (07: quando C1 lascia il punto di campionamento; 08: quando la ruota gira da sola) e torna **grigia** quando l'ultimo carrier è uscito completamente dal riquadro.
 - Nella 08 l'ultima rotazione parte solo quando C2 è uscito completamente dal cerchio della ruota.
 - Durate: 07 ≈ 48 s, 08 ≈ 60 s.
+
+## 9f. Scene 09–12 — spur
+
+Geometria comune: Main-Lane a y 760 (NSD a x 800, rientro a x 290); deviazione diagonale e curva di 90° nel ramo d'andata (x 660), con due posizioni di coda (`queue2` y 560, `queue` y 500) sotto il punto di campionamento (y 440); analizzatore a destra (x 730–930, y 330–550); traversa in cima (y 250) e ramo di ritorno (x 380). Velocità dei carrier 110 px/s (lo spur è più lungo); l'uscita dal punto di campionamento è un move `in` fino alla cima, `linear` fino al rientro e `out` fino all'uscita, senza fermate.
+
+- **09** happy path (≈ 36 s): come la 01.
+- **10** carrier mancante → Clear (≈ 51 s): come la 03.
+- **11** errore dello strumento con l'ago giù e recovery (≈ 46 s): come la 05; l'operatore lavora sotto l'analizzatore.
+- **12** carrier run-away → Cancel, Clear All (≈ 48 s): come la 07, con l'interfaccia rossa dalla fuga finché tutti i carrier ne sono usciti.
 
 ---
 

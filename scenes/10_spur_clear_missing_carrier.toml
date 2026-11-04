@@ -1,0 +1,617 @@
+# Scene 10 — spur, a carrier expected in the spur is missing: Clear
+# Same situation as scene 03, on a spur. C2 is believed to be diverted (Prepare is sent)
+# but physically goes straight on the Main-Lane; its logical position is a dashed ghost
+# ("C2L"). C3 queues on top of it. At the sampling point the interface sends Clear for
+# C2 and, after the reply, Sample Acquisition for C3.
+# Carrier flow: right to left on the Main-Lane; the spur rises perpendicular to it.
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+# Points left of x=30 or right of x=950 are outside the panel (hidden).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "Spur — a carrier expected in the spur is missing, Clear"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+# Spur: a U-shaped branch perpendicular to the Main-Lane. The NSD diverts the
+# carrier, without stopping, into a short piece of pit-lane that turns 90° into
+# the up branch of the spur; the sampling point is on the up branch, with the
+# analyzer on its right. At the top the carrier crosses to the down branch and
+# goes back to the Main-Lane.
+[[point]]
+id = "spawn"
+x = 1010
+y = 760
+[[point]]
+id = "main_in"
+x = 910
+y = 760
+[[point]]
+id = "nsd"
+x = 800
+y = 760
+[[point]]
+id = "merge"
+x = 290
+y = 760
+[[point]]
+id = "main_out"
+x = 65
+y = 760
+[[point]]
+id = "gone"
+x = -40
+y = 760
+# Divert: diagonal off the NSD, then a 90° turn into the up branch.
+[[point]]
+id = "pit_in"
+x = 740
+y = 700
+[[point]]
+id = "spur_in"
+x = 660
+y = 700
+# Up branch: two queue positions below the sampling point.
+[[point]]
+id = "queue2"
+x = 660
+y = 560
+[[point]]
+id = "queue"
+x = 660
+y = 500
+[[point]]
+id = "sampling"
+x = 660
+y = 440
+[[point]]
+id = "spur_top_in"
+x = 660
+y = 250
+[[point]]
+id = "spur_top_out"
+x = 380
+y = 250
+# Down branch, then a 90° turn back towards the Main-Lane.
+[[point]]
+id = "spur_out"
+x = 380
+y = 700
+[[point]]
+id = "pit_out"
+x = 350
+y = 700
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+label_x = 470
+label_y = 820
+
+[[lane]]
+id = "spur"
+label = "Spur"
+kind = "pit"
+points = ["pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out"]
+label_x = 490
+label_y = 330
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 250
+y = 170
+w = 640
+h = 660
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 730
+y = 330
+w = 200
+h = 220
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+[[device]]
+id = "sp"
+kind = "sampling"
+at = "sampling"
+label = "Sampling point"
+label_x = 560
+label_y = 396
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+speed = 110
+
+# The real C2: it is not diverted and goes straight on the Main-Lane.
+[[carrier]]
+id = "C2"
+tube = true
+sample_id = "SID-000124"
+route = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+speed = 110
+cap_color = "#0EA5E9"
+
+# Where the interface believes C2 is: diverted into the spur.
+[[carrier]]
+id = "C2L"
+ghost = true
+visible = false
+tube = true
+sample_id = "SID-000124"
+tag = "SID-000124 (expected)"
+route = ["nsd", "pit_in", "spur_in", "queue2", "queue", "sampling"]
+speed = 110
+cap_color = "#0EA5E9"
+
+[[carrier]]
+id = "C3"
+tube = true
+sample_id = "SID-000125"
+route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+speed = 110
+cap_color = "#DB2777"
+
+# ---------------------------------------------------------------- steps
+# Messages use `at` (absolute start, seconds) and are written in time order, so
+# the rows of the sequence diagram stay in time order. Moves that continue
+# another move without stopping use start = "after", right after it.
+
+[[step]]
+action = "caption"
+at = 0
+title = "1 · Three carriers"
+text = "Three carriers holding sample tubes travel on the Main-Lane towards the spur of the analyzer interface."
+
+[[step]]
+action = "move"
+at = 1.5
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "sampling"
+ease = "out"
+
+[[step]]
+action = "move"
+at = 3.59
+carrier = "C2"
+to = "gone"
+ease = "linear"
+
+[[step]]
+action = "move"
+at = 6.59
+carrier = "C3"
+to = "nsd"
+ease = "linear"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C3"
+to = "queue"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 3.07
+title = "2 · NSD — Prepare"
+text = "The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+at = 3.07
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "highlight"
+at = 5.5
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "highlight"
+at = 8.5
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "caption"
+at = 5.5
+title = "3 · Physically straight, logically diverted"
+text = "The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is."
+
+[[step]]
+action = "show"
+at = 5.5
+carrier = "C2L"
+duration = 0.4
+
+[[step]]
+action = "move"
+at = 5.5
+carrier = "C2L"
+to = "queue"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 8.5
+title = "4 · Third carrier — Prepare"
+text = "The third carrier is diverted into the spur: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
+
+[[step]]
+action = "caption"
+at = 11.0
+title = "5 · Sample Acquisition — the others queue up"
+text = "The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up below it."
+
+[[step]]
+action = "pipette"
+at = 12.6
+device = "sp"
+duration = 5.0
+
+[[step]]
+action = "caption"
+at = 13.8
+title = "6 · One position, two carriers"
+text = "The third carrier stops on the same queue position as the second one: the second is not physically there, it went straight on along the Main-Lane."
+
+[[step]]
+action = "caption"
+at = 17.8
+title = "7 · Sample Complete"
+text = "Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point."
+
+[[step]]
+action = "move"
+at = 19.0
+carrier = "C1"
+to = "spur_top_in"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "move"
+at = 20.0
+carrier = "C2L"
+to = "sampling"
+ease = "inout"
+duration = 1.2
+
+[[step]]
+action = "move"
+at = 20.0
+carrier = "C3"
+to = "sampling"
+ease = "inout"
+duration = 1.2
+
+[[step]]
+action = "caption"
+at = 21.4
+title = "8 · Clear"
+text = "The interface expects the second sample at the sampling point, but finds the third one: the second never arrived. It sends Clear for the second sample and waits for the reply."
+
+[[step]]
+action = "hide"
+at = 24.5
+carrier = "C2L"
+duration = 0.6
+
+[[step]]
+action = "caption"
+at = 24.8
+title = "9 · Sample Acquisition"
+text = "Only after the reply to Clear the interface sends Sample Acquisition for the third sample."
+
+[[step]]
+action = "pipette"
+at = 26.4
+device = "sp"
+duration = 4.5
+
+[[step]]
+action = "caption"
+at = 29.39
+title = "10 · Release"
+text = "The first carrier is back on the Main-Lane: Release."
+
+[[step]]
+action = "caption"
+at = 31.1
+title = "11 · Back to normal"
+text = "Sample Complete for the third sample: the carrier goes round the spur and, back on the Main-Lane, the interface sends Release."
+
+[[step]]
+action = "move"
+at = 32.6
+carrier = "C3"
+to = "spur_top_in"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C3"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C3"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "message"
+at = 3.07
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 4.7
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "message"
+at = 5.5
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+at = 6.0
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 7.1
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "message"
+at = 7.8
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "message"
+at = 8.5
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "message"
+at = 9.0
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+at = 10.1
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
+
+[[step]]
+action = "message"
+at = 10.6
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "message"
+at = 11.2
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 11.8
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "note"
+at = 12.6
+actor = "AN"
+text = "Pipetting"
+duration = 5.0
+
+[[step]]
+action = "message"
+at = 13.4
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
+
+[[step]]
+action = "message"
+at = 17.8
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 21.4
+from = "IF"
+to = "AN"
+text = "Clear"
+params = "SampleId={SampleId}"
+carrier = "C2"
+
+[[step]]
+action = "message"
+at = 23.0
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C2"
+reply = true
+
+[[step]]
+action = "message"
+at = 24.8
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "note"
+at = 26.4
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
+
+[[step]]
+action = "message"
+at = 29.39
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 31.1
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "message"
+at = 42.99
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C3"
+

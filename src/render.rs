@@ -189,15 +189,16 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 let _ = write!(
                     o,
                     r##"<rect x="{}" y="{}" width="72" height="64" rx="9" fill="#FFFFFF" fill-opacity="0.35" stroke="{col}" stroke-width="3"/><text x="{x}" y="{}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
-                    x - 36.0, y - 32.0, y + 58.0, esc(&d.label)
+                    x - 36.0, y - 32.0, d.label_pos.map_or(y + 58.0, |p| p.1), esc(&d.label)
                 );
             }
             DeviceKind::Sampling => {
                 let (x, y) = sc.pt(d.at.as_deref().unwrap());
+                let (lx, ly) = d.label_pos.unwrap_or((x, y + 56.0));
                 let _ = write!(
                     o,
-                    r##"<circle cx="{x}" cy="{y}" r="30" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-dasharray="6 5"/><text x="{x}" y="{}" font-size="16" font-weight="600" text-anchor="middle" fill="#B91C1C">{}</text>"##,
-                    y + 56.0, esc(&d.label)
+                    r##"<circle cx="{x}" cy="{y}" r="30" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-dasharray="6 5"/><text x="{lx}" y="{ly}" font-size="16" font-weight="600" text-anchor="middle" fill="#B91C1C">{}</text>"##,
+                    esc(&d.label)
                 );
             }
             DeviceKind::Turnstile => {
@@ -305,6 +306,11 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
     let mut order: Vec<usize> = (0..sc.carriers.len()).filter(|&ci| op[ci] > 0.0).collect();
     order.sort_by_key(|&ci| !sc.carriers[ci].ghost);
     let mut taken: Vec<(usize, (f64, f64, f64, f64))> = order.iter().map(|&ci| (ci, (pos[ci].0 - 24.0, pos[ci].1 - 24.0, pos[ci].0 + 24.0, pos[ci].1 + 24.0))).collect();
+    // Tags don't cover the analyzer either.
+    for d in sc.devices.iter().filter(|d| d.kind == DeviceKind::Analyzer) {
+        let (x, y, w, h) = d.rect;
+        taken.push((usize::MAX, (x, y, x + w, y + h)));
+    }
     for &ci in &order {
         let c = &sc.carriers[ci];
         let (x, y) = pos[ci];
@@ -429,13 +435,18 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         }
         let (sx, sy) = sc.pt(sd.at.as_deref().unwrap());
         let an = sc.devices.iter().find(|d| d.kind == DeviceKind::Analyzer).unwrap();
-        let top = an.rect.1 + an.rect.3;
-        let tip = top + (sy - top) * ext;
+        let (ax, ay, aw, ah) = an.rect;
+        // The probe leaves the analyzer from the side nearest to the sampling
+        // point: the bottom (analyzer above the lane) or a side (e.g. a spur).
+        let vertical = sy >= ay + ah || sy <= ay;
+        let (bx, by) = (sx.clamp(ax, ax + aw), sy.clamp(ay, ay + ah));
+        let (tx, ty) = (bx + (sx - bx) * ext, by + (sy - by) * ext);
         let col = if error { "#B91C1C" } else { "#475569" };
+        let (hw, hh) = if vertical { (28.0, 18.0) } else { (18.0, 28.0) };
         let _ = write!(
             o,
-            r##"<rect x="{}" y="{}" width="28" height="18" rx="4" fill="{col}"/><line x1="{sx}" y1="{top}" x2="{sx}" y2="{tip:.1}" stroke="{col}" stroke-width="6" stroke-linecap="round"/><circle cx="{sx}" cy="{tip:.1}" r="6" fill="#1E293B"/>"##,
-            sx - 14.0, top - 4.0
+            r##"<rect x="{:.1}" y="{:.1}" width="{hw}" height="{hh}" rx="4" fill="{col}"/><line x1="{bx}" y1="{by}" x2="{tx:.1}" y2="{ty:.1}" stroke="{col}" stroke-width="6" stroke-linecap="round"/><circle cx="{tx:.1}" cy="{ty:.1}" r="6" fill="#1E293B"/>"##,
+            bx - hw / 2.0, by - hh / 2.0
         );
         let label = if aspirating {
             for k in 0..2 {
@@ -456,9 +467,13 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             if let Some(w) = tl.wheel_of_device(device) {
                 // Turnstile: left of the probe, between the analyzer and the wheel.
                 let rim_top = w.cy - w.r - TS_RIM;
-                let _ = write!(o, r##"<text x="{}" y="{:.1}" font-size="17" font-weight="600" text-anchor="end" fill="{fill}">{text}</text>"##, sx - 18.0, (top + rim_top) / 2.0 + 6.0);
+                let _ = write!(o, r##"<text x="{}" y="{:.1}" font-size="17" font-weight="600" text-anchor="end" fill="{fill}">{text}</text>"##, sx - 18.0, (by + rim_top) / 2.0 + 6.0);
+            } else if vertical {
+                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="{fill}">{text}</text>"##, sx + 22.0, by + 105.0);
             } else {
-                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="{fill}">{text}</text>"##, sx + 22.0, top + 105.0);
+                // Probe from a side (e.g. a spur): the lane side is busy with
+                // carriers and tags, so the label goes inside the analyzer.
+                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" text-anchor="middle" fill="{fill}">{text}</text>"##, ax + aw / 2.0, ay + ah / 2.0 + 64.0);
             }
         }
     }
@@ -471,8 +486,11 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     use std::f64::consts::PI;
     let (ax, ay, aw, ah) = an.rect;
     let walk = (dur / 3.0).min(2.0);
-    let (x_work, x_out) = (ax + aw + 42.0, TRACK.0 + TRACK.2 + 40.0);
-    let y = ay + ah / 2.0 - 4.0;
+    // Right of the analyzer if there is room, otherwise below it (bottom right),
+    // working with the arm raised.
+    let x_out = TRACK.0 + TRACK.2 + 40.0;
+    let below = ax + aw + 75.0 > TRACK.0 + TRACK.2;
+    let (x_work, y) = if below { (ax + aw - 45.0, ay + ah + 48.0) } else { (ax + aw + 42.0, ay + ah / 2.0 - 4.0) };
     let (x, walking, facing_left) = if u < walk {
         (x_out + (x_work - x_out) * Ease::InOut.apply(u / walk), true, true)
     } else if u > dur - walk {
@@ -503,6 +521,8 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     );
     let ang = if walking {
         PI / 2.0 - 0.3 + step * 0.3
+    } else if below {
+        -1.0 + 0.3 * (t * 2.0 * PI * 1.8).sin()
     } else {
         0.15 + 0.35 * (t * 2.0 * PI * 1.8).sin()
     };
@@ -527,14 +547,16 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     );
     if !walking {
         // Little sparks where the wrench touches the analyzer.
+        // They spread out of the analyzer edge, away from it.
         let ph = (t * 1.8).fract();
+        let ((cx, cy), base) = if below { ((wx, ay + ah), PI / 2.0) } else { ((ax + aw, wy), PI) };
         for k in 0..3 {
-            let a = -0.8 + k as f64 * 0.8;
+            let a = base - 0.8 + k as f64 * 0.8;
             let r0 = 6.0 + ph * 10.0;
             let _ = write!(
                 o,
                 r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{ACCENT}" stroke-width="2.5" stroke-linecap="round" opacity="{:.2}"/>"##,
-                ax + aw - r0 * a.cos(), wy + r0 * a.sin(), ax + aw - (r0 + 6.0) * a.cos(), wy + (r0 + 6.0) * a.sin(), 1.0 - ph
+                cx - r0 * a.cos(), cy + r0 * a.sin(), cx - (r0 + 6.0) * a.cos(), cy + (r0 + 6.0) * a.sin(), 1.0 - ph
             );
         }
     }
@@ -740,6 +762,24 @@ mod tests {
         let steps = "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"s\"\nrunaway = true\n";
         assert!(!frame_at(steps, 0.5).contains("RUN-AWAY"));
         assert!(frame_at(steps, 1.5).contains("SID-1 · RUN-AWAY"));
+    }
+
+    #[test]
+    fn side_probe_puts_the_label_inside_the_analyzer() {
+        // Analyzer on the right of the sampling point (as in a spur): x 650..850, center y 700.
+        let base = SAMPLING.replace("x = 100\ny = 150\nw = 400\nh = 150", "x = 650\ny = 600\nw = 200\nh = 200");
+        let (sc, tl) = ok(&base, "[[step]]\naction = \"pipette\"\ndevice = \"sp\"\nduration = 5\n");
+        let f = frame(&sc, &tl, 2.5);
+        // label centered in the analyzer (x 750), probe leaving its left side (x 650)
+        assert!(f.contains(r##"<text x="750" y="764" font-size="17" font-weight="600" text-anchor="middle" fill="#1D4ED8">Aspirating…</text>"##), "{f}");
+        assert!(f.contains(r#"<line x1="650" y1="700""#));
+    }
+
+    #[test]
+    fn device_label_position_can_be_given() {
+        let base = SAMPLING.replace("id = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "id = \"sp\"\nkind = \"sampling\"\nat = \"s\"\nlabel = \"Sampling point\"\nlabel_x = 123\nlabel_y = 456");
+        let (sc, tl) = ok(&base, "[[step]]\naction = \"wait\"\nduration = 1\n");
+        assert!(frame(&sc, &tl, 0.5).contains(r#"<text x="123" y="456""#));
     }
 
     #[test]

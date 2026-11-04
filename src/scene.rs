@@ -58,6 +58,8 @@ pub struct Device {
     pub label: String,
     /// Turnstile only: the entry position is on the right (flow right to left).
     pub entry_right: bool,
+    /// Label position (center of the text) for nsd/sampling, if not the default.
+    pub label_pos: Option<(f64, f64)>,
 }
 
 /// Turnstile: distance from the pocket centers to the rim of the wheel.
@@ -254,7 +256,7 @@ impl Scene {
             let mut entry_right = true;
             match kind {
                 DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Gate | DeviceKind::Antenna => {
-                    t.check_keys(&["id", "kind", "at", "label"])?;
+                    t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y"])?;
                     let a = t.str_req("at")?;
                     if !points.contains_key(&a) {
                         return Err(format!("{}: unknown point '{a}'", t.location()));
@@ -286,7 +288,12 @@ impl Scene {
                     at = Some(format!("{id}.needle"));
                 }
             }
-            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right });
+            let label_pos = match (t.num_opt("label_x")?, t.num_opt("label_y")?) {
+                (Some(x), Some(y)) => Some((x, y)),
+                (None, None) => None,
+                _ => return Err(format!("{}: give both label_x and label_y", t.location())),
+            };
+            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos });
         }
 
         let need_point = |id: &str, t: &Table| -> Result<(), String> {

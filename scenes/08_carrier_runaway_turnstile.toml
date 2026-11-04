@@ -342,13 +342,6 @@ device = "ts"
 duration = 4.5
 
 [[step]]
-action = "note"
-at = 21.8
-actor = "AN"
-text = "Pipetting"
-duration = 4.5
-
-[[step]]
 action = "caption"
 at = 26.5
 title = "5 · Sample Complete — Cancel"
@@ -569,6 +562,13 @@ text = "Tests to perform"
 params = "SampleId={SampleId}"
 carrier = "C3"
 reply = true
+
+[[step]]
+action = "note"
+at = 21.8
+actor = "AN"
+text = "Pipetting"
+duration = 4.5
 
 [[step]]
 action = "message"

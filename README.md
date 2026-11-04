@@ -134,6 +134,21 @@ probe shows "Aspirating…"; with `status` `error` it turns red with "Needle dow
 `--check` refuses a turnstile rotation, or a carrier leaving a sampling point,
 between a `needle down` and the end of the next `needle up`. See scenes 05 and 06.
 
+### Spur
+
+A spur is a U-shaped branch perpendicular to the Main-Lane, built from plain
+points and lanes (see `scenes/09_spur_happy_path.toml`): the NSD diverts the
+carrier, without stopping, into a short piece of pit-lane that turns 90° into the
+up branch; the sampling point is on the up branch with the analyzer on its right;
+the carrier crosses at the top and comes back down the other branch to the
+Main-Lane. Scenes 09–12 cover the happy path, Clear, analyzer error and run-away.
+
+When the analyzer is beside the sampling point (not above it) the probe comes out
+of the analyzer's side and "Aspirating…" / "Needle down" are written inside the
+analyzer. If there is no room on the right of the analyzer, the `operator` works
+from below it. Carrier tags never cover the analyzer. `nsd` and `sampling`
+devices accept `label_x`, `label_y` to move their label.
+
 ### Ghost carriers (logical position)
 
 A carrier with `ghost = true` shows where the interface *believes* a carrier is,

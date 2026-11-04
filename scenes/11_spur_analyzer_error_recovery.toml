@@ -1,0 +1,408 @@
+# Scene 11 — spur, analyzer error during sampling with the needle down, operator recovery
+# Same situation as scene 05, on a spur. On error the analyzer sends Status (Error) and
+# Sample Complete; the carrier is released only after Status (Ready).
+# Carrier flow: right to left on the Main-Lane; the spur rises perpendicular to it.
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+# Points left of x=30 or right of x=950 are outside the panel (hidden).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "Spur — analyzer error with the needle down, operator recovery"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+# Spur: a U-shaped branch perpendicular to the Main-Lane. The NSD diverts the
+# carrier, without stopping, into a short piece of pit-lane that turns 90° into
+# the up branch of the spur; the sampling point is on the up branch, with the
+# analyzer on its right. At the top the carrier crosses to the down branch and
+# goes back to the Main-Lane.
+[[point]]
+id = "spawn"
+x = 1010
+y = 760
+[[point]]
+id = "main_in"
+x = 910
+y = 760
+[[point]]
+id = "nsd"
+x = 800
+y = 760
+[[point]]
+id = "merge"
+x = 290
+y = 760
+[[point]]
+id = "main_out"
+x = 65
+y = 760
+[[point]]
+id = "gone"
+x = -40
+y = 760
+# Divert: diagonal off the NSD, then a 90° turn into the up branch.
+[[point]]
+id = "pit_in"
+x = 740
+y = 700
+[[point]]
+id = "spur_in"
+x = 660
+y = 700
+# Up branch: two queue positions below the sampling point.
+[[point]]
+id = "queue2"
+x = 660
+y = 560
+[[point]]
+id = "queue"
+x = 660
+y = 500
+[[point]]
+id = "sampling"
+x = 660
+y = 440
+[[point]]
+id = "spur_top_in"
+x = 660
+y = 250
+[[point]]
+id = "spur_top_out"
+x = 380
+y = 250
+# Down branch, then a 90° turn back towards the Main-Lane.
+[[point]]
+id = "spur_out"
+x = 380
+y = 700
+[[point]]
+id = "pit_out"
+x = 350
+y = 700
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+label_x = 470
+label_y = 820
+
+[[lane]]
+id = "spur"
+label = "Spur"
+kind = "pit"
+points = ["pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out"]
+label_x = 490
+label_y = 330
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 250
+y = 170
+w = 640
+h = 660
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 730
+y = 330
+w = 200
+h = 220
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+[[device]]
+id = "sp"
+kind = "sampling"
+at = "sampling"
+label = "Sampling point"
+label_x = 560
+label_y = 396
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+speed = 110
+
+# ---------------------------------------------------------------- steps
+# Messages use `at` (absolute start, seconds) and are written in time order, so
+# the rows of the sequence diagram stay in time order. Moves that continue
+# another move without stopping use start = "after", right after it.
+
+[[step]]
+action = "caption"
+at = 0
+title = "1 · Spur"
+text = "A carrier holding a sample tube travels along the Main-Lane towards the spur of the analyzer interface."
+
+[[step]]
+action = "move"
+at = 1.5
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "sampling"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 3.07
+title = "2 · NSD — Prepare"
+text = "At the NSD the carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+at = 3.07
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "caption"
+at = 6.3
+title = "3 · Test query"
+text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample."
+
+[[step]]
+action = "caption"
+at = 9.4
+title = "4 · Sampling point — Sample Acquisition"
+text = "The carrier stops at the sampling point. The interface sends Sample Acquisition and the analyzer starts aspirating."
+
+[[step]]
+action = "needle"
+at = 11.2
+device = "sp"
+to = "down"
+
+[[step]]
+action = "caption"
+at = 13.8
+title = "5 · Instrument error"
+text = "During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status."
+
+[[step]]
+action = "status"
+at = 13.8
+device = "analyzer"
+state = "error"
+
+[[step]]
+action = "caption"
+at = 17.4
+title = "6 · Operator recovery"
+text = "Sample Complete is not enough: with the analyzer in error the carrier stays still, the needle is in the tube. An operator comes to the instrument for a recovery: the needle goes back up."
+
+[[step]]
+action = "operator"
+at = 17.4
+device = "analyzer"
+duration = 7.0
+
+[[step]]
+action = "needle"
+at = 19.9
+device = "sp"
+to = "up"
+duration = 1.2
+
+[[step]]
+action = "caption"
+at = 23.7
+title = "7 · Instrument ready"
+text = "The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released."
+
+[[step]]
+action = "status"
+at = 23.7
+device = "analyzer"
+state = "ready"
+
+[[step]]
+action = "move"
+at = 27.1
+carrier = "C1"
+to = "spur_top_in"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "gone"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 37.49
+title = "8 · Main-Lane — Release"
+text = "The carrier went round the spur and is back on the Main-Lane: the interface sends Release."
+
+[[step]]
+action = "message"
+at = 3.07
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 4.9
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "message"
+at = 6.5
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 8.3
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "message"
+at = 9.6
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "note"
+at = 11.2
+actor = "AN"
+text = "Pipetting"
+duration = 2.6
+
+[[step]]
+action = "message"
+at = 13.8
+from = "AN"
+to = "IF"
+text = "Status"
+params = "State=Error"
+
+[[step]]
+action = "message"
+at = 14.3
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 15.6
+from = "IF"
+to = "AN"
+text = "OK"
+reply = true
+
+[[step]]
+action = "note"
+at = 17.4
+actor = "AN"
+text = "Operator recovery"
+duration = 6.0
+
+[[step]]
+action = "message"
+at = 23.7
+from = "AN"
+to = "IF"
+text = "Status"
+params = "State=Ready"
+
+[[step]]
+action = "message"
+at = 25.4
+from = "IF"
+to = "AN"
+text = "OK"
+reply = true
+
+[[step]]
+action = "message"
+at = 37.49
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
