@@ -96,7 +96,9 @@ trackviz/
 │   ├── 01_prepare_sample_release.toml
 │   ├── 02_turnstile_three_carriers.toml
 │   ├── 03_clear_missing_carrier.toml
-│   └── 04_clear_missing_carrier_turnstile.toml
+│   ├── 04_clear_missing_carrier_turnstile.toml
+│   ├── 05_analyzer_error_recovery.toml
+│   └── 06_analyzer_error_recovery_turnstile.toml
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -154,6 +156,8 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 - Durata del move = lunghezza / speed × fattore, con fattore 1 per linear e **π/2 per gli altri**. In questo modo la **velocità di picco è uguale a `speed`**, e un move `in` seguito da un move `out` ha velocità continua nel punto di giunzione. È così che si rappresenta il passaggio **senza fermata** dall'NSD.
 
 **Carrier fantasma** (`ghost = true`): posizione logica di un carrier (dove l'Interfaccia crede che sia) mentre fisicamente è altrove. Non apre i gate e non viene letto dalle antenne. `visible = false` lo nasconde all'inizio; `show`/`hide` lo fanno comparire o sparire in dissolvenza (`CarrierPath::opacity`).
+
+**Stato dell'analizzatore e ago:** `status` colora l'analizzatore (error: rosso con "ERROR"; ready: verde con "READY"; pulsa per 1,5 s al cambio). `needle` porta giù o su l'ago e lo lascia lì; con l'ago giù e lo strumento non in errore compare "Aspirating…", in errore l'ago diventa rosso con "Needle down". `--check` rifiuta una rotazione della ruota, o un carrier che lascia il punto di campionamento, tra l'inizio di un `needle down` e la fine del `needle up` successivo.
 
 **Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata nell'ordine del file.
 
@@ -220,6 +224,8 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
+| `status` | `device` (analyzer), `state` = error\|ready\|normal (vale fino al `status` successivo) |
+| `needle` | `device` (sampling o turnstile), `to` = down\|up (default 0,9 s) |
 | `wait` | (solo `duration`) |
 
 ---
@@ -297,6 +303,18 @@ Stessa situazione in due geometrie: 03 con il punto di campionamento semplice (g
 - **04:** appena l'antenna legge C3 (C1 è ancora in pipettaggio) l'Interfaccia manda **Clear** di C2 → **OK** (il fantasma sparisce) → **Prepare viola** di C3. C3 aspetta al gate il Sample Complete di C1, entra, la ruota gira, Sample Acquisition di C3.
 - Per C2 non c'è Release.
 - Durate: 03 ≈ 54 s, 04 ≈ 56 s.
+
+## 9d. Scene 05 e 06 — errore dello strumento con l'ago giù, recovery
+
+Un solo carrier; 05 con il punto di campionamento semplice (geometria della scena 01), 06 con turnstile, gate e antenna (geometria della scena 02).
+
+- Flusso normale fino alla Sample Acquisition (nella 06 anche il Prepare viola all'antenna, l'ingresso e la rotazione).
+- Durante l'aspirazione l'analizzatore va in errore lasciando l'ago nel tubo: diventa rosso e manda subito **Status `State=Error`** e **Sample Complete** (con SampleId); l'Interfaccia risponde **OK** allo Status (senza parametri). Il Sample Complete **non** basta per rilasciare: con lo strumento in errore il carrier resta fermo (nella 06 la ruota non gira).
+- L'operatore esegue la recovery (nota "Operator recovery"): l'ago risale.
+- Lo strumento torna verde e manda **Status `State=Ready`**; l'Interfaccia risponde **OK** e solo ora rilascia il carrier (nella 06 prima la ruota lo porta all'uscita).
+- Sulla Main-Lane l'Interfaccia manda **Release**.
+- I messaggi Status e i relativi OK non hanno SampleId (è lo stato dello strumento).
+- Durate: 05 ≈ 45 s, 06 ≈ 51 s.
 
 ---
 

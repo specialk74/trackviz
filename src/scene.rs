@@ -136,7 +136,18 @@ pub enum Action {
     Rotate { device: String },
     /// Fades a carrier in (`show`) or out (`hide`).
     Visibility { carrier: String, show: bool },
+    /// Analyzer state shown on the track: error (red), ready (green), normal.
+    Status { device: String, state: AnalyzerState },
+    /// The analyzer needle goes down into the tube (and stays) or back up.
+    Needle { device: String, down: bool },
     Wait,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum AnalyzerState {
+    Normal,
+    Error,
+    Ready,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -341,8 +352,10 @@ impl Scene {
                 "highlight" => &["device"],
                 "rotate" => &["device"],
                 "show" | "hide" => &["carrier"],
+                "status" => &["device", "state"],
+                "needle" => &["device", "to"],
                 "wait" => &[],
-                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|wait)", t.location())),
+                o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|status|needle|wait)", t.location())),
             };
             let allowed: Vec<&str> = common.iter().chain(extra.iter()).copied().collect();
             t.check_keys(&allowed)?;
@@ -374,6 +387,23 @@ impl Scene {
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
                 "rotate" => Action::Rotate { device: t.str_req("device")? },
                 "show" | "hide" => Action::Visibility { carrier: t.str_req("carrier")?, show: action_name == "show" },
+                "status" => Action::Status {
+                    device: t.str_req("device")?,
+                    state: match t.str_req("state")?.as_str() {
+                        "normal" => AnalyzerState::Normal,
+                        "error" => AnalyzerState::Error,
+                        "ready" => AnalyzerState::Ready,
+                        o => return Err(format!("{}: unknown state '{o}' (normal|error|ready)", t.location())),
+                    },
+                },
+                "needle" => Action::Needle {
+                    device: t.str_req("device")?,
+                    down: match t.str_req("to")?.as_str() {
+                        "down" => true,
+                        "up" => false,
+                        o => return Err(format!("{}: unknown needle position '{o}' (down|up)", t.location())),
+                    },
+                },
                 _ => {
                     if t.num_opt("duration")?.is_none() {
                         return Err(format!("{}: 'wait' needs a duration", t.location()));
@@ -660,6 +690,9 @@ pub enum Ev {
     Note { actor: usize, text: String, row: usize },
     Pipette { device: usize },
     Highlight { device: usize },
+    Status { device: usize, state: AnalyzerState },
+    /// Needle of the analyzer at a sampling/turnstile device going down or up.
+    Needle { device: usize, down: bool },
     Wait,
 }
 
@@ -884,6 +917,29 @@ impl Timeline {
                     let verb = if *show { "show" } else { "hide" };
                     (d, Ev::Wait, format!("{verb:<9} {carrier}"))
                 }
+                Action::Status { device, state } => {
+                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
+                    if sc.devices[di].kind != DeviceKind::Analyzer {
+                        return Err(format!("{}: status needs a device of kind 'analyzer'", st.loc));
+                    }
+                    let name = match state {
+                        AnalyzerState::Normal => "normal",
+                        AnalyzerState::Error => "error",
+                        AnalyzerState::Ready => "ready",
+                    };
+                    (st.duration.unwrap_or(0.0), Ev::Status { device: di, state: *state }, format!("status    {device} {name}"))
+                }
+                Action::Needle { device, down } => {
+                    let di = sc.device_idx(device).ok_or_else(|| format!("{}: unknown device '{device}'", st.loc))?;
+                    if !matches!(sc.devices[di].kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
+                        return Err(format!("{}: needle needs a device of kind 'sampling' or 'turnstile'", st.loc));
+                    }
+                    if !sc.devices.iter().any(|d| d.kind == DeviceKind::Analyzer) {
+                        return Err(format!("{}: needle needs an 'analyzer' device", st.loc));
+                    }
+                    let dir = if *down { "down" } else { "up" };
+                    (st.duration.unwrap_or(0.9), Ev::Needle { device: di, down: *down }, format!("needle    {device} {dir}"))
+                }
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
             };
             let t1 = t0 + dur;
@@ -906,6 +962,37 @@ impl Timeline {
                             "carrier '{}' drives into turnstile '{}' ({:.2}s - {:.2}s) while the analyzer is sampling there ({:.2}s - {:.2}s): it must wait at the gate",
                             sc.carriers[ci].id, sc.devices[di].id, a.t_move, a.t0, e.t0, e.t1
                         ));
+                    }
+                }
+            }
+        }
+
+        // While the needle is down (from the start of a `needle down` to the end
+        // of the next `needle up`) the wheel can't turn and the carrier under
+        // the needle can't leave.
+        let mut needle_down: Vec<(usize, f64, f64)> = Vec::new();
+        let mut needles: Vec<&Timed> = events.iter().filter(|e| matches!(e.ev, Ev::Needle { .. })).collect();
+        needles.sort_by(|a, b| a.t0.total_cmp(&b.t0));
+        for (k, e) in needles.iter().enumerate() {
+            if let Ev::Needle { device, down: true } = e.ev {
+                let up = needles[k + 1..].iter().find(|u| matches!(u.ev, Ev::Needle { device: d, down: false } if d == device));
+                needle_down.push((device, e.t0, up.map_or(f64::INFINITY, |u| u.t1)));
+            }
+        }
+        for &(di, a, b) in &needle_down {
+            let d = &sc.devices[di];
+            if let Some(w) = wheels.iter().find(|w| w.device == di) {
+                if let Some(r) = w.rots.iter().find(|r| r.0 < b - 1e-9 && r.1 > a + 1e-9) {
+                    return Err(format!("turnstile '{}' rotates ({:.2}s - {:.2}s) while the needle is down ({a:.2}s - {b:.2}s)", d.id, r.0, r.1));
+                }
+            } else {
+                let p = sc.pt(d.at.as_deref().unwrap());
+                for (ci, c) in carriers.iter().enumerate() {
+                    for m in &c.moves {
+                        let at = c.pos_at_s(m.s0);
+                        if m.t0 > a - 1e-9 && m.t0 < b - 1e-9 && ((at.0 - p.0).powi(2) + (at.1 - p.1).powi(2)).sqrt() < 3.0 {
+                            return Err(format!("carrier '{}' leaves '{}' at {:.2}s while the needle is down ({a:.2}s - {b:.2}s)", sc.carriers[ci].id, d.id, m.t0));
+                        }
                     }
                 }
             }

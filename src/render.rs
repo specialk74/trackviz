@@ -142,11 +142,31 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         match d.kind {
             DeviceKind::Analyzer => {
                 let (x, y, w, h) = d.rect;
+                let st = analyzer_state(tl, di, t);
+                let (fill, stroke, badge) = match st.map(|s| s.0) {
+                    Some(AnalyzerState::Error) => ("#FEE2E2", "#DC2626", Some(("ERROR", "#DC2626"))),
+                    Some(AnalyzerState::Ready) => ("#DCFCE7", "#16A34A", Some(("READY", "#16A34A"))),
+                    _ => ("#E8EDF3", "#64748B", None),
+                };
+                // A status change pulses for 1.5 s.
+                if let Some((_, t0)) = st.filter(|s| s.0 != AnalyzerState::Normal && t - s.1 < 1.5) {
+                    let a = 0.35 + 0.35 * ((t - t0) / 1.5 * std::f64::consts::PI * 4.0).sin().abs();
+                    let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="16" fill="none" stroke="{stroke}" stroke-width="10" opacity="{a:.2}"/>"#, x - 6.0, y - 6.0, w + 12.0, h + 12.0);
+                }
+                let sw = if badge.is_some() { 3.5 } else { 2.0 };
+                let ly = if badge.is_some() { y + h / 2.0 - 4.0 } else { y + h / 2.0 + 9.0 };
                 let _ = write!(
                     o,
-                    r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="#E8EDF3" stroke="#64748B" stroke-width="2"/><text x="{}" y="{}" font-size="26" font-weight="700" text-anchor="middle" fill="#334155">{}</text>"##,
-                    x + w / 2.0, y + h / 2.0 + 9.0, esc(&d.label)
+                    r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/><text x="{}" y="{ly}" font-size="26" font-weight="700" text-anchor="middle" fill="#334155">{}</text>"##,
+                    x + w / 2.0, esc(&d.label)
                 );
+                if let Some((text, col)) = badge {
+                    let _ = write!(
+                        o,
+                        r##"<rect x="{}" y="{}" width="96" height="28" rx="14" fill="{col}"/><text x="{}" y="{}" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#FFFFFF">{text}</text>"##,
+                        x + w / 2.0 - 48.0, ly + 14.0, x + w / 2.0, ly + 33.5
+                    );
+                }
             }
             DeviceKind::Nsd => {
                 let (x, y) = sc.pt(d.at.as_deref().unwrap());
@@ -338,45 +358,93 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         );
     }
 
-    // Pipetting probe (drawn above the carrier).
-    if let Some(e) = active(tl, t, |e| matches!(e, Ev::Pipette { .. })) {
-        if let Ev::Pipette { device } = e.ev {
-            let (sx, sy) = sc.pt(sc.devices[device].at.as_deref().unwrap());
-            let an = sc.devices.iter().find(|d| d.kind == DeviceKind::Analyzer).unwrap();
-            let top = an.rect.1 + an.rect.3;
+    // Analyzer probe (drawn above the carrier): a `pipette` (down, aspirate,
+    // up) or the needle moved by `needle` steps (it stays down in between).
+    let error = sc
+        .devices
+        .iter()
+        .enumerate()
+        .any(|(di, d)| d.kind == DeviceKind::Analyzer && analyzer_state(tl, di, t).is_some_and(|s| s.0 == AnalyzerState::Error));
+    for (device, sd) in sc.devices.iter().enumerate() {
+        if !matches!(sd.kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
+            continue;
+        }
+        let (mut ext, mut aspirating) = (0.0f64, false);
+        if let Some(e) = active(tl, t, |e| matches!(e, Ev::Pipette { device: d } if *d == device)) {
             let u = (t - e.t0) / (e.t1 - e.t0).max(1e-6);
-            let ext = if u < 0.2 {
+            ext = if u < 0.2 {
                 Ease::InOut.apply(u / 0.2)
             } else if u < 0.8 {
                 1.0
             } else {
                 1.0 - Ease::InOut.apply((u - 0.8) / 0.2)
             };
-            let tip = top + (sy - top) * ext;
-            let _ = write!(
-                o,
-                r##"<rect x="{}" y="{}" width="28" height="18" rx="4" fill="#475569"/><line x1="{sx}" y1="{top}" x2="{sx}" y2="{tip:.1}" stroke="#475569" stroke-width="6" stroke-linecap="round"/><circle cx="{sx}" cy="{tip:.1}" r="6" fill="#1E293B"/>"##,
-                sx - 14.0, top - 4.0
-            );
-            if (0.2..0.8).contains(&u) {
-                for k in 0..2 {
-                    let ph = ((t * 1.4) + k as f64 * 0.5).fract();
-                    let _ = write!(
-                        o,
-                        r##"<circle cx="{sx}" cy="{sy}" r="{:.1}" fill="none" stroke="#2563EB" stroke-width="3" opacity="{:.2}"/>"##,
-                        16.0 + ph * 26.0, 0.8 * (1.0 - ph)
-                    );
-                }
-                if let Some(w) = tl.wheel_of_device(device) {
-                    // Turnstile: left of the probe, between the analyzer and the wheel.
-                    let rim_top = w.cy - w.r - TS_RIM;
-                    let _ = write!(o, r##"<text x="{}" y="{:.1}" font-size="17" font-weight="600" text-anchor="end" fill="#1D4ED8">Aspirating…</text>"##, sx - 18.0, (top + rim_top) / 2.0 + 6.0);
-                } else {
-                    let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="#1D4ED8">Aspirating…</text>"##, sx + 22.0, top + 105.0);
+            aspirating = (0.2..0.8).contains(&u);
+        }
+        let mut needle = 0.0;
+        for e in tl.events.iter().filter(|e| e.t0 <= t) {
+            if let Ev::Needle { device: d, down } = e.ev {
+                if d == device {
+                    let u = Ease::InOut.apply((t - e.t0) / (e.t1 - e.t0).max(1e-6));
+                    needle = if down { needle + (1.0 - needle) * u } else { needle * (1.0 - u) };
                 }
             }
         }
+        let stuck = needle >= 1.0 - 1e-9 && error;
+        if needle >= 1.0 - 1e-9 && !error {
+            aspirating = true;
+        }
+        ext = ext.max(needle);
+        if ext <= 0.0 {
+            continue;
+        }
+        let (sx, sy) = sc.pt(sd.at.as_deref().unwrap());
+        let an = sc.devices.iter().find(|d| d.kind == DeviceKind::Analyzer).unwrap();
+        let top = an.rect.1 + an.rect.3;
+        let tip = top + (sy - top) * ext;
+        let col = if error { "#B91C1C" } else { "#475569" };
+        let _ = write!(
+            o,
+            r##"<rect x="{}" y="{}" width="28" height="18" rx="4" fill="{col}"/><line x1="{sx}" y1="{top}" x2="{sx}" y2="{tip:.1}" stroke="{col}" stroke-width="6" stroke-linecap="round"/><circle cx="{sx}" cy="{tip:.1}" r="6" fill="#1E293B"/>"##,
+            sx - 14.0, top - 4.0
+        );
+        let label = if aspirating {
+            for k in 0..2 {
+                let ph = ((t * 1.4) + k as f64 * 0.5).fract();
+                let _ = write!(
+                    o,
+                    r##"<circle cx="{sx}" cy="{sy}" r="{:.1}" fill="none" stroke="#2563EB" stroke-width="3" opacity="{:.2}"/>"##,
+                    16.0 + ph * 26.0, 0.8 * (1.0 - ph)
+                );
+            }
+            Some(("Aspirating…", "#1D4ED8"))
+        } else if stuck {
+            Some(("Needle down", "#B91C1C"))
+        } else {
+            None
+        };
+        if let Some((text, fill)) = label {
+            if let Some(w) = tl.wheel_of_device(device) {
+                // Turnstile: left of the probe, between the analyzer and the wheel.
+                let rim_top = w.cy - w.r - TS_RIM;
+                let _ = write!(o, r##"<text x="{}" y="{:.1}" font-size="17" font-weight="600" text-anchor="end" fill="{fill}">{text}</text>"##, sx - 18.0, (top + rim_top) / 2.0 + 6.0);
+            } else {
+                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="{fill}">{text}</text>"##, sx + 22.0, top + 105.0);
+            }
+        }
     }
+}
+
+/// Last `status` of an analyzer at time t, with the time it was set.
+fn analyzer_state(tl: &Timeline, di: usize, t: f64) -> Option<(AnalyzerState, f64)> {
+    tl.events
+        .iter()
+        .filter(|e| e.t0 <= t)
+        .filter_map(|e| match e.ev {
+            Ev::Status { device, state } if device == di => Some((state, e.t0)),
+            _ => None,
+        })
+        .max_by(|a, b| a.1.total_cmp(&b.1))
 }
 
 fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {

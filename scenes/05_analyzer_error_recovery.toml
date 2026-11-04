@@ -1,0 +1,358 @@
+# Scene 05 — analyzer error during sampling, needle left down (sampling point)
+# One carrier, geometry of scene 01. While the sample is aspirated the analyzer
+# goes into error leaving the needle in the tube: it sends Status (Error), the
+# interface replies OK and keeps the carrier still. An operator performs a
+# recovery (the needle goes back up); when the instrument is green again it
+# sends Status (Ready), the interface replies OK and releases the carrier.
+# Carrier flow: right to left, Pit-Lane above the Main-Lane.
+# Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+
+[video]
+title = "Analyzer interface · message exchange with the automation"
+subtitle = "Single carrier — analyzer error with the needle down, operator recovery"
+width = 1920
+height = 1080
+fps = 30
+tail = 3.5
+show_clock = true
+show_times = true
+
+# ---------------------------------------------------------------- track
+[[point]]
+id = "main_in"
+x = 910
+y = 740
+[[point]]
+id = "nsd"
+x = 730
+y = 740
+[[point]]
+id = "pit_in"
+x = 620
+y = 540
+[[point]]
+id = "sampling"
+x = 440
+y = 540
+[[point]]
+id = "pit_out"
+x = 290
+y = 540
+[[point]]
+id = "merge"
+x = 180
+y = 740
+[[point]]
+id = "main_out"
+x = 65
+y = 740
+
+[[lane]]
+id = "main"
+label = "Main-Lane"
+kind = "main"
+points = ["main_in", "nsd", "merge", "main_out"]
+label_x = 830
+label_y = 800
+
+[[lane]]
+id = "pit"
+label = "Pit-Lane"
+kind = "pit"
+points = ["pit_in", "sampling", "pit_out"]
+label_x = 250
+label_y = 500
+
+[[lane]]
+id = "divert"
+kind = "link"
+points = ["nsd", "pit_in"]
+
+[[lane]]
+id = "return"
+kind = "link"
+points = ["pit_out", "merge"]
+
+[[device]]
+id = "interface"
+kind = "zone"
+label = "Interface module"
+x = 90
+y = 425
+w = 720
+h = 420
+
+[[device]]
+id = "analyzer"
+kind = "analyzer"
+label = "Analyzer"
+x = 200
+y = 185
+w = 480
+h = 175
+
+[[device]]
+id = "nsd"
+kind = "nsd"
+at = "nsd"
+label = "NSD"
+
+[[device]]
+id = "sp"
+kind = "sampling"
+at = "sampling"
+label = "Sampling point"
+
+# ---------------------------------------------------------------- actors
+[[actor]]
+id = "IF"
+label = "Interface"
+sub = "Inpeco automation"
+color = "#2563EB"
+
+[[actor]]
+id = "AN"
+label = "Analyzer"
+sub = "Instrument"
+color = "#EA580C"
+
+[[actor]]
+id = "DMX"
+label = "DMX"
+sub = "LIS"
+color = "#059669"
+
+# ---------------------------------------------------------------- carriers
+[[carrier]]
+id = "C1"
+tube = true
+sample_id = "SID-000123"
+route = ["main_in", "nsd", "pit_in", "sampling", "pit_out", "merge", "main_out"]
+speed = 75
+
+# ---------------------------------------------------------------- steps
+# Messages and captions use `at` (absolute start, seconds) so the rows of the
+# sequence diagram stay in time order. Status messages carry only the state.
+
+[[step]]
+action = "caption"
+at = 0
+title = "1 · Main-Lane"
+text = "A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface."
+
+[[step]]
+action = "move"
+at = 1.0
+carrier = "C1"
+to = "nsd"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "sampling"
+ease = "out"
+
+[[step]]
+action = "caption"
+at = 4.77
+title = "2 · NSD — Prepare"
+text = "At the NSD the carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
+
+[[step]]
+action = "highlight"
+at = 4.77
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "message"
+at = 4.77
+from = "IF"
+to = "AN"
+text = "Prepare"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 6.77
+from = "AN"
+to = "IF"
+text = "OK"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "caption"
+at = 8.6
+title = "3 · Test query"
+text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample."
+
+[[step]]
+action = "message"
+at = 8.8
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 10.8
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "caption"
+at = 13.4
+title = "4 · Sampling point — Sample Acquisition"
+text = "The carrier stops at the sampling point. The interface sends Sample Acquisition and the analyzer starts aspirating."
+
+[[step]]
+action = "message"
+at = 13.6
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "needle"
+at = 15.2
+device = "sp"
+to = "down"
+
+[[step]]
+action = "note"
+at = 15.2
+actor = "AN"
+text = "Pipetting"
+duration = 2.6
+
+[[step]]
+action = "caption"
+at = 17.8
+title = "5 · Instrument error"
+text = "During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status."
+
+[[step]]
+action = "status"
+at = 17.8
+device = "analyzer"
+state = "error"
+
+[[step]]
+action = "message"
+at = 17.8
+from = "AN"
+to = "IF"
+text = "Status"
+params = "State=Error"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 18.3
+from = "AN"
+to = "IF"
+text = "Sample Complete"
+params = "SampleId={SampleId}"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 19.6
+from = "IF"
+to = "AN"
+text = "OK"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "caption"
+at = 21.400000000000002
+title = "6 · Operator recovery"
+text = "Sample Complete is not enough: with the analyzer in error the interface does not move the carrier: the needle is still in the tube. An operator performs a recovery on the instrument, and the needle is brought back up."
+
+[[step]]
+action = "note"
+at = 21.400000000000002
+actor = "AN"
+text = "Operator recovery"
+duration = 6.0
+
+[[step]]
+action = "needle"
+at = 23.900000000000002
+device = "sp"
+to = "up"
+duration = 1.2
+
+[[step]]
+action = "caption"
+at = 27.700000000000003
+title = "7 · Instrument ready"
+text = "The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released."
+
+[[step]]
+action = "status"
+at = 27.700000000000003
+device = "analyzer"
+state = "ready"
+
+[[step]]
+action = "message"
+at = 27.700000000000003
+from = "AN"
+to = "IF"
+text = "Status"
+params = "State=Ready"
+carrier = "C1"
+
+[[step]]
+action = "message"
+at = 29.400000000000002
+from = "IF"
+to = "AN"
+text = "OK"
+carrier = "C1"
+reply = true
+
+[[step]]
+action = "caption"
+at = 31.1
+title = "8 · Carrier released — Release"
+text = "The interface releases the carrier. As soon as it is back on the Main-Lane, the interface sends Release."
+
+[[step]]
+action = "move"
+at = 31.1
+carrier = "C1"
+to = "merge"
+ease = "in"
+
+[[step]]
+action = "move"
+start = "after"
+carrier = "C1"
+to = "main_out"
+ease = "out"
+
+[[step]]
+action = "message"
+at = 39.02
+from = "IF"
+to = "AN"
+text = "Release"
+params = "SampleId={SampleId}"
+carrier = "C1"
+

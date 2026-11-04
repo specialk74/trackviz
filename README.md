@@ -71,6 +71,8 @@ Steps run in file order. Each step's `start` decides when it begins:
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
+| `status` | `device` (an `analyzer`), `state` = `error` (red, ERROR) \| `ready` (green, READY) \| `normal`; lasts until the next `status` | 0 s |
+| `needle` | `device` (a `sampling` or `turnstile`), `to` = `down` \| `up`: the needle goes down and stays there until `up` | 0.9 s |
 | `wait` | — | `duration` is required |
 
 `{SampleId}` and `{CarrierId}` inside `text` and `params` are replaced with the
@@ -106,6 +108,14 @@ the entry pocket must be free when a carrier arrives, a carrier can leave only
 from the exit position, a rotation can't start while a carrier is still in the
 exit position, and nothing arrives or leaves while the wheel is turning.
 See `scenes/02_turnstile_three_carriers.toml`.
+
+### Analyzer error and needle
+
+`needle` moves the analyzer needle by hand (unlike `pipette`, which goes down
+and back up by itself). While it is down and the analyzer is not in error the
+probe shows "Aspirating…"; with `status` `error` it turns red with "Needle down".
+`--check` refuses a turnstile rotation, or a carrier leaving a sampling point,
+between a `needle down` and the end of the next `needle up`. See scenes 05 and 06.
 
 ### Ghost carriers (logical position)
 
