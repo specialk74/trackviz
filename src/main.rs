@@ -19,6 +19,17 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 
+/// Version from Cargo.toml.
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn usage() -> String {
+    format!(
+        "trackviz {VERSION}\n\
+         usage: trackviz <scene.toml> [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
+         \x20 without -o the video is written to out/<scene name>.mp4"
+    )
+}
+
 /// Inter (variable font: font-weight maps to the wght axis), fetched by build.rs.
 const INTER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Inter.ttf"));
 
@@ -74,7 +85,7 @@ fn run() -> Result<(), String> {
             "--svg" => svg_out = true,
             "--check" => check = true,
             "-h" | "--help" => {
-                println!("usage: trackviz <scene.toml> [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]");
+                println!("{}", usage());
                 return Ok(());
             }
             a if scene_path.is_none() && !a.starts_with('-') => scene_path = Some(a.to_string()),
@@ -82,7 +93,7 @@ fn run() -> Result<(), String> {
         }
         i += 1;
     }
-    let scene_path = scene_path.ok_or("missing scene file (try --help)")?;
+    let scene_path = scene_path.ok_or_else(|| format!("missing scene file\n{}", usage()))?;
     let src = std::fs::read_to_string(&scene_path).map_err(|e| format!("{scene_path}: {e}"))?;
     let doc = toml::parse(&src).map_err(|e| format!("{scene_path}: {e}"))?;
     let sc = scene::Scene::from_doc(&doc).map_err(|e| format!("{scene_path}: {e}"))?;
