@@ -327,7 +327,7 @@ fn turnstile_rules() {
 
 #[test]
 fn status_needs_an_analyzer_and_a_known_state() {
-    err(SAMPLING, "[[step]]\naction = \"status\"\ndevice = \"sp\"\nstate = \"error\"\n", "status needs a device of kind 'analyzer'");
+    err(SAMPLING, "[[step]]\naction = \"status\"\ndevice = \"sp\"\nstate = \"error\"\n", "status needs a device of kind 'analyzer' or 'zone'");
     err(SAMPLING, "[[step]]\naction = \"status\"\ndevice = \"an\"\nstate = \"broken\"\n", "unknown state");
     let (_, tl) = ok(SAMPLING, "[[step]]\naction = \"status\"\ndevice = \"an\"\nstate = \"ready\"\n");
     assert!(matches!(tl.events[0].ev, Ev::Status { state: AnalyzerState::Ready, .. }));
@@ -384,4 +384,32 @@ fn all_scenes_in_the_repository_are_valid() {
         }
     }
     assert!(n >= 6, "found only {n} scenes");
+}
+
+#[test]
+fn runaway_moves_are_flagged_only_while_moving() {
+    let (_, tl) = ok(SAMPLING, "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"c\"\nease = \"linear\"\nrunaway = true\n");
+    let c = &tl.carriers[0];
+    assert!(!c.running_away(0.5));
+    assert!(c.running_away(2.0));
+    assert!(!c.running_away(100.0));
+}
+
+#[test]
+fn the_wheel_waits_until_a_leaving_carrier_is_clear() {
+    let base = format!(
+        "{C1_IN}[[step]]\naction = \"rotate\"\ndevice = \"ts\"\n[[step]]\naction = \"rotate\"\ndevice = \"ts\"\n\
+         [[step]]\naction = \"move\"\ncarrier = \"C1\"\nto = \"out\"\nease = \"linear\"\n"
+    );
+    // ts.out is 70 px from the center; clear means r + rim + carrier = 124 px.
+    err(TURNSTILE, &format!("{base}[[step]]\naction = \"rotate\"\nstart = \"with\"\ndelay = 0.2\ndevice = \"ts\"\n"), "not yet clear of the wheel");
+    ok(TURNSTILE, &format!("{base}[[step]]\naction = \"rotate\"\nstart = \"with\"\ndelay = 1.0\ndevice = \"ts\"\n"));
+}
+
+#[test]
+fn status_also_works_on_zones() {
+    let base = SAMPLING.replace("[[device]]\nid = \"sp\"", "[[device]]\nid = \"zone\"\nkind = \"zone\"\nx = 90\ny = 400\nw = 700\nh = 400\n[[device]]\nid = \"sp\"");
+    let (_, tl) = ok(&base, "[[step]]\naction = \"status\"\ndevice = \"zone\"\nstate = \"error\"\n");
+    assert!(matches!(tl.events[0].ev, Ev::Status { state: AnalyzerState::Error, .. }));
+    err(&base, "[[step]]\naction = \"status\"\ndevice = \"nsd\"\nstate = \"error\"\n", "status needs a device of kind 'analyzer' or 'zone'");
 }

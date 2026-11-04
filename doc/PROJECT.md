@@ -98,7 +98,9 @@ trackviz/
 │   ├── 03_clear_missing_carrier.toml
 │   ├── 04_clear_missing_carrier_turnstile.toml
 │   ├── 05_analyzer_error_recovery.toml
-│   └── 06_analyzer_error_recovery_turnstile.toml
+│   ├── 06_analyzer_error_recovery_turnstile.toml
+│   ├── 07_carrier_runaway.toml
+│   └── 08_carrier_runaway_turnstile.toml
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -145,7 +147,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, rotate 2 s, move calcolata (vedi sotto).
 
-**Turnstile:** il device genera i punti `<id>.in`, `<id>.needle`, `<id>.out` (posizioni fisse delle tre posizioni). Un `move` che termina in `<id>.in` aggancia il carrier alla tasca in ingresso; da lì la sua posizione segue l'angolo della ruota (`Timeline::carrier_pos`); un `move` successivo lo sgancia dall'uscita. Le tasche vengono assegnate e controllate **in ordine di tempo** dopo aver disposto tutti gli step (`simulate_wheels`), perché l'ordine nel file non coincide sempre con l'ordine temporale. Errori: ingresso occupato, uscita da una posizione diversa dall'uscita, rotazione con un carrier ancora in uscita, arrivi o uscite durante una rotazione. In caso di errore `--check` stampa anche la timeline calcolata fino a quel punto. Un carrier che entra nella ruota (dal gate alla tasca d'ingresso) mentre è in corso un `pipette` su quel turnstile è un errore: deve aspettare al gate.
+**Turnstile:** il device genera i punti `<id>.in`, `<id>.needle`, `<id>.out` (posizioni fisse delle tre posizioni). Un `move` che termina in `<id>.in` aggancia il carrier alla tasca in ingresso; da lì la sua posizione segue l'angolo della ruota (`Timeline::carrier_pos`); un `move` successivo lo sgancia dall'uscita. Le tasche vengono assegnate e controllate **in ordine di tempo** dopo aver disposto tutti gli step (`simulate_wheels`), perché l'ordine nel file non coincide sempre con l'ordine temporale. Errori: ingresso occupato, uscita da una posizione diversa dall'uscita, rotazione con un carrier ancora in uscita, arrivi o uscite durante una rotazione, rotazione mentre un carrier fuori dalle tasche (appena uscito o in arrivo) è ancora dentro il cerchio della ruota (distanza dal centro < r + bordo 32 px + raggio del carrier 22 px). In caso di errore `--check` stampa anche la timeline calcolata fino a quel punto. Un carrier che entra nella ruota (dal gate alla tasca d'ingresso) mentre è in corso un `pipette` su quel turnstile è un errore: deve aspettare al gate.
 
 **Gate e antenna** (`gate`, `antenna`, con `at`): nessuno step dedicato. Il gate è aperto negli intervalli in cui un carrier lo attraversa (calcolati in `Timeline::gates` proiettando il punto del gate sulla route di ogni carrier: da 60 px prima a 45 px dopo, con apertura/chiusura di 0,4 s). L'antenna mostra la lettura quando un carrier è fermo sul suo punto.
 
@@ -159,7 +161,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 
 **Carrier fantasma** (`ghost = true`): posizione logica di un carrier (dove l'Interfaccia crede che sia) mentre fisicamente è altrove. Non apre i gate e non viene letto dalle antenne. `visible = false` lo nasconde all'inizio; `show`/`hide` lo fanno comparire o sparire in dissolvenza (`CarrierPath::opacity`).
 
-**Stato dell'analizzatore e ago:** `status` colora l'analizzatore (error: rosso con "ERROR"; ready: verde con "READY"; pulsa per 1,5 s al cambio). `needle` porta giù o su l'ago e lo lascia lì; con l'ago giù e lo strumento non in errore compare "Aspirating…", in errore l'ago diventa rosso con "Needle down". `--check` rifiuta una rotazione della ruota, o un carrier che lascia il punto di campionamento, tra l'inizio di un `needle down` e la fine del `needle up` successivo.
+**Stato dell'analizzatore e delle zone:** `status` vale anche per le zone (es. "Interface module": rossa in errore, verde in ready, grigia in normal). `status` colora l'analizzatore (error: rosso con "ERROR"; ready: verde con "READY"; pulsa per 1,5 s al cambio). `needle` porta giù o su l'ago e lo lascia lì; con l'ago giù e lo strumento non in errore compare "Aspirating…", in errore l'ago diventa rosso con "Needle down". `--check` rifiuta una rotazione della ruota, o un carrier che lascia il punto di campionamento, tra l'inizio di un `needle down` e la fine del `needle up` successivo.
 
 **Operatore** (`operator`): operatore di laboratorio stilizzato (camice bianco lungo, guanti blu sottili, capelli scuri, chiave inglese) che entra a piedi dal bordo destro del pannello, si ferma a destra dell'analizzatore, lavora (braccio che oscilla e scintille ambra sul bordo) e se ne va. Ogni camminata dura min(2 s, durata/3).
 
@@ -221,14 +223,14 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | action | Chiavi specifiche |
 |---|---|
 | `caption` | `title`, `text` |
-| `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed` |
+| `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed`, `runaway` (false: carrier che scappa, anello rosso pulsante e cartellino "… · RUN-AWAY" durante il movimento) |
 | `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
 | `pipette` | `device` sampling o turnstile |
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
-| `status` | `device` (analyzer), `state` = error\|ready\|normal (vale fino al `status` successivo) |
+| `status` | `device` (analyzer o zone), `state` = error\|ready\|normal (vale fino al `status` successivo) |
 | `needle` | `device` (sampling o turnstile), `to` = down\|up (default 0,9 s) |
 | `operator` | `device` (analyzer); default 7 s, minimo 2 s |
 | `wait` | (solo `duration`) |
@@ -320,6 +322,17 @@ Un solo carrier; 05 con il punto di campionamento semplice (geometria della scen
 - Sulla Main-Lane l'Interfaccia manda **Release**.
 - I messaggi Status e i relativi OK non hanno SampleId (è lo stato dello strumento).
 - Durate: 05 ≈ 45 s, 06 ≈ 51 s.
+
+## 9e. Scene 07 e 08 — carrier run-away durante il campionamento
+
+Tre carrier deviati (Prepare/OK, Query/Tests to perform per ciascuno); 07 con il punto di campionamento semplice (geometria della scena 03 con due posizioni di coda, `queue` e `queue2`), 08 con turnstile, gate e antenna (geometria della scena 02 con una posizione di coda `pit_q` dietro l'antenna).
+
+- **07:** Sample Acquisition per C1; **prima che l'ago scenda** C1 scappa (`runaway = true`) ed esce fino alla Main-Lane. C2 scivola sotto l'ago, C3 avanza in coda. L'analizzatore aspira C2 credendo che sia C1.
+- **08:** C2 aspetta al gate (Prepare viola all'antenna), C3 dietro di lui. Dopo la Sample Acquisition per C1 la ruota **gira da sola**: C1 va all'uscita e scappa verso la Main-Lane. L'ago scende nella tasca vuota e non aspira nulla.
+- In entrambe l'analizzatore manda **Sample Complete** con il SampleId di C1; l'Interfaccia manda **Cancel** (SampleId di C1) → **OK**, poi manda via tutti i carrier senza campionarli (nella 08 C2 e C3 passano dalla ruota: entrano, rotazioni, escono; C3 si ferma all'antenna ma non riceve Prepare). Quando l'ultimo è sulla Main-Lane: **Clear All** (senza parametri) → **OK**. Nessun Release.
+- L'**interfaccia** (zona "Interface module") diventa **rossa** al momento della fuga (07: quando C1 lascia il punto di campionamento; 08: quando la ruota gira da sola) e torna **grigia** quando l'ultimo carrier è uscito completamente dal riquadro.
+- Nella 08 l'ultima rotazione parte solo quando C2 è uscito completamente dal cerchio della ruota.
+- Durate: 07 ≈ 48 s, 08 ≈ 60 s.
 
 ---
 

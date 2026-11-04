@@ -78,14 +78,14 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | action | keys | default duration |
 |---|---|---|
 | `caption` | `title`, `text` | stays until the next caption |
-| `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed` | computed from length and speed |
+| `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed`, `runaway` (bool: the carrier escapes by itself; red pulsing ring and tag "… · RUN-AWAY" while it moves) | computed from length and speed |
 | `message` | `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
 | `pipette` | `device` (a `sampling` or `turnstile` device) | 3 s |
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
-| `status` | `device` (an `analyzer`), `state` = `error` (red, ERROR) \| `ready` (green, READY) \| `normal`; lasts until the next `status` | 0 s |
+| `status` | `device` (an `analyzer` or a `zone`), `state` = `error` (red; ERROR badge on an analyzer) \| `ready` (green) \| `normal` (grey); lasts until the next `status` | 0 s |
 | `operator` | `device` (an `analyzer`): a stylized lab operator (white coat, thin blue gloves) walks in from the right edge of the panel, works on the analyzer with a wrench, then walks away (walks take up to 2 s each) | 7 s |
 | `needle` | `device` (a `sampling` or `turnstile`), `to` = `down` \| `up`: the needle goes down and stays there until `up` | 0.9 s |
 | `wait` | — | `duration` is required |
@@ -121,7 +121,9 @@ needle position.
 Checked by `--check` (in time order, whatever the order of the steps in the file):
 the entry pocket must be free when a carrier arrives, a carrier can leave only
 from the exit position, a rotation can't start while a carrier is still in the
-exit position, and nothing arrives or leaves while the wheel is turning.
+exit position, nothing arrives or leaves while the wheel is turning, and the wheel
+doesn't turn until a carrier that has left (or is arriving) is completely outside
+the wheel's circle.
 See `scenes/02_turnstile_three_carriers.toml`.
 
 ### Analyzer error and needle

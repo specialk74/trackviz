@@ -60,6 +60,11 @@ pub struct Device {
     pub entry_right: bool,
 }
 
+/// Turnstile: distance from the pocket centers to the rim of the wheel.
+pub const TS_RIM: f64 = 32.0;
+/// Radius of a carrier as drawn on the track.
+pub const CARRIER_R: f64 = 22.0;
+
 /// Turnstile geometry. Three pockets 120° apart; positions (slots) are
 /// 0 = entry, 1 = under the needle (top), 2 = exit. Each rotation moves every
 /// pocket one slot forward: entry -> needle -> exit -> entry.
@@ -127,7 +132,8 @@ impl Ease {
 
 pub enum Action {
     Caption { title: String, text: String },
-    Move { carrier: String, to: String, ease: Ease, speed: Option<f64> },
+    /// `runaway`: the carrier escapes by itself (drawn in red, tag "RUN-AWAY").
+    Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
     Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String> },
     Note { actor: String, text: String },
     Pipette { device: String },
@@ -356,7 +362,7 @@ impl Scene {
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
-                "move" => &["carrier", "to", "ease", "speed"],
+                "move" => &["carrier", "to", "ease", "speed", "runaway"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color"],
                 "note" => &["actor", "text"],
                 "pipette" => &["device"],
@@ -384,6 +390,7 @@ impl Scene {
                         o => return Err(format!("{}: unknown ease '{o}' (linear|in|out|inout)", t.location())),
                     },
                     speed: t.num_opt("speed")?,
+                    runaway: t.bool_opt("runaway")?.unwrap_or(false),
                 },
                 "message" => Action::Message {
                     from: t.str_req("from")?,
@@ -516,6 +523,7 @@ pub struct MoveSeg {
     pub s0: f64,
     pub s1: f64,
     pub ease: Ease,
+    pub runaway: bool,
 }
 
 pub struct CarrierPath {
@@ -686,6 +694,10 @@ impl CarrierPath {
     }
     pub fn moving(&self, t: f64) -> bool {
         self.moves.iter().any(|m| t > m.t0 && t < m.t1)
+    }
+    /// Running away (during a `move` with `runaway = true`).
+    pub fn running_away(&self, t: f64) -> bool {
+        self.moves.iter().any(|m| m.runaway && t >= m.t0 && t <= m.t1)
     }
     /// 0 = hidden, 1 = fully visible (fading in between).
     pub fn opacity(&self, t: f64) -> f64 {
@@ -878,7 +890,7 @@ impl Timeline {
                 Action::Caption { title, text } => {
                     (st.duration.unwrap_or(0.0), Ev::Caption { title: title.clone(), text: text.clone() }, format!("caption   {title}"))
                 }
-                Action::Move { carrier, to, ease, speed } => {
+                Action::Move { carrier, to, ease, speed, runaway } => {
                     let ci = sc.need_carrier(carrier, &st.loc)?;
                     let c = &sc.carriers[ci];
                     let mut from = cur_idx[ci];
@@ -904,7 +916,7 @@ impl Timeline {
                         }
                     }
                     let d = st.duration.unwrap_or((s1 - s0) / speed.unwrap_or(c.speed) * ease.factor());
-                    path.moves.push(MoveSeg { t0, t1: t0 + d, s0, s1, ease: *ease });
+                    path.moves.push(MoveSeg { t0, t1: t0 + d, s0, s1, ease: *ease, runaway: *runaway });
                     cur_idx[ci] = ti;
                     // Entering a turnstile: the carrier drops into the pocket at the entry.
                     // The pocket is assigned later, in time order (simulate_wheels).
@@ -915,7 +927,8 @@ impl Timeline {
                         attached[ci] = Some(ai);
                         wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
                     }
-                    (d, Ev::Wait, format!("move      {carrier} -> {to}"))
+                    let tag = if *runaway { "  (run-away)" } else { "" };
+                    (d, Ev::Wait, format!("move      {carrier} -> {to}{tag}"))
                 }
                 Action::Message { from, to, text, params, reply, carrier, color } => {
                     let (fi, ti) = (sc.need_actor(from, &st.loc)?, sc.need_actor(to, &st.loc)?);
@@ -966,7 +979,7 @@ impl Timeline {
                     (d, Ev::Wait, format!("{verb:<9} {carrier}"))
                 }
                 Action::Status { device, state } => {
-                    let di = sc.need_device(device, &st.loc, "status", &[(DeviceKind::Analyzer, "analyzer")])?;
+                    let di = sc.need_device(device, &st.loc, "status", &[(DeviceKind::Analyzer, "analyzer"), (DeviceKind::Zone, "zone")])?;
                     (st.duration.unwrap_or(0.0), Ev::Status { device: di, state: *state }, format!("status    {device} {}", state.name()))
                 }
                 Action::Needle { device, down } => {
@@ -1004,6 +1017,33 @@ impl Timeline {
                             "carrier '{}' drives into turnstile '{}' ({:.2}s - {:.2}s) while the analyzer is sampling there ({:.2}s - {:.2}s): it must wait at the gate",
                             sc.carriers[ci].id, sc.devices[di].id, a.t_move, a.t0, e.t0, e.t1
                         ));
+                    }
+                }
+            }
+        }
+
+        // A turnstile can't turn while a carrier outside its pockets (one that
+        // has just left, or is arriving) still overlaps the wheel.
+        for w in &wheels {
+            let clear = w.r + TS_RIM + CARRIER_R;
+            for &(r0, r1) in &w.rots {
+                let n = ((r1 - r0) / 0.05).ceil().max(1.0) as usize;
+                for k in 0..=n {
+                    let t = r0 + (r1 - r0) * k as f64 / n as f64;
+                    for (ci, c) in carriers.iter().enumerate() {
+                        // At the instant it leaves, a carrier is still in the exit pocket.
+                        let on_wheel = c.attach.iter().any(|a| t >= a.t0 && t <= a.t1);
+                        if on_wheel || c.ghost || c.opacity(t) <= 0.0 {
+                            continue;
+                        }
+                        let (x, y) = c.pos(t);
+                        let d = ((x - w.cx).powi(2) + (y - w.cy).powi(2)).sqrt();
+                        if d < clear - 1e-6 {
+                            return Err(format!(
+                                "turnstile '{}' rotates ({r0:.2}s - {r1:.2}s) while carrier '{}' is not yet clear of the wheel (at t={t:.2}s it is {d:.0} px from the center, needs {clear:.0}); start the rotation later",
+                                sc.devices[w.device].id, sc.carriers[ci].id
+                            ));
+                        }
                     }
                 }
             }

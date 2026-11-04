@@ -17,8 +17,7 @@ const GLOVE: &str = "#3B82F6";
 const TRACK: (f64, f64, f64, f64) = (30.0, 120.0, 920.0, 765.0);
 const SEQ: (f64, f64, f64, f64) = (970.0, 120.0, 920.0, 765.0);
 const CAPTION_Y: f64 = 905.0;
-/// Turnstile: distance from the pocket centers to the rim of the wheel.
-const TS_RIM: f64 = 32.0;
+
 /// Sequence diagram: below this row height the diagram scrolls instead of
 /// shrinking, with rows of SCROLL_ROW_H.
 const MIN_ROW_H: f64 = 38.0;
@@ -94,11 +93,22 @@ fn active(tl: &Timeline, t: f64, pred: impl Fn(&Ev) -> bool) -> Option<&Timed> {
 
 fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
     // Zones (e.g. the interface module) first, as background.
-    for d in sc.devices.iter().filter(|d| d.kind == DeviceKind::Zone) {
+    // A `status` turns them red (error) or green (ready).
+    for (di, d) in sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Zone) {
         let (x, y, w, h) = d.rect;
+        let st = device_state(tl, di, t);
+        let (fill, stroke, text, sw) = match st.map(|s| s.0) {
+            Some(AnalyzerState::Error) => ("#FEF2F2", "#DC2626", "#B91C1C", 3.0),
+            Some(AnalyzerState::Ready) => ("#F0FDF4", "#16A34A", "#15803D", 3.0),
+            _ => ("#F8FAFC", "#94A3B8", MUTED, 2.0),
+        };
+        if let Some((_, t0)) = st.filter(|s| s.0 != AnalyzerState::Normal && t - s.1 < 1.5) {
+            let a = 0.3 + 0.3 * ((t - t0) / 1.5 * std::f64::consts::PI * 4.0).sin().abs();
+            let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="22" fill="none" stroke="{stroke}" stroke-width="10" opacity="{a:.2}"/>"#, x - 5.0, y - 5.0, w + 10.0, h + 10.0);
+        }
         let _ = write!(
             o,
-            r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="18" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" stroke-dasharray="10 8"/><text x="{}" y="{}" font-size="16" font-weight="600" fill="{MUTED}">{}</text>"##,
+            r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="18" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-dasharray="10 8"/><text x="{}" y="{}" font-size="16" font-weight="600" fill="{text}">{}</text>"##,
             x + 16.0, y + 28.0, esc(&d.label)
         );
     }
@@ -144,7 +154,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         match d.kind {
             DeviceKind::Analyzer => {
                 let (x, y, w, h) = d.rect;
-                let st = analyzer_state(tl, di, t);
+                let st = device_state(tl, di, t);
                 let (fill, stroke, badge) = match st.map(|s| s.0) {
                     Some(AnalyzerState::Error) => ("#FEE2E2", "#DC2626", Some(("ERROR", "#DC2626"))),
                     Some(AnalyzerState::Ready) => ("#DCFCE7", "#16A34A", Some(("READY", "#16A34A"))),
@@ -299,6 +309,10 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         let c = &sc.carriers[ci];
         let (x, y) = pos[ci];
         let _ = write!(o, r#"<g opacity="{:.2}">"#, op[ci]);
+        if tl.carriers[ci].running_away(t) {
+            let a = 0.35 + 0.45 * (t * 2.0 * std::f64::consts::PI * 2.0).sin().abs();
+            let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="31" fill="none" stroke="#DC2626" stroke-width="5" opacity="{a:.2}"/>"##);
+        }
         if c.ghost {
             let _ = write!(
                 o,
@@ -337,11 +351,15 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         if x < TRACK.0 || x > TRACK.0 + TRACK.2 {
             continue;
         }
-        let tag = match &c.tag {
+        let runaway = tl.carriers[ci].running_away(t);
+        let mut tag = match &c.tag {
             Some(tag) => tag.clone(),
             None if c.tube && !c.sample_id.is_empty() => c.sample_id.clone(),
             None => format!("{} (empty)", c.id),
         };
+        if runaway {
+            tag.push_str(" · RUN-AWAY");
+        }
         let w = 16.0 + tag.chars().count() as f64 * 9.0;
         let cands = [(x + 30.0, y - 13.0), (x - 30.0 - w, y - 13.0), (x - w / 2.0, y + 30.0), (x - w / 2.0, y - 56.0)];
         let inside = |(tx, ty): (f64, f64)| tx > TRACK.0 + 8.0 && tx + w < TRACK.0 + TRACK.2 - 8.0 && ty > TRACK.1 && ty + 26.0 < TRACK.1 + TRACK.3;
@@ -355,14 +373,16 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             .or_else(|| cands.iter().copied().find(|&p| inside(p)))
             .unwrap_or(cands[0]);
         taken.push((usize::MAX, (tx, ty, tx + w, ty + 26.0)));
-        let (fill, stroke, dash, style) = if c.ghost {
-            ("#F8FAFC", "#64748B", r#" stroke-dasharray="5 4""#, r#" font-style="italic""#)
+        let (fill, stroke, dash, ink, style) = if runaway {
+            ("#FEE2E2", "#DC2626", "", "#B91C1C", r#" font-weight="700""#)
+        } else if c.ghost {
+            ("#F8FAFC", "#64748B", r#" stroke-dasharray="5 4""#, INK, r#" font-style="italic""#)
         } else {
-            ("#FFFFFF", "#94A3B8", "", "")
+            ("#FFFFFF", "#94A3B8", "", INK, "")
         };
         let _ = write!(
             o,
-            r##"<g opacity="{:.2}"><rect x="{:.1}" y="{:.1}" width="{w:.1}" height="26" rx="6" fill="{fill}" stroke="{stroke}"{dash}/><text x="{:.1}" y="{:.1}" font-size="15" font-family="{MONO}" fill="{INK}"{style}>{}</text></g>"##,
+            r##"<g opacity="{:.2}"><rect x="{:.1}" y="{:.1}" width="{w:.1}" height="26" rx="6" fill="{fill}" stroke="{stroke}"{dash}/><text x="{:.1}" y="{:.1}" font-size="15" font-family="{MONO}" fill="{ink}"{style}>{}</text></g>"##,
             op[ci], tx, ty, tx + 8.0, ty + 18.5, esc(&tag)
         );
     }
@@ -373,7 +393,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
         .devices
         .iter()
         .enumerate()
-        .any(|(di, d)| d.kind == DeviceKind::Analyzer && analyzer_state(tl, di, t).is_some_and(|s| s.0 == AnalyzerState::Error));
+        .any(|(di, d)| d.kind == DeviceKind::Analyzer && device_state(tl, di, t).is_some_and(|s| s.0 == AnalyzerState::Error));
     for (device, sd) in sc.devices.iter().enumerate() {
         if !matches!(sd.kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
             continue;
@@ -521,8 +541,8 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     let _ = write!(o, r##"<text x="{x:.1}" y="{:.1}" font-size="14" font-weight="600" text-anchor="middle" fill="{MUTED}">Operator</text>"##, y + 54.0 - bob);
 }
 
-/// Last `status` of an analyzer at time t, with the time it was set.
-fn analyzer_state(tl: &Timeline, di: usize, t: f64) -> Option<(AnalyzerState, f64)> {
+/// Last `status` of a device (analyzer or zone) at time t, with the time it was set.
+fn device_state(tl: &Timeline, di: usize, t: f64) -> Option<(AnalyzerState, f64)> {
     tl.events
         .iter()
         .filter(|e| e.t0 <= t)
@@ -681,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn needle_label_depends_on_the_analyzer_state() {
+    fn needle_label_depends_on_the_device_state() {
         let steps = "[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp\"\nto = \"down\"\n\
                      [[step]]\naction = \"status\"\nat = 3\ndevice = \"an\"\nstate = \"error\"\n";
         assert!(frame_at(steps, 2.0).contains("Aspirating…"));
@@ -713,6 +733,13 @@ mod tests {
         assert!(frame_at(steps, 1.0).contains("FIRST"));
         let f = frame_at(steps, 3.0);
         assert!(f.contains("SECOND") && !f.contains("FIRST"));
+    }
+
+    #[test]
+    fn runaway_tag_is_shown_during_the_move() {
+        let steps = "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"s\"\nrunaway = true\n";
+        assert!(!frame_at(steps, 0.5).contains("RUN-AWAY"));
+        assert!(frame_at(steps, 1.5).contains("SID-1 · RUN-AWAY"));
     }
 
     #[test]
