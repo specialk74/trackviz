@@ -126,7 +126,6 @@ h = 150
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "antenna"
@@ -213,8 +212,8 @@ ease = "out"
 [[step]]
 action = "caption"
 at = 4.77
-title = "2 · NSD — Prepare"
-text = "At the NSD the first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
+title = "2 · Diverted — Prepare"
+text = "The first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
@@ -308,7 +307,7 @@ duration = 2.0
 action = "caption"
 at = 14.4
 title = "4 · Rotation"
-text = "Only now, with the carrier in the entry position, the wheel rotates and brings it under the needle. Meanwhile the second carrier passes the NSD: Prepare."
+text = "Only now, with the carrier in the entry position, the wheel rotates and brings it under the needle. Meanwhile the second carrier is diverted: Prepare."
 
 [[step]]
 action = "rotate"
@@ -444,7 +443,7 @@ duration = 2.0
 action = "caption"
 at = 27.5
 title = "7 · Rotation — Sample Acquisition"
-text = "Now the wheel rotates: the new carrier goes under the needle, the processed one to the exit and back to the Main-Lane. The third carrier passes the NSD."
+text = "Now the wheel rotates: the new carrier goes under the needle, the processed one to the exit and back to the Main-Lane. The third carrier is diverted."
 
 [[step]]
 action = "highlight"

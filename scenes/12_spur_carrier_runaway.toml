@@ -135,7 +135,6 @@ h = 220
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "sp"

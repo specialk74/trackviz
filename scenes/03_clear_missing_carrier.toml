@@ -110,7 +110,6 @@ h = 175
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "sp"
@@ -221,7 +220,7 @@ ease = "out"
 [[step]]
 action = "caption"
 at = 4.77
-title = "2 · NSD — Prepare"
+title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the Pit-Lane without stopping: the interface sends Prepare to the analyzer."
 
 [[step]]

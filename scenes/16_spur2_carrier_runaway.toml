@@ -218,7 +218,6 @@ h = 400
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "div1"
@@ -311,7 +310,7 @@ cap_color = "#16A34A"
 action = "caption"
 at = 0
 title = "1 · Four carriers"
-text = "Three carriers need needle 1, one needs needle 2. Each one gets Prepare at the NSD and Prepare again at the divert that sends it to its needle."
+text = "Three carriers need needle 1, one needs needle 2. Each one gets Prepare when it enters the spur and Prepare again at the divert that sends it to its needle."
 
 [[step]]
 action = "move"

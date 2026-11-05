@@ -217,7 +217,6 @@ h = 400
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "div1"
@@ -312,8 +311,8 @@ ease = "linear"
 [[step]]
 action = "caption"
 at = 2.439896632895322
-title = "2 · NSD — Prepare"
-text = "At the NSD each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
+title = "2 · Diverted — Prepare"
+text = "Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "move"
@@ -408,7 +407,7 @@ duration = 0.6
 action = "caption"
 at = 8.52490910272343
 title = "3 · Standard divert — Prepare again"
-text = "Unlike the NSD, here the carrier stops and is read. This sample needs needle 1: Prepare again, then it is diverted while the next carrier stops behind."
+text = "Unlike at the entrance of the spur, here the carrier stops and is read. This sample needs needle 1: Prepare again, then it is diverted while the next carrier stops behind."
 
 [[step]]
 action = "message"

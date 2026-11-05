@@ -493,3 +493,35 @@ fn queries_to_dmx_are_sent_one_at_a_time() {
         }
     }
 }
+
+/// The videos never show the internal term "NSD": no caption, label or message.
+#[test]
+fn the_videos_do_not_mention_the_nsd() {
+    let bad = |what: &str, text: &str, path: &std::path::Path| {
+        assert!(!text.contains("NSD") && !text.contains("No Stop"), "{}: {what}: {text}", path.display());
+    };
+    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes")).unwrap() {
+        let path = entry.unwrap().path();
+        let doc = toml::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let sc = Scene::from_doc(&doc).unwrap();
+        let tl = Timeline::build(&sc).unwrap();
+        bad("title", &sc.video.title, &path);
+        bad("subtitle", &sc.video.subtitle, &path);
+        sc.devices.iter().for_each(|d| bad("device", &d.label, &path));
+        sc.lanes.iter().for_each(|l| bad("lane", &l.label, &path));
+        for e in &tl.events {
+            match &e.ev {
+                Ev::Caption { title, text } => {
+                    bad("caption", title, &path);
+                    bad("caption", text, &path);
+                }
+                Ev::Message { text, params, .. } => {
+                    bad("message", text, &path);
+                    bad("message", params, &path);
+                }
+                Ev::Note { text, .. } => bad("note", text, &path),
+                _ => {}
+            }
+        }
+    }
+}

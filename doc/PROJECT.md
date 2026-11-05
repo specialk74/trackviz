@@ -23,7 +23,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Tubo / provetta** | Contiene il campione biologico. Ha un'etichetta con il **SampleId**. |
 | **SampleId** | Identificativo del campione letto dall'etichetta. **Deve comparire in tutti i messaggi.** |
 | **Main-Lane** | Corsia principale del track. |
-| **NSD** | **No Stop Divert**: il dispositivo che sposta il carrier, pieno o vuoto, dalla Main-Lane alla Pit-Lane **senza fermarlo**. |
+| **NSD** | **No Stop Divert**: il dispositivo che sposta il carrier, pieno o vuoto, dalla Main-Lane alla Pit-Lane **senza fermarlo**. Il termine è solo interno: **nei video non compare** (il riquadro non ha etichetta e le didascalie dicono "diverted without stopping"). Lo verifica un test su tutte le scene; nei file di scena restano `kind = "nsd"` e l'id `nsd`. |
 | **Pit-Lane** | Corsia secondaria, parallela alla Main-Lane, in cui il carrier viene fermato per farlo campionare dall'analizzatore. Dopo il punto di campionamento rientra nella Main-Lane, così i carrier processati (pieni o vuoti) tornano nella corsia principale. |
 | **Punto di campionamento** | Posizione sulla Pit-Lane in cui il carrier si ferma e l'analizzatore aspira (pipetta) il campione. |
 | **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
@@ -297,7 +297,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Testi delle didascalie (in inglese):**
 1. *Main-Lane* — A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface.
-2. *NSD — Prepare* — At the NSD (No Stop Divert) the carrier is diverted into the Pit-Lane without stopping. At this moment the interface sends Prepare to the analyzer.
+2. *Diverted — Prepare* — The carrier is diverted into the Pit-Lane without stopping. At this moment the interface sends Prepare to the analyzer.
 3. *Test query* — After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample.
 4. *Sampling point — Sample Acquisition* — The carrier stops at the sampling point. The interface sends Sample Acquisition: the tube is in position and can be aspirated.
 5. *Pipetting* — The analyzer aspirates the biological material from the tube. Meanwhile the carrier is held at the sampling point.

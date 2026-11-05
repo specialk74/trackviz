@@ -218,7 +218,6 @@ h = 400
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "div1"
@@ -334,7 +333,7 @@ ease = "linear"
 [[step]]
 action = "caption"
 at = 2.439896632895322
-title = "2 · NSD — Prepare"
+title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer."
 
 [[step]]

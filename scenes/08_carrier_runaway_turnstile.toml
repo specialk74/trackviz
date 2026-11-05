@@ -131,7 +131,6 @@ h = 150
 id = "nsd"
 kind = "nsd"
 at = "nsd"
-label = "NSD"
 
 [[device]]
 id = "antenna"
