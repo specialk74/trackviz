@@ -53,6 +53,35 @@ log when tuning timings.
 
 ## Scene format (TOML subset)
 
+Parts shared by several scenes live in `scenes/common/` and are pulled in with a
+top-level `include`, written before the first section:
+
+```toml
+include = ["common/video.toml", "common/actors.toml", "common/spur.toml"]
+
+[video]
+subtitle = "My scene"     # added to the included [video]
+
+[[carrier]]
+...
+```
+
+Paths are relative to the including file, and included files can include others.
+Sections like `[[point]]` or `[[device]]` from included files come first, then the
+ones of the scene. Keys of `[video]` are merged and the scene wins, so it can
+override any of them. An id defined twice is an error, and so is a circular include.
+A lane can't be extended from a scene: a geometry that differs needs its own points
+and lanes (scenes 03, 07 and 08 keep theirs in the scene file).
+
+| Common file | Contents |
+|---|---|
+| `video.toml` | title, size, fps, tail, clock |
+| `actors.toml` | Interface, Analyzer, DMX |
+| `sampling.toml` | Pit-Lane with a simple sampling point |
+| `turnstile.toml` | Pit-Lane with turnstile, gate and antenna |
+| `spur.toml` | spur with one sampling point |
+| `spur2.toml` | spur with two sampling points |
+
 All coordinates are in a fixed 1920×1080 space. The track panel covers
 x 30–950 and y 120–885. `[video] width/height` only scales the output.
 

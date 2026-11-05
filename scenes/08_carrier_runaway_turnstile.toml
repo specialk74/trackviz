@@ -10,15 +10,10 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
+include = ["common/video.toml", "common/actors.toml"]
+
 [video]
-title = "Analyzer interface · message exchange with the automation"
 subtitle = "Three carriers — carrier run-away during sampling, Cancel and Clear All (turnstile)"
-width = 1920
-height = 1080
-fps = 30
-tail = 3.5
-show_clock = true
-show_times = true
 
 # ---------------------------------------------------------------- track
 [[point]]
@@ -144,25 +139,6 @@ id = "gate"
 kind = "gate"
 at = "gate"
 label = "Gate"
-
-# ---------------------------------------------------------------- actors
-[[actor]]
-id = "IF"
-label = "Interface"
-sub = "Inpeco automation"
-color = "#2563EB"
-
-[[actor]]
-id = "AN"
-label = "Analyzer"
-sub = "Instrument"
-color = "#EA580C"
-
-[[actor]]
-id = "DMX"
-label = "DMX"
-sub = "LIS"
-color = "#059669"
 
 # ---------------------------------------------------------------- carriers
 [[carrier]]

@@ -214,6 +214,18 @@ impl Scene {
                 return Err(format!("unknown section [[{k}]]"));
             }
         }
+        // Included files make it easy to define the same thing twice.
+        for section in ["lane", "device", "actor", "carrier"] {
+            let mut seen = Vec::new();
+            for t in arr(doc, section) {
+                if let Some(id) = t.str_opt("id")? {
+                    if seen.contains(&id) {
+                        return Err(format!("{}: duplicate {section} id '{id}'", t.location()));
+                    }
+                    seen.push(id);
+                }
+            }
+        }
         let root = &doc.tables[""];
         if !root.entries.is_empty() {
             return Err("keys outside of any section are not allowed".into());

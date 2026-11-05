@@ -118,6 +118,13 @@ route = ["a", "w", "ts.in", "ts.out", "out"]
 speed = 100
 "#;
 
+/// The scenes in scenes/ (the shared files in scenes/common/ are not scenes).
+fn scene_files() -> Vec<std::path::PathBuf> {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes");
+    let list = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path());
+    list.filter(|p| p.extension().is_some_and(|e| e == "toml")).collect()
+}
+
 fn build(base: &str, steps: &str) -> Result<(Scene, Timeline), String> {
     let doc = toml::parse(&format!("{base}\n{steps}"))?;
     let sc = Scene::from_doc(&doc)?;
@@ -180,6 +187,12 @@ fn only_one_timing_key_per_step() {
     err(SAMPLING, &msg("start = \"with\"\nafter_start = 2"), "use only one of");
     err(SAMPLING, &msg("after_end = -1"), "must not be negative");
     err(SAMPLING, &msg("start = \"later\""), "unknown start");
+}
+
+#[test]
+fn duplicate_ids_are_rejected() {
+    let dup = "[[actor]]\nid = \"IF\"\nlabel = \"x\"\n[[step]]\naction = \"wait\"\nduration = 1\n";
+    err(SAMPLING, dup, "duplicate actor id 'IF'");
 }
 
 #[test]
@@ -373,15 +386,11 @@ fn operator_rules() {
 #[test]
 fn all_scenes_in_the_repository_are_valid() {
     let mut n = 0;
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes")).unwrap() {
-        let path = entry.unwrap().path();
-        if path.extension().is_some_and(|e| e == "toml") {
-            let src = std::fs::read_to_string(&path).unwrap();
-            let doc = toml::parse(&src).unwrap();
-            let sc = Scene::from_doc(&doc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-            Timeline::build(&sc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-            n += 1;
-        }
+    for path in scene_files() {
+        let doc = toml::parse_file(&path).unwrap();
+        let sc = Scene::from_doc(&doc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        Timeline::build(&sc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        n += 1;
     }
     assert!(n >= 6, "found only {n} scenes");
 }
@@ -419,13 +428,12 @@ fn status_also_works_on_zones() {
 #[test]
 fn carriers_do_not_overlap_in_the_multi_analyzer_scenes() {
     let mut n = 0;
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes")).unwrap() {
-        let path = entry.unwrap().path();
+    for path in scene_files() {
         if !path.file_name().unwrap().to_str().unwrap().contains("_spur2_") {
             continue;
         }
         n += 1;
-        let doc = toml::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let doc = toml::parse_file(&path).unwrap();
         let sc = Scene::from_doc(&doc).unwrap();
         let tl = Timeline::build(&sc).unwrap();
         let mut t = 0.0;
@@ -456,9 +464,8 @@ fn carriers_do_not_overlap_in_the_multi_analyzer_scenes() {
 /// arrived), and a sample gets Sample Acquisition only after its tests are known.
 #[test]
 fn queries_to_dmx_are_sent_one_at_a_time() {
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes")).unwrap() {
-        let path = entry.unwrap().path();
-        let doc = toml::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for path in scene_files() {
+        let doc = toml::parse_file(&path).unwrap();
         let sc = Scene::from_doc(&doc).unwrap();
         let tl = Timeline::build(&sc).unwrap();
         let mut msgs: Vec<(f64, f64, &str, &str)> = tl
@@ -500,9 +507,8 @@ fn the_videos_do_not_mention_the_nsd() {
     let bad = |what: &str, text: &str, path: &std::path::Path| {
         assert!(!text.contains("NSD") && !text.contains("No Stop"), "{}: {what}: {text}", path.display());
     };
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes")).unwrap() {
-        let path = entry.unwrap().path();
-        let doc = toml::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for path in scene_files() {
+        let doc = toml::parse_file(&path).unwrap();
         let sc = Scene::from_doc(&doc).unwrap();
         let tl = Timeline::build(&sc).unwrap();
         bad("title", &sc.video.title, &path);

@@ -105,8 +105,7 @@ fn expand(arg: &str) -> Result<Vec<String>, String> {
 }
 
 fn load(path: &str) -> Result<(scene::Scene, scene::Timeline), String> {
-    let src = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
-    let doc = toml::parse(&src).map_err(|e| format!("{path}: {e}"))?;
+    let doc = toml::parse_file(Path::new(path)).map_err(|e| if e.starts_with(path) { e } else { format!("{path}: {e}") })?;
     let sc = scene::Scene::from_doc(&doc).map_err(|e| format!("{path}: {e}"))?;
     let tl = scene::Timeline::build(&sc).map_err(|e| format!("{path}: {e}"))?;
     Ok((sc, tl))

@@ -4,6 +4,7 @@
 //! and arrays (possibly spanning multiple lines).
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -17,6 +18,8 @@ pub enum Value {
 pub struct Table {
     pub name: String,
     pub line: usize,
+    /// The included file this table comes from (empty: the scene file itself).
+    pub file: String,
     pub entries: BTreeMap<String, Value>,
 }
 
@@ -29,6 +32,59 @@ pub struct Doc {
 enum Cur {
     Table(String),
     Arr(String),
+}
+
+/// Reads a scene file with its includes. A top-level `include = ["a.toml", ...]`
+/// loads other files first (paths relative to the including file, nested includes
+/// allowed): their array sections come before the ones of this file, and the keys
+/// of a table such as [video] are merged, the including file winning.
+pub fn parse_file(path: &Path) -> Result<Doc, String> {
+    parse_included(path, "", &mut Vec::new())
+}
+
+fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<Doc, String> {
+    let name = path.display();
+    let real = path.canonicalize().map_err(|e| format!("{name}: {e}"))?;
+    if stack.contains(&real) {
+        return Err(format!("{name}: circular include"));
+    }
+    let src = std::fs::read_to_string(path).map_err(|e| format!("{name}: {e}"))?;
+    let mut own = parse(&src).map_err(|e| if shown.is_empty() { e } else { format!("{shown}: {e}") })?;
+    for t in own.tables.values_mut().chain(own.arrays.values_mut().flatten()) {
+        t.file = shown.to_string();
+    }
+    let root = own.tables.get_mut("").unwrap();
+    let includes = match root.entries.contains_key("include") {
+        true => root.str_list("include")?,
+        false => Vec::new(),
+    };
+    root.entries.remove("include");
+
+    stack.push(real);
+    let mut doc = Doc::default();
+    for inc in &includes {
+        let target = path.parent().unwrap_or(Path::new("")).join(inc);
+        let d = parse_included(&target, inc, stack)?;
+        merge(&mut doc, d);
+    }
+    stack.pop();
+    merge(&mut doc, own);
+    Ok(doc)
+}
+
+/// Adds `other` after `doc`: arrays are appended, table keys override.
+fn merge(doc: &mut Doc, other: Doc) {
+    for (k, t) in other.tables {
+        match doc.tables.get_mut(&k) {
+            Some(d) => d.entries.extend(t.entries),
+            None => {
+                doc.tables.insert(k, t);
+            }
+        }
+    }
+    for (k, v) in other.arrays {
+        doc.arrays.entry(k).or_default().extend(v);
+    }
 }
 
 pub fn parse(src: &str) -> Result<Doc, String> {
@@ -208,7 +264,12 @@ fn parse_value(s: &str) -> Result<(Value, &str), String> {
 
 impl Table {
     fn ctx(&self) -> String {
-        format!("[{}] at line {}", self.name, self.line)
+        let place = format!("[{}] at line {}", self.name, self.line);
+        if self.file.is_empty() {
+            place
+        } else {
+            format!("{}: {place}", self.file)
+        }
     }
     pub fn check_keys(&self, allowed: &[&str]) -> Result<(), String> {
         for k in self.entries.keys() {
@@ -304,6 +365,60 @@ id = "p2"
         assert_eq!(pts.len(), 2);
         assert_eq!(pts[0].str_list("list").unwrap(), vec!["a", "b"]);
         assert_eq!(pts[1].str_req("id").unwrap(), "p2");
+    }
+
+    /// Writes files in a fresh temporary directory, returning it.
+    fn files(tag: &str, list: &[(&str, &str)]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("trackviz_inc_{tag}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for (name, text) in list {
+            let p = dir.join(name);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn includes_are_merged_and_the_scene_wins() {
+        let dir = files(
+            "merge",
+            &[
+                ("s.toml", "include = [\"common/a.toml\", \"common/b.toml\"]\n[video]\ntail = 9\n[[point]]\nid = \"s\"\n"),
+                ("common/a.toml", "include = [\"c.toml\"]\n[video]\ntitle = \"t\"\ntail = 1\n[[point]]\nid = \"a\"\n"),
+                ("common/b.toml", "[[point]]\nid = \"b\"\n"),
+                ("common/c.toml", "[[point]]\nid = \"c\"\n"),
+            ],
+        );
+        let doc = parse_file(&dir.join("s.toml")).unwrap();
+        let v = &doc.tables["video"];
+        assert_eq!(v.str_req("title").unwrap(), "t");
+        assert_eq!(v.num_req("tail").unwrap(), 9.0);
+        let ids: Vec<String> = doc.arrays["point"].iter().map(|t| t.str_req("id").unwrap()).collect();
+        // Nested first, then in include order, then the scene's own.
+        assert_eq!(ids, vec!["c", "a", "b", "s"]);
+        assert!(doc.tables[""].entries.is_empty(), "include is consumed");
+        // Errors in an included table name its file.
+        assert!(doc.arrays["point"][1].location().contains("common/a.toml"), "{}", doc.arrays["point"][1].location());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn include_errors() {
+        let dir = files(
+            "err",
+            &[
+                ("loop1.toml", "include = [\"loop2.toml\"]\n"),
+                ("loop2.toml", "include = [\"loop1.toml\"]\n"),
+                ("missing.toml", "include = [\"nope.toml\"]\n"),
+                ("bad.toml", "include = [\"broken.toml\"]\n"),
+                ("broken.toml", "[video\n"),
+            ],
+        );
+        assert!(parse_file(&dir.join("loop1.toml")).unwrap_err().contains("circular include"));
+        assert!(parse_file(&dir.join("missing.toml")).unwrap_err().contains("nope.toml"));
+        assert!(parse_file(&dir.join("bad.toml")).unwrap_err().contains("broken.toml"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

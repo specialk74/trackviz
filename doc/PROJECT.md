@@ -110,7 +110,8 @@ trackviz/
 │   ├── 13_spur2_happy_path.toml
 │   ├── 14_spur2_clear_missing_carrier.toml
 │   ├── 15_spur2_analyzer_error_recovery.toml
-│   └── 16_spur2_carrier_runaway.toml
+│   ├── 16_spur2_carrier_runaway.toml
+│   └── common/           # parti comuni incluse dalle scene: video, attori, geometrie
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -222,6 +223,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 ---
 
 ## 8. Formato delle scene (riferimento)
+
+Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.toml"` prende solo le scene. Le scene 03, 07 e 08 hanno geometrie uniche e le tengono nel proprio file.
 
 | Sezione | Chiavi |
 |---|---|
