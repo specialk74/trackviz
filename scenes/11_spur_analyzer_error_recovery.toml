@@ -45,13 +45,13 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 3.07
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
-at = 3.07
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
@@ -139,14 +139,14 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 37.49
+when = "C1 at merge"
 title = "8 · Main-Lane — Release"
 text = "The carrier went round the spur and is back on the Main-Lane: the interface sends Release."
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.07
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -170,7 +170,8 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "sample_acquisition"
-at = 9.6
+when = "C1 at sampling"
+delay = 0.46
 carrier = "C1"
 
 [[step]]
@@ -216,6 +217,6 @@ at = 25.4
 [[step]]
 action = "message"
 type = "release"
-at = 37.49
+when = "C1 at merge"
 carrier = "C1"
 

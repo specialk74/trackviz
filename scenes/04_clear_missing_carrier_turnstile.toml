@@ -100,20 +100,20 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 4.77
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
-at = 4.77
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 4.77
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -130,20 +130,21 @@ carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 10.62
+when = "C1 at pit_wait"
 title = "3 · Antenna — Prepare again"
 text = "The first carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle."
 
 [[step]]
 action = "highlight"
-at = 10.62
+when = "C1 at pit_wait"
 device = "antenna"
 duration = 1.5
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 10.82
+when = "C1 at pit_wait"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
@@ -204,20 +205,20 @@ device = "ts"
 
 [[step]]
 action = "caption"
-at = 14.5
+when = "C3 at nsd"
 title = "5 · Third carrier — Prepare"
 text = "The third carrier is diverted into the Pit-Lane: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
 
 [[step]]
 action = "highlight"
-at = 14.5
+when = "C3 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 14.5
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -258,13 +259,13 @@ duration = 6.6
 
 [[step]]
 action = "caption"
-at = 20.35
+when = "C3 at pit_wait"
 title = "7 · Antenna reads the third carrier — Clear"
 text = "The third carrier stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second."
 
 [[step]]
 action = "highlight"
-at = 20.35
+when = "C3 at pit_wait"
 device = "antenna"
 duration = 1.5
 
@@ -376,7 +377,7 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "release"
-at = 38.08
+when = "C1 at merge"
 carrier = "C1"
 
 [[step]]
@@ -401,6 +402,6 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-at = 48.28
+when = "C3 at merge"
 carrier = "C3"
 

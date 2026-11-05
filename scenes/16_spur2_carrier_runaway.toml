@@ -76,14 +76,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 2.44
+when = "C1 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 2.44
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -95,14 +95,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 3.35
+when = "C4 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.35
+when = "C4 at nsd"
 carrier = "C4"
 
 [[step]]
@@ -133,14 +133,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 5.35
+when = "C2 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 5.35
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
@@ -171,14 +171,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 7.35
+when = "C3 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 7.35
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -189,14 +189,15 @@ carrier = "C1"
 
 [[step]]
 action = "highlight"
-at = 8.52
+when = "C1 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 8.62
+when = "C1 at d1"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -228,7 +229,7 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 10.81
+when = "C4 at d1"
 device = "div1"
 duration = 0.6
 
@@ -281,7 +282,8 @@ carrier = "C2"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 1
-at = 12.5
+when = "C1 at s1"
+delay = 0.3
 carrier = "C1"
 
 [[step]]
@@ -293,14 +295,15 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 13.1
+when = "C2 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 13.2
+when = "C2 at d1"
+delay = 0.1
 carrier = "C2"
 
 [[step]]
@@ -312,7 +315,7 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 14.35
+when = "C4 at d2"
 device = "div2"
 duration = 0.6
 
@@ -325,7 +328,8 @@ carrier = "C2"
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 14.45
+when = "C4 at d2"
+delay = 0.1
 carrier = "C4"
 
 [[step]]
@@ -344,14 +348,15 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 15.58
+when = "C3 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 15.68
+when = "C3 at d1"
+delay = 0.1
 carrier = "C3"
 
 [[step]]
@@ -412,7 +417,8 @@ carrier = "C3"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 2
-at = 18.23
+when = "C4 at s2"
+delay = 0.2
 carrier = "C4"
 
 [[step]]
@@ -423,7 +429,7 @@ duration = 4.0
 
 [[step]]
 action = "highlight"
-at = 19.19
+when = "C1 at d2"
 device = "div2"
 duration = 0.6
 
@@ -503,7 +509,7 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 32.42
+when = "C2 at d2"
 device = "div2"
 duration = 0.6
 
@@ -538,7 +544,7 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-at = 35.07
+when = "C4 at merge"
 carrier = "C4"
 
 [[step]]
@@ -549,7 +555,7 @@ state = "normal"
 
 [[step]]
 action = "highlight"
-at = 38.76
+when = "C3 at d2"
 device = "div2"
 duration = 0.6
 

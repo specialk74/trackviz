@@ -195,20 +195,20 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 4.77
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the Pit-Lane without stopping: the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
-at = 4.77
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 4.77
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -269,20 +269,20 @@ carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 11.0
+when = "C3 at nsd"
 title = "4 · Third carrier — Prepare"
 text = "The third carrier is diverted into the Pit-Lane: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
 
 [[step]]
 action = "highlight"
-at = 11.0
+when = "C3 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 11.0
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -312,7 +312,8 @@ carrier = "C2"
 [[step]]
 action = "message"
 type = "sample_acquisition"
-at = 14.4
+when = "C1 at sampling"
+delay = 1.08
 carrier = "C1"
 
 [[step]]
@@ -329,7 +330,7 @@ duration = 5.0
 
 [[step]]
 action = "caption"
-at = 18.3
+when = "C3 at queue"
 title = "6 · One position, two carriers"
 text = "The third carrier stops on the same queue position as the second one: the second is not physically there: it went straight on along the Main-Lane."
 
@@ -420,7 +421,7 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "release"
-at = 30.42
+when = "C1 at merge"
 carrier = "C1"
 
 [[step]]
@@ -458,5 +459,5 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-at = 45.92
+when = "C3 at merge"
 carrier = "C3"

@@ -73,7 +73,7 @@ ease = "linear"
 
 [[step]]
 action = "caption"
-at = 2.439896632895322
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer."
 
@@ -86,14 +86,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 2.44
+when = "C1 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 2.44
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -161,14 +161,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 6.35
+when = "C3 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 6.35
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -185,14 +185,15 @@ carrier = "C3"
 
 [[step]]
 action = "highlight"
-at = 8.52
+when = "C1 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 8.62
+when = "C1 at d1"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -225,18 +226,19 @@ carrier = "C2"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 1
-at = 12.4
+when = "C1 at s1"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 12.43
+when = "C3 at d1"
 title = "4 · Read at the divert — Clear"
 text = "The third carrier stops at the divert on top of the second one, which is not there. It reads the third sample instead of the second: the interface sends Clear for the second."
 
 [[step]]
 action = "highlight"
-at = 12.43
+when = "C3 at d1"
 device = "div1"
 duration = 0.6
 
@@ -326,7 +328,8 @@ ease = "inout"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 1
-at = 24.29
+when = "C3 at s1"
+delay = 0.2
 carrier = "C3"
 
 [[step]]
@@ -337,7 +340,7 @@ duration = 4.0
 
 [[step]]
 action = "highlight"
-at = 25.95
+when = "C1 at d2"
 device = "div2"
 duration = 0.6
 
@@ -378,7 +381,7 @@ ease = "inout"
 [[step]]
 action = "message"
 type = "release"
-at = 35.64
+when = "C1 at merge"
 carrier = "C1"
 
 [[step]]
@@ -390,7 +393,7 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 35.84
+when = "C3 at d2"
 device = "div2"
 duration = 0.6
 
@@ -411,7 +414,7 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "release"
-at = 45.53
+when = "C3 at merge"
 carrier = "C3"
 
 [[step]]

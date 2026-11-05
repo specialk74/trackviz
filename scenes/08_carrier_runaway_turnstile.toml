@@ -219,25 +219,25 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 4.77
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "highlight"
-at = 10.0
+when = "C2 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "highlight"
-at = 13.0
+when = "C3 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "highlight"
-at = 10.62
+when = "C1 at pit_wait"
 device = "antenna"
 duration = 1.5
 
@@ -256,7 +256,7 @@ device = "ts"
 
 [[step]]
 action = "highlight"
-at = 15.85
+when = "C2 at pit_wait"
 device = "antenna"
 duration = 1.5
 
@@ -392,7 +392,7 @@ ease = "out"
 [[step]]
 action = "message"
 type = "prepare"
-at = 4.77
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -410,13 +410,14 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "prepare"
-at = 10.0
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 10.82
+when = "C1 at pit_wait"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
@@ -440,7 +441,7 @@ carrier = "C2"
 [[step]]
 action = "message"
 type = "prepare"
-at = 13.0
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -464,7 +465,8 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 16.05
+when = "C2 at pit_wait"
+delay = 0.2
 carrier = "C2"
 
 [[step]]

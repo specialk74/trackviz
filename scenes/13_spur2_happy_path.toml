@@ -51,7 +51,7 @@ ease = "linear"
 
 [[step]]
 action = "caption"
-at = 2.439896632895322
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
 
@@ -64,14 +64,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 2.44
+when = "C1 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 2.44
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -83,14 +83,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 3.35
+when = "C2 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.35
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
@@ -119,20 +119,21 @@ carrier = "C1"
 
 [[step]]
 action = "highlight"
-at = 8.52
+when = "C1 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "caption"
-at = 8.52490910272343
+when = "C1 at d1"
 title = "3 · Standard divert — Prepare again"
 text = "Unlike at the entrance of the spur, here the carrier stops and is read. This sample needs needle 1: Prepare again, then it is diverted while the next carrier stops behind."
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 8.62
+when = "C1 at d1"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -151,13 +152,13 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 11.01
+when = "C2 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "caption"
-at = 11.010398163397447
+when = "C2 at d1"
 title = "4 · The next carrier goes straight on"
 text = "The second carrier also stops and is read, but it only needs needle 2: it goes straight on to the second divert, where it gets Prepare again."
 
@@ -184,7 +185,8 @@ carrier = "C2"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 1
-at = 12.5
+when = "C1 at s1"
+delay = 0.3
 carrier = "C1"
 
 [[step]]
@@ -195,14 +197,15 @@ duration = 4.0
 
 [[step]]
 action = "highlight"
-at = 14.55
+when = "C2 at d2"
 device = "div2"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 14.65
+when = "C2 at d2"
+delay = 0.1
 carrier = "C2"
 
 [[step]]
@@ -229,7 +232,8 @@ text = "There is one Sample Acquisition for each sampling point: the Needle para
 action = "message"
 type = "sample_acquisition_needle"
 needle = 2
-at = 18.43
+when = "C2 at s2"
+delay = 0.2
 carrier = "C2"
 
 [[step]]
@@ -247,20 +251,21 @@ duration = 4.0
 
 [[step]]
 action = "caption"
-at = 24.05
+when = "C1 at d2"
 title = "6 · The first sample also needs needle 2"
 text = "Leaving needle 1 the carrier stops at the second divert: Prepare again. It also needs needle 2, so it enters the second pit-lane right away, even if the carrier ahead is still there."
 
 [[step]]
 action = "highlight"
-at = 24.05
+when = "C1 at d2"
 device = "div2"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 24.15
+when = "C1 at d2"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -295,7 +300,8 @@ ease = "linear"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 2
-at = 27.93
+when = "C1 at s2"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
@@ -327,14 +333,14 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 35.27
+when = "C2 at merge"
 title = "7 · Main-Lane — Release"
 text = "Back on the Main-Lane each carrier gets one Release, however many needles sampled it."
 
 [[step]]
 action = "message"
 type = "release"
-at = 35.27
+when = "C2 at merge"
 carrier = "C2"
 
 [[step]]
@@ -354,6 +360,6 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-at = 44.77
+when = "C1 at merge"
 carrier = "C1"
 

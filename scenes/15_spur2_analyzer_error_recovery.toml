@@ -51,7 +51,7 @@ ease = "linear"
 
 [[step]]
 action = "caption"
-at = 2.439896632895322
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer."
 
@@ -64,14 +64,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 2.44
+when = "C1 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 2.44
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -83,14 +83,14 @@ ease = "out"
 
 [[step]]
 action = "highlight"
-at = 3.35
+when = "C2 at nsd"
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.35
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
@@ -119,14 +119,15 @@ carrier = "C1"
 
 [[step]]
 action = "highlight"
-at = 8.52
+when = "C1 at d1"
 device = "div1"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 8.62
+when = "C1 at d1"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -145,7 +146,7 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 11.01
+when = "C2 at d1"
 device = "div1"
 duration = 0.6
 
@@ -178,7 +179,8 @@ carrier = "C2"
 action = "message"
 type = "sample_acquisition_needle"
 needle = 1
-at = 12.4
+when = "C1 at s1"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
@@ -196,14 +198,15 @@ duration = 2.6
 
 [[step]]
 action = "highlight"
-at = 14.55
+when = "C2 at d2"
 device = "div2"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 14.65
+when = "C2 at d2"
+delay = 0.1
 carrier = "C2"
 
 [[step]]
@@ -247,7 +250,8 @@ at = 18.4
 action = "message"
 type = "sample_acquisition_needle"
 needle = 2
-at = 18.8
+when = "C2 at s2"
+delay = 0.57
 carrier = "C2"
 
 [[step]]
@@ -335,7 +339,7 @@ ease = "inout"
 
 [[step]]
 action = "highlight"
-at = 34.45
+when = "C1 at d2"
 device = "div2"
 duration = 0.6
 
@@ -355,14 +359,14 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 35.64
+when = "C2 at merge"
 title = "7 · Main-Lane — Release"
 text = "Each carrier gets its Release when it is back on the Main-Lane."
 
 [[step]]
 action = "message"
 type = "release"
-at = 35.64
+when = "C2 at merge"
 carrier = "C2"
 
 [[step]]
@@ -375,7 +379,7 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "release"
-at = 44.14
+when = "C1 at merge"
 carrier = "C1"
 
 [[step]]

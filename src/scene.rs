@@ -173,13 +173,15 @@ impl AnalyzerState {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum StartMode {
     After,
     With,
     AfterAll,
     /// Absolute start time in seconds (`at = ...`); `delay` is added on top.
     At(f64),
+    /// `when = "C1 at merge"`: when the carrier reaches the point.
+    When { carrier: String, point: String },
 }
 
 pub struct Step {
@@ -393,7 +395,7 @@ impl Scene {
 
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
-            let common = ["action", "start", "at", "after_start", "after_end", "delay", "duration"];
+            let common = ["action", "start", "at", "after_start", "after_end", "when", "delay", "duration"];
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
@@ -480,9 +482,10 @@ impl Scene {
             // (seconds after the start / end of the previous step) or `start`.
             let (at, after_start, after_end) = (t.num_opt("at")?, t.num_opt("after_start")?, t.num_opt("after_end")?);
             let start_key = t.str_opt("start")?;
-            let given = [at.is_some(), after_start.is_some(), after_end.is_some(), start_key.is_some()].iter().filter(|b| **b).count();
+            let when = t.str_opt("when")?;
+            let given = [at.is_some(), after_start.is_some(), after_end.is_some(), start_key.is_some(), when.is_some()].iter().filter(|b| **b).count();
             if given > 1 {
-                return Err(format!("{}: use only one of 'at', 'after_start', 'after_end', 'start'", t.location()));
+                return Err(format!("{}: use only one of 'at', 'after_start', 'after_end', 'when', 'start'", t.location()));
             }
             for (k, v) in [("after_start", after_start), ("after_end", after_end)] {
                 if v.is_some_and(|v| v < 0.0) {
@@ -490,7 +493,12 @@ impl Scene {
                 }
             }
             let mut delay = t.num_opt("delay")?.unwrap_or(0.0);
-            let start = if let Some(at) = at {
+            let start = if let Some(w) = when {
+                match w.split_whitespace().collect::<Vec<_>>()[..] {
+                    [carrier, "at", point] => StartMode::When { carrier: carrier.into(), point: point.into() },
+                    _ => return Err(format!("{}: 'when' is written \"<carrier> at <point>\", not \"{w}\"", t.location())),
+                }
+            } else if let Some(at) = at {
                 StartMode::At(at)
             } else if let Some(d) = after_start {
                 delay += d;
@@ -796,6 +804,11 @@ impl CarrierPath {
         }
         None
     }
+    /// When the carrier reaches distance s along its route, among the moves
+    /// laid out so far.
+    fn reaches(&self, s: f64) -> Option<f64> {
+        self.moves.iter().find(|m| m.s1 >= s - 1e-9).map(|m| if (m.s1 - s).abs() < 1e-9 { m.t1 } else { self.time_at_s(m, s) })
+    }
     /// First time within move m at which the carrier reaches distance s.
     fn time_at_s(&self, m: &MoveSeg, s: f64) -> f64 {
         if s <= m.s0 {
@@ -938,8 +951,17 @@ impl Timeline {
         let mut first = true;
 
         for st in &sc.steps {
-            let base = match st.start {
-                StartMode::At(at) => at,
+            let base = match &st.start {
+                StartMode::At(at) => *at,
+                StartMode::When { carrier, point } => {
+                    let ci = sc.need_carrier(carrier, &st.loc)?;
+                    let i = sc.carriers[ci].route.iter().position(|p| p == point)
+                        .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
+                    let path = &carriers[ci];
+                    path.reaches(path.cum[i]).ok_or_else(|| {
+                        format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
+                    })?
+                }
                 _ if first => 0.0,
                 StartMode::After => prev_end,
                 StartMode::With => prev_start,

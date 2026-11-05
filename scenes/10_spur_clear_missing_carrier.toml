@@ -97,13 +97,13 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 3.07
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
-at = 3.07
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
@@ -115,7 +115,7 @@ duration = 2.0
 
 [[step]]
 action = "highlight"
-at = 8.5
+when = "C3 at nsd"
 device = "nsd"
 duration = 2.0
 
@@ -140,7 +140,7 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 8.5
+when = "C3 at nsd"
 title = "4 · Third carrier — Prepare"
 text = "The third carrier is diverted into the spur: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
 
@@ -219,7 +219,7 @@ text = "Only after the reply to Clear the interface sends Sample Acquisition for
 
 [[step]]
 action = "caption"
-at = 29.39
+when = "C1 at merge"
 title = "10 · Release"
 text = "The first carrier is back on the Main-Lane: Release."
 
@@ -253,7 +253,7 @@ ease = "out"
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.07
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -289,7 +289,7 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "prepare"
-at = 8.5
+when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
@@ -367,7 +367,7 @@ duration = 4.5
 [[step]]
 action = "message"
 type = "release"
-at = 29.39
+when = "C1 at merge"
 carrier = "C1"
 
 [[step]]
@@ -379,6 +379,6 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "release"
-at = 42.99
+when = "C3 at merge"
 carrier = "C3"
 

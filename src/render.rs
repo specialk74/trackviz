@@ -27,6 +27,11 @@ pub fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
+/// Caption lines, and how many of them fit in the band.
+pub fn caption_lines(title: &str, text: &str) -> (Vec<String>, usize) {
+    (wrap(text, 118), if title.is_empty() { 3 } else { 2 })
+}
+
 fn wrap(text: &str, max: usize) -> Vec<String> {
     let mut lines = Vec::new();
     for para in text.split('\n') {
@@ -741,8 +746,8 @@ fn caption(o: &mut String, tl: &Timeline, t: f64) {
             } else {
                 y += 14.0;
             }
-            let max_lines = if title.is_empty() { 3 } else { 2 };
-            for line in wrap(text, 118).iter().take(max_lines) {
+            let (lines, max_lines) = caption_lines(title, text);
+            for line in lines.iter().take(max_lines) {
                 let _ = write!(o, r##"<text x="64" y="{y}" font-size="27" fill="#F8FAFC">{}</text>"##, esc(line));
                 y += 36.0;
             }

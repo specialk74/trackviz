@@ -49,7 +49,14 @@ A scene that fails doesn't stop the others: all the failures are listed at the e
 the exit code is 1. `-o` and `--still` take a single scene.
 
 `--check` prints every step with its start and end time. Use it as the event
-log when tuning timings.
+log when tuning timings. It also prints warnings, as rendering does, for what is
+valid but looks wrong; they don't stop anything and the exit code stays 0:
+
+- two physical carriers overlapping on the track
+- rows of the sequence diagram out of time order (rows follow the file)
+- captions too long for the band, which get cut
+- a Query sent before the reply to the previous one has arrived
+- a Sample Acquisition sent before the tests of that sample are known
 
 ## Scene format (TOML subset)
 
@@ -95,7 +102,7 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (bool: this actor gets the "Pipetting" note) |
 | `[[message]]` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color`, `ghost` (bool, see below), `visible` (bool, default true), `tag` (tag text, default the SampleId) |
-| `[[step]]` | `action`, one of `start` / `at` / `after_start` / `after_end`, `delay`, `duration` + action keys (below) |
+| `[[step]]` | `action`, one of `start` / `at` / `after_start` / `after_end` / `when`, `delay`, `duration` + action keys (below) |
 
 ### Steps
 
@@ -110,12 +117,15 @@ Instead of `start` (only one of these keys per step):
 - `at = <seconds>`: absolute time
 - `after_start = <seconds>`: that many seconds after the **start** of the previous step
 - `after_end = <seconds>`: that many seconds after the **end** of the previous step
+- `when = "C1 at merge"`: when the carrier reaches the point, also in the middle of a
+  move. The move must come before this step in the file. If a speed changes, the
+  step follows the carrier
 
 `delay` adds seconds on top of any of them. The previous step is the one
 before in the file. Example: a message `at = 10` (1.5 s long), then
 `after_start = 3` starts at 13 s, while `after_end = 3` would start at 14.5 s.
 
-**With none of these keys** (no `start`, `at`, `after_start`, `after_end`) a step
+**With none of these keys** (no `start`, `at`, `after_start`, `after_end`, `when`) a step
 starts when the previous step ends, i.e. steps run one after the other. The first
 step of the file starts at 0 s. To start a step together with the previous one use
 `start = "with"` (same as `after_start = 0`). Note that `caption` and `status` last

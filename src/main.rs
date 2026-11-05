@@ -11,6 +11,7 @@
 //! Frames are rasterized in-process with resvg; only `ffmpeg` is needed on PATH
 //! (and only for video output).
 
+mod lint;
 mod render;
 mod scene;
 mod toml;
@@ -111,10 +112,13 @@ fn load(path: &str) -> Result<(scene::Scene, scene::Timeline), String> {
     Ok((sc, tl))
 }
 
-fn timeline_text(tl: &scene::Timeline) -> String {
+fn timeline_text(sc: &scene::Scene, tl: &scene::Timeline) -> String {
     let mut t = format!("Timeline ({:.1} s total):\n", tl.duration);
     for l in &tl.log {
         t.push_str(&format!("  {l}\n"));
+    }
+    for w in lint::warnings(sc, tl) {
+        t.push_str(&format!("warning: {w}\n"));
     }
     t
 }
@@ -218,7 +222,12 @@ fn render_many(files: &[String], jobs: usize) -> Result<(), String> {
             s.spawn(|| {
                 while let Some(path) = files.get(next.fetch_add(1, Ordering::SeqCst)) {
                     let out = default_out(path);
-                    let r = load(path).and_then(|(sc, tl)| render_video(&sc, &tl, &out, each, &opt, false));
+                    let r = load(path).and_then(|(sc, tl)| {
+                        for w in lint::warnings(&sc, &tl) {
+                            eprintln!("warning: {path}: {w}");
+                        }
+                        render_video(&sc, &tl, &out, each, &opt, false)
+                    });
                     match r {
                         Ok(()) => eprintln!("wrote {out}"),
                         Err(e) => {
@@ -296,7 +305,7 @@ fn run() -> Result<(), String> {
                 eprintln!("== {f}");
             }
             match load(f) {
-                Ok((_, tl)) => eprint!("{}", timeline_text(&tl)),
+                Ok((sc, tl)) => eprint!("{}", timeline_text(&sc, &tl)),
                 Err(e) if files.len() == 1 => return Err(e),
                 Err(e) => failures.push(e),
             }
@@ -309,7 +318,7 @@ fn run() -> Result<(), String> {
 
     let scene_path = &files[0];
     let (sc, tl) = load(scene_path)?;
-    eprint!("{}", timeline_text(&tl));
+    eprint!("{}", timeline_text(&sc, &tl));
     if let Some(t) = still {
         let (w, h) = (sc.video.width, sc.video.height);
         let svg = render::frame(&sc, &tl, t);

@@ -423,84 +423,6 @@ fn status_also_works_on_zones() {
     err(&base, "[[step]]\naction = \"status\"\ndevice = \"nsd\"\nstate = \"error\"\n", "status needs a device of kind 'analyzer' or 'zone' or 'sampling'");
 }
 
-/// Physical carriers never overlap on the track (checked on the scenes with
-/// several analyzers, where carriers stop and queue the most).
-#[test]
-fn carriers_do_not_overlap_in_the_multi_analyzer_scenes() {
-    let mut n = 0;
-    for path in scene_files() {
-        if !path.file_name().unwrap().to_str().unwrap().contains("_spur2_") {
-            continue;
-        }
-        n += 1;
-        let doc = toml::parse_file(&path).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap();
-        let tl = Timeline::build(&sc).unwrap();
-        let mut t = 0.0;
-        while t < tl.duration {
-            let pos: Vec<Option<(f64, f64)>> = (0..sc.carriers.len())
-                .map(|ci| {
-                    let p = tl.carrier_pos(ci, t);
-                    // Outside the panel carriers may share the spawn or exit point.
-                    (tl.carriers[ci].physical(t) && (30.0..950.0).contains(&p.0)).then_some(p)
-                })
-                .collect();
-            for i in 0..pos.len() {
-                for j in i + 1..pos.len() {
-                    if let (Some(a), Some(b)) = (pos[i], pos[j]) {
-                        let d = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
-                        assert!(d >= 2.0 * CARRIER_R, "{}: {} and {} overlap at t={t:.2}s ({d:.0} px)", path.display(), sc.carriers[i].id, sc.carriers[j].id);
-                    }
-                }
-            }
-            t += 0.02;
-        }
-    }
-    assert_eq!(n, 4);
-}
-
-/// Domain rules on the message order, checked on every scene: the analyzer sends
-/// one Query at a time (the next one only after the reply to the previous one has
-/// arrived), and a sample gets Sample Acquisition only after its tests are known.
-#[test]
-fn queries_to_dmx_are_sent_one_at_a_time() {
-    for path in scene_files() {
-        let doc = toml::parse_file(&path).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap();
-        let tl = Timeline::build(&sc).unwrap();
-        let mut msgs: Vec<(f64, f64, &str, &str)> = tl
-            .events
-            .iter()
-            .filter_map(|e| match &e.ev {
-                Ev::Message { text, params, .. } => Some((e.t0, e.t1, text.as_str(), params.as_str())),
-                _ => None,
-            })
-            .collect();
-        msgs.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let mut waiting = false;
-        let mut free_at = f64::NEG_INFINITY;
-        for &(t0, t1, text, params) in &msgs {
-            match text {
-                "Query" => {
-                    assert!(!waiting && t0 >= free_at, "{}: Query at {t0:.2}s before the previous reply has arrived ({params})", path.display());
-                    waiting = true;
-                }
-                "Tests to perform" => {
-                    assert!(waiting, "{}: reply at {t0:.2}s without a Query", path.display());
-                    waiting = false;
-                    free_at = t1;
-                }
-                "Sample Acquisition" => {
-                    let id = params.split_whitespace().next().unwrap();
-                    let known = msgs.iter().any(|m| m.2 == "Tests to perform" && m.3.split_whitespace().next() == Some(id) && m.1 <= t0);
-                    assert!(known, "{}: Sample Acquisition at {t0:.2}s before the tests of {id} are known", path.display());
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
 /// The videos never show the internal term "NSD": no caption, label or message.
 #[test]
 fn the_videos_do_not_mention_the_nsd() {
@@ -575,4 +497,43 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
     // No analyzer actor: no note.
     let (_, tl) = ok(SAMPLING, steps);
     assert!(notes(&tl).is_empty());
+}
+
+#[test]
+fn no_scene_has_warnings() {
+    for path in scene_files() {
+        let doc = toml::parse_file(&path).unwrap();
+        let sc = Scene::from_doc(&doc).unwrap();
+        let tl = Timeline::build(&sc).unwrap();
+        let w = crate::lint::warnings(&sc, &tl);
+        assert!(w.is_empty(), "{}: {w:?}", path.display());
+    }
+}
+
+// ------------------------------------------------------------ when
+
+const C1_MOVES: &str = "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"c\"\nease = \"linear\"\n";
+
+#[test]
+fn when_starts_a_step_as_the_carrier_reaches_a_point() {
+    // a -> b -> s -> c: 450 px at 75 px/s, starting at t=1.
+    let (_, tl) = ok(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at c\"")].concat());
+    assert!((tl.events[1].t0 - 7.0).abs() < 1e-9);
+    // A point crossed in the middle of the move, with a delay.
+    let (_, tl) = ok(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at b\"\ndelay = 0.5")].concat());
+    assert!((tl.events[1].t0 - 3.5).abs() < 0.03, "{}", tl.events[1].t0);
+    // It follows the move: a slower carrier moves the message too.
+    let slow = SAMPLING.replace("speed = 75", "speed = 150");
+    let (_, tl) = ok(&slow, &[C1_MOVES, &msg("when = \"C1 at c\"")].concat());
+    assert!((tl.events[1].t0 - 4.0).abs() < 1e-9);
+}
+
+#[test]
+fn when_errors() {
+    err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 near c\"")].concat(), "is written");
+    err(SAMPLING, &[C1_MOVES, &msg("when = \"C9 at c\"")].concat(), "unknown carrier 'C9'");
+    err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at nowhere\"")].concat(), "not on the route");
+    err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at c\"\nat = 2")].concat(), "use only one of");
+    // The move comes later in the file.
+    err(SAMPLING, &[&msg("when = \"C1 at c\""), C1_MOVES].concat(), "must come before this step");
 }

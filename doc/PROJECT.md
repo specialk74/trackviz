@@ -116,6 +116,7 @@ trackviz/
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── toml.rs           # parser del sottoinsieme TOML
+    ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, righe fuori ordine, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
     └── render.rs         # generazione dell'SVG di un fotogramma (con i suoi test)
@@ -130,6 +131,8 @@ trackviz <scene.toml> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.toml> --still <sec> --svg -o f.svg
 trackviz <scene.toml>... --check                  # valida e stampa la timeline
 ```
+
+**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, righe del diagramma fuori ordine, didascalie tagliate, Query prima della risposta alla precedente, Sample Acquisition prima dei test. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
@@ -165,7 +168,9 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Gate e antenna** (`gate`, `antenna`, con `at`): nessuno step dedicato. Il gate è aperto negli intervalli in cui un carrier lo attraversa (calcolati in `Timeline::gates` proiettando il punto del gate sulla route di ogni carrier: da 60 px prima a 45 px dopo, con apertura/chiusura di 0,4 s). L'antenna mostra la lettura quando un carrier è fermo sul suo punto.
 
-**`at`, `after_start`, `after_end`:** uno step con `at = <secondi>` parte a un istante assoluto; con `after_start = <secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start = "with"` + `delay`), con `after_end = <secondi>` dopo la sua **fine** (equivale a `start = "after"` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end` e `start`; valori negativi di `after_*` sono rifiutati.
+**`when`:** `when = "C1 at merge"` fa partire lo step quando il carrier raggiunge il punto, anche a metà di un move (più `delay`). Il move deve stare prima dello step nel file, altrimenti è un errore. Prepare, Prepare viola, Sample Acquisition, Release, highlight e didascalie che coincidono con un arrivo usano `when` e seguono il carrier se cambia una velocità. Restano assoluti i move, `pipette` e le risposte che li seguono: una modifica ai tempi può richiedere di ritoccarli.
+
+**`at`, `after_start`, `after_end`:** uno step con `at = <secondi>` parte a un istante assoluto; con `after_start = <secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start = "with"` + `delay`), con `after_end = <secondi>` dopo la sua **fine** (equivale a `start = "after"` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end`, `when` e `start`; valori negativi di `after_*` sono rifiutati.
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
@@ -237,7 +242,7 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 | `[[actor]]` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
 | `[[message]]` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
-| `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `delay`, `duration` + le chiavi specifiche dell'azione |
+| `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `when` = "<carrier> at <punto>", `delay`, `duration` + le chiavi specifiche dell'azione |
 
 | action | Chiavi specifiche |
 |---|---|

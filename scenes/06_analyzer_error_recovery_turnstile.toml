@@ -45,20 +45,20 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 4.77
+when = "C1 at nsd"
 title = "2 · Diverted — Prepare"
 text = "The carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer."
 
 [[step]]
 action = "highlight"
-at = 4.77
+when = "C1 at nsd"
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 4.77
+when = "C1 at nsd"
 carrier = "C1"
 
 [[step]]
@@ -75,20 +75,21 @@ carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 10.62
+when = "C1 at pit_wait"
 title = "3 · Antenna — Prepare again"
 text = "The carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle."
 
 [[step]]
 action = "highlight"
-at = 10.62
+when = "C1 at pit_wait"
 device = "antenna"
 duration = 1.5
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 10.82
+when = "C1 at pit_wait"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
@@ -243,6 +244,6 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-at = 43.68
+when = "C1 at merge"
 carrier = "C1"
 
