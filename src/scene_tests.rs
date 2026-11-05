@@ -205,6 +205,16 @@ fn unknown_keys_and_actions_are_rejected() {
 // ------------------------------------------------------------ messages
 
 #[test]
+fn rows_follow_time_whatever_the_file_order() {
+    let (_, tl) = ok(SAMPLING, &[msg("at = 5\ntext = \"\"").replace("text = \"M\"\n", ""), msg("at = 2")].concat());
+    let row_of = |i: usize| match tl.events[i].ev {
+        Ev::Message { row, .. } => row,
+        _ => panic!(),
+    };
+    assert_eq!((row_of(0), row_of(1)), (1, 0));
+}
+
+#[test]
 fn messages_take_rows_and_substitute_placeholders() {
     let steps = [msg("params = \"SampleId={SampleId} C={CarrierId}\""), msg("carrier = \"G\"\nparams = \"{SampleId}\"")].concat();
     let (_, tl) = ok(SAMPLING, &steps);
@@ -529,11 +539,47 @@ fn when_starts_a_step_as_the_carrier_reaches_a_point() {
 }
 
 #[test]
+fn when_follows_messages_and_actions() {
+    let chain = format!(
+        "{TYPES}[[step]]\naction = \"message\"\ntype = \"acq\"\nat = 2\ncarrier = \"C1\"\nneedle = 1\n\
+         [[step]]\naction = \"pipette\"\nwhen = \"acq C1 arrived\"\ndevice = \"sp\"\nduration = 4\n\
+         [[step]]\naction = \"message\"\ntype = \"acq\"\nwhen = \"pipette sp done\"\ndelay = 0.5\ncarrier = \"G\"\nneedle = 2\n\
+         [[step]]\naction = \"wait\"\nwhen = \"acq sent\"\nduration = 1\n[[step]]\naction = \"wait\"\nwhen = \"acq C1 sent\"\nduration = 1\n"
+    );
+    let (_, tl) = ok(SAMPLING, &chain);
+    // 2 + 1.5 flight = 3.5; + 4 pipette + 0.5 = 8; the latest "acq"; C1's own.
+    assert_eq!(starts(&tl), vec![2.0, 3.5, 8.0, 8.0, 2.0]);
+}
+
+#[test]
 fn when_errors() {
-    err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 near c\"")].concat(), "is written");
+    err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 near c\"")].concat(), "'when' is");
+    err(SAMPLING, &msg("when = \"query C1 sent\""), "no earlier step matches 'query C1'");
+    err(SAMPLING, &msg("when = \"pipette sp done\""), "no earlier step matches 'pipette sp'");
     err(SAMPLING, &[C1_MOVES, &msg("when = \"C9 at c\"")].concat(), "unknown carrier 'C9'");
     err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at nowhere\"")].concat(), "not on the route");
     err(SAMPLING, &[C1_MOVES, &msg("when = \"C1 at c\"\nat = 2")].concat(), "use only one of");
     // The move comes later in the file.
     err(SAMPLING, &[&msg("when = \"C1 at c\""), C1_MOVES].concat(), "must come before this step");
+}
+
+/// The scenes are a chain of causes: slowing the carriers moves everything after.
+#[test]
+fn a_slower_carrier_moves_the_whole_scene() {
+    let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/09_spur_happy_path.toml"));
+    let times = |slow: bool| {
+        let mut doc = toml::parse_file(path).unwrap();
+        if slow {
+            for c in doc.arrays.get_mut("carrier").unwrap() {
+                c.entries.insert("speed".into(), toml::Value::Num(80.0));
+            }
+        }
+        let sc = Scene::from_doc(&doc).unwrap();
+        let tl = Timeline::build(&sc).unwrap();
+        let of = |name: &str| tl.events.iter().find(|e| matches!(&e.ev, Ev::Message { text, .. } if text == name)).unwrap().t0;
+        let pipette = tl.events.iter().find(|e| matches!(e.ev, Ev::Pipette { .. })).unwrap().t0;
+        (of("Sample Acquisition"), pipette, of("Sample Complete"), of("Release"))
+    };
+    let (a, b) = (times(false), times(true));
+    assert!(b.0 > a.0 + 1.0 && b.1 > a.1 + 1.0 && b.2 > a.2 + 1.0 && b.3 > a.3 + 1.0, "{a:?} {b:?}");
 }

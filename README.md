@@ -53,7 +53,6 @@ log when tuning timings. It also prints warnings, as rendering does, for what is
 valid but looks wrong; they don't stop anything and the exit code stays 0:
 
 - two physical carriers overlapping on the track
-- rows of the sequence diagram out of time order (rows follow the file)
 - captions too long for the band, which get cut
 - a Query sent before the reply to the previous one has arrived
 - a Sample Acquisition sent before the tests of that sample are known
@@ -106,7 +105,9 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 
 ### Steps
 
-Steps run in file order. Each step's `start` decides when it begins:
+Each step's `start` decides when it begins, in file order. Rows of the sequence
+diagram always follow time, whatever the order in the file.
+
 
 - `after` (default): when the previous step ends
 - `with`: at the same time as the previous step
@@ -117,9 +118,14 @@ Instead of `start` (only one of these keys per step):
 - `at = <seconds>`: absolute time
 - `after_start = <seconds>`: that many seconds after the **start** of the previous step
 - `after_end = <seconds>`: that many seconds after the **end** of the previous step
-- `when = "C1 at merge"`: when the carrier reaches the point, also in the middle of a
-  move. The move must come before this step in the file. If a speed changes, the
-  step follows the carrier
+- `when`: when something happens, so the step follows it if the timing changes:
+  - `when = "C1 at merge"`: the carrier reaches the point, also in the middle of a move
+  - `when = "query C1 sent"` / `"query C1 arrived"`: a named message starts / ends;
+    the carrier is optional (`"status_error sent"`)
+  - `when = "pipette sp done"`: a `pipette`, `rotate` or `needle` on that device ends
+
+  It refers to the latest matching step **before** it in the file, so write steps in
+  time order. Add `delay` for a wait after the event.
 
 `delay` adds seconds on top of any of them. The previous step is the one
 before in the file. Example: a message `at = 10` (1.5 s long), then

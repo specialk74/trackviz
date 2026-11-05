@@ -8,7 +8,6 @@ const TRACK_X: std::ops::Range<f64> = 30.0..950.0;
 
 pub fn warnings(sc: &Scene, tl: &Timeline) -> Vec<String> {
     let mut w = overlapping_carriers(sc, tl);
-    w.extend(rows_out_of_order(tl));
     w.extend(cut_captions(tl));
     w.extend(queries(tl));
     w
@@ -43,24 +42,6 @@ fn overlapping_carriers(sc: &Scene, tl: &Timeline) -> Vec<String> {
         t += 0.02;
     }
     out
-}
-
-/// Rows of the sequence diagram follow the file: a row that starts before the
-/// one above it reads backwards.
-fn rows_out_of_order(tl: &Timeline) -> Vec<String> {
-    let mut rows: Vec<(usize, f64, &str)> = tl
-        .events
-        .iter()
-        .filter_map(|e| match &e.ev {
-            Ev::Message { row, text, .. } | Ev::Note { row, text, .. } => Some((*row, e.t0, text.as_str())),
-            _ => None,
-        })
-        .collect();
-    rows.sort_by_key(|r| r.0);
-    rows.windows(2)
-        .filter(|r| r[1].1 < r[0].1 - 1e-9)
-        .map(|r| format!("row '{}' ({:.2}s) comes after '{}' ({:.2}s) in the file: move it up", r[1].2, r[1].1, r[0].2, r[0].1))
-        .collect()
 }
 
 /// Captions longer than the band are cut.
@@ -143,13 +124,6 @@ mod tests {
         assert!(w[0].contains("'C1' and 'G' overlap at t=0.00s"), "{w:?}");
         // A ghost on the same point is not a contact.
         assert!(warned("[[step]]\naction = \"show\"\ncarrier = \"G\"\n").is_empty());
-    }
-
-    #[test]
-    fn rows_out_of_order_are_reported() {
-        let w = warned(&[msg("Late", 5.0, ""), msg("Early", 2.0, "")].concat());
-        assert_eq!(w.len(), 1);
-        assert!(w[0].contains("row 'Early' (2.00s) comes after 'Late'"), "{w:?}");
     }
 
     #[test]

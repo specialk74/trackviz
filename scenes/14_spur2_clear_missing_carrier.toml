@@ -78,13 +78,6 @@ title = "2 · Diverted — Prepare"
 text = "The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer."
 
 [[step]]
-action = "move"
-at = 2.44
-carrier = "C1"
-to = "d1"
-ease = "out"
-
-[[step]]
 action = "highlight"
 when = "C1 at nsd"
 device = "nsd"
@@ -95,6 +88,13 @@ action = "message"
 type = "prepare"
 when = "C1 at nsd"
 carrier = "C1"
+
+[[step]]
+action = "move"
+when = "C1 at nsd"
+carrier = "C1"
+to = "d1"
+ease = "out"
 
 [[step]]
 action = "move"
@@ -105,32 +105,35 @@ ease = "out"
 
 [[step]]
 action = "caption"
-at = 3.35
+when = "prepare C1 sent"
+delay = 0.91
 title = "3 · Physically straight, logically diverted"
 text = "The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is."
 
 [[step]]
 action = "highlight"
-at = 3.35
+when = "prepare C1 sent"
+delay = 0.91
 device = "nsd"
 duration = 1.6
 
 [[step]]
 action = "message"
 type = "prepare"
-at = 3.35
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
 action = "show"
-at = 3.35
+when = "prepare C2 sent"
 carrier = "C2L"
 duration = 0.4
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 4.14
+when = "prepare C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
@@ -143,18 +146,20 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 5.05
+when = "prepare C2 sent"
+delay = 1.7
 carrier = "C2"
 
 [[step]]
 action = "message"
 type = "query"
-at = 5.84
+when = "sample_ok C1 arrived"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "move"
-at = 6.35
+when = "C3 at nsd"
 carrier = "C3"
 to = "d1"
 ease = "out"
@@ -174,13 +179,15 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "tests"
-at = 7.54
+when = "query C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 8.05
+when = "prepare C3 sent"
+delay = 1.7
 carrier = "C3"
 
 [[step]]
@@ -198,28 +205,32 @@ carrier = "C1"
 
 [[step]]
 action = "move"
-at = 9.125
+when = "C1 at d1"
+delay = 0.6
 carrier = "C1"
 to = "s1"
 ease = "inout"
 
 [[step]]
+action = "message"
+type = "query"
+when = "tests C1 arrived"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
 action = "move"
-at = 9.925
+when = "C2L at w1"
+delay = 1.276
 carrier = "C2L"
 to = "d1"
 ease = "inout"
 
 [[step]]
 action = "message"
-type = "query"
-at = 9.14
-carrier = "C2"
-
-[[step]]
-action = "message"
 type = "tests"
-at = 10.84
+when = "query C2 sent"
+delay = 1.7
 carrier = "C2"
 
 [[step]]
@@ -245,54 +256,61 @@ duration = 0.6
 [[step]]
 action = "message"
 type = "query"
-at = 12.44
+when = "tests C2 arrived"
+delay = 0.1
 carrier = "C3"
 
 [[step]]
 action = "message"
 type = "clear"
-at = 12.63
+when = "C3 at d1"
+delay = 0.195
 carrier = "C2"
 
 [[step]]
 action = "pipette"
-at = 14.0
+when = "sample_acquisition_needle C1 arrived"
+delay = 0.099
 device = "sp1"
 duration = 6.0
 
 [[step]]
 action = "message"
 type = "tests"
-at = 14.14
+when = "query C3 sent"
+delay = 1.7
 carrier = "C3"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 14.23
+when = "clear C2 sent"
+delay = 1.6
 carrier = "C2"
 
 [[step]]
 action = "hide"
-at = 15.73
+when = "sample_ok C2 arrived"
 carrier = "C2L"
 duration = 0.6
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 15.83
+when = "sample_ok C2 arrived"
+delay = 0.1
 carrier = "C3"
 
 [[step]]
 action = "caption"
-at = 15.83
+when = "prepare_again C3 sent"
 title = "5 · Prepare again for the third carrier"
 text = "Only after the reply to Clear the interface sends Prepare again for the third carrier, and diverts it into the pit-lane, behind the first one."
 
 [[step]]
 action = "move"
-at = 16.435
+when = "C3 at d1"
+delay = 4.0
 carrier = "C3"
 to = "q1"
 ease = "inout"
@@ -301,25 +319,27 @@ ease = "inout"
 action = "message"
 type = "sample_complete_needle"
 needle = 1
-at = 20.2
+when = "pipette sp1 done"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 20.2
+when = "sample_complete_needle C1 sent"
 title = "6 · Sample Complete"
 text = "Sample Complete: the first carrier is released and the third moves up to the sampling point."
 
 [[step]]
 action = "move"
-at = 21.7
+when = "sample_complete_needle C1 arrived"
 carrier = "C1"
 to = "d2"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 23.3
+when = "sample_complete_needle C1 arrived"
+delay = 1.6
 carrier = "C3"
 to = "s1"
 ease = "inout"
@@ -334,7 +354,8 @@ carrier = "C3"
 
 [[step]]
 action = "pipette"
-at = 25.89
+when = "sample_acquisition_needle C3 arrived"
+delay = 0.105
 device = "sp1"
 duration = 4.0
 
@@ -346,14 +367,15 @@ duration = 0.6
 
 [[step]]
 action = "move"
-at = 26.355
+when = "C1 at d2"
+delay = 0.401
 carrier = "C1"
 to = "rj2"
 ease = "in"
 
 [[step]]
 action = "move"
-at = 28.319
+when = "C1 at rj2"
 carrier = "C1"
 to = "merge"
 ease = "linear"
@@ -362,18 +384,19 @@ ease = "linear"
 action = "message"
 type = "sample_complete_needle"
 needle = 1
-at = 30.09
+when = "pipette sp1 done"
+delay = 0.2
 carrier = "C3"
 
 [[step]]
 action = "caption"
-at = 30.09
+when = "sample_complete_needle C3 sent"
 title = "7 · Back to normal"
 text = "Sample Complete for the third sample: the carrier goes on up the spur, stops at the second divert and, back on the Main-Lane, gets its Release."
 
 [[step]]
 action = "move"
-at = 31.59
+when = "sample_complete_needle C3 arrived"
 carrier = "C3"
 to = "d2"
 ease = "inout"
@@ -386,7 +409,7 @@ carrier = "C1"
 
 [[step]]
 action = "move"
-at = 35.643
+when = "C1 at merge"
 carrier = "C1"
 to = "gone"
 ease = "out"
@@ -399,14 +422,16 @@ duration = 0.6
 
 [[step]]
 action = "move"
-at = 36.245
+when = "C3 at d2"
+delay = 0.401
 carrier = "C3"
 to = "rj2"
 ease = "in"
 
 [[step]]
 action = "move"
-at = 38.209
+when = "C3 at rj2"
+delay = 0.001
 carrier = "C3"
 to = "merge"
 ease = "linear"
@@ -419,8 +444,7 @@ carrier = "C3"
 
 [[step]]
 action = "move"
-at = 45.533
+when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
-

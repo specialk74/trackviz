@@ -37,7 +37,7 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
 to = "sampling"
 ease = "out"
@@ -55,40 +55,92 @@ device = "nsd"
 duration = 2.0
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C1 at nsd"
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C1 sent"
+delay = 1.829
+carrier = "C1"
+
+[[step]]
 action = "caption"
-at = 6.3
+when = "sample_ok C1 sent"
+delay = 1.4
 title = "3 · Test query"
 text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample."
 
 [[step]]
+action = "message"
+type = "query"
+when = "sample_ok C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "tests"
+when = "query C1 sent"
+delay = 1.5
+carrier = "C1"
+
+[[step]]
 action = "caption"
-at = 9.4
+when = "C1 at sampling"
+delay = 0.262
 title = "4 · Sampling point — Sample Acquisition"
 text = "The carrier stops at the sampling point on the up branch. The interface sends Sample Acquisition: the tube is in position and can be aspirated."
 
 [[step]]
+action = "message"
+type = "sample_acquisition"
+when = "C1 at sampling"
+delay = 0.46
+carrier = "C1"
+
+[[step]]
+action = "pipette"
+when = "sample_acquisition C1 arrived"
+delay = 0.102
+device = "sp"
+duration = 4.5
+
+[[step]]
 action = "caption"
-at = 15.9
+when = "pipette sp done"
+delay = 0.2
 title = "5 · Sample Complete"
 text = "When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch."
 
 [[step]]
+action = "message"
+type = "sample_complete"
+when = "pipette sp done"
+delay = 0.3
+carrier = "C1"
+
+[[step]]
 action = "move"
-at = 17.6
+when = "sample_complete C1 arrived"
+delay = 0.1
 carrier = "C1"
 to = "spur_top_in"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at spur_top_in"
 carrier = "C1"
 to = "merge"
 ease = "linear"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at merge"
 carrier = "C1"
 to = "gone"
 ease = "out"
@@ -101,50 +153,6 @@ text = "As soon as the carrier is back on the Main-Lane, the interface sends Rel
 
 [[step]]
 action = "message"
-type = "prepare"
-when = "C1 at nsd"
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 4.9
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "query"
-at = 6.5
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 8.0
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_acquisition"
-when = "C1 at sampling"
-delay = 0.46
-carrier = "C1"
-
-[[step]]
-action = "pipette"
-at = 11.2
-device = "sp"
-duration = 4.5
-
-[[step]]
-action = "message"
-type = "sample_complete"
-at = 16.0
-carrier = "C1"
-
-[[step]]
-action = "message"
 type = "release"
 when = "C1 at merge"
 carrier = "C1"
-

@@ -69,30 +69,9 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
 to = "sampling"
-ease = "out"
-
-[[step]]
-action = "move"
-at = 3.59
-carrier = "C2"
-to = "gone"
-ease = "linear"
-
-[[step]]
-action = "move"
-at = 6.59
-carrier = "C3"
-to = "nsd"
-ease = "linear"
-
-[[step]]
-action = "move"
-start = "after"
-carrier = "C3"
-to = "queue"
 ease = "out"
 
 [[step]]
@@ -108,26 +87,43 @@ device = "nsd"
 duration = 2.0
 
 [[step]]
-action = "highlight"
-at = 5.5
-device = "nsd"
-duration = 2.0
+action = "message"
+type = "prepare"
+when = "C1 at nsd"
+carrier = "C1"
+
+[[step]]
+action = "move"
+at = 3.59
+carrier = "C2"
+to = "gone"
+ease = "linear"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C1 sent"
+delay = 1.629
+carrier = "C1"
 
 [[step]]
 action = "highlight"
-when = "C3 at nsd"
+when = "sample_ok C1 sent"
+delay = 0.8
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "caption"
-at = 5.5
+when = "sample_ok C1 sent"
+delay = 0.8
 title = "3 · Physically straight, logically diverted"
 text = "The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is."
 
 [[step]]
 action = "show"
-at = 5.5
+when = "sample_ok C1 sent"
+delay = 0.8
 carrier = "C2L"
 duration = 0.4
 
@@ -139,53 +135,153 @@ to = "queue"
 ease = "out"
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C2 at nsd"
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "query"
+when = "sample_ok C1 sent"
+delay = 1.3
+carrier = "C1"
+
+[[step]]
+action = "move"
+at = 6.59
+carrier = "C3"
+to = "nsd"
+ease = "linear"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C2 sent"
+delay = 1.6
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "tests"
+when = "query C1 sent"
+delay = 1.8
+carrier = "C1"
+
+[[step]]
+action = "move"
+when = "C3 at nsd"
+carrier = "C3"
+to = "queue"
+ease = "out"
+
+[[step]]
+action = "highlight"
+when = "C3 at nsd"
+device = "nsd"
+duration = 2.0
+
+[[step]]
 action = "caption"
 when = "C3 at nsd"
 title = "4 · Third carrier — Prepare"
 text = "The third carrier is diverted into the spur: Prepare. For each Prepare the analyzer asks DMX which tests to perform."
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C3 at nsd"
+carrier = "C3"
+
+[[step]]
+action = "message"
+type = "query"
+when = "tests C1 arrived"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C3 sent"
+delay = 1.601
+carrier = "C3"
+
+[[step]]
 action = "caption"
-at = 11.0
+when = "query C2 arrived"
+delay = 0.1
 title = "5 · Sample Acquisition — the others queue up"
 text = "The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up below it."
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C2 sent"
+delay = 1.7
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "sample_acquisition"
+when = "C1 at sampling"
+delay = 2.062
+carrier = "C1"
+
+[[step]]
+action = "pipette"
+when = "sample_acquisition C1 sent"
+delay = 1.4
+device = "sp"
+duration = 5.0
+
+[[step]]
+action = "message"
+type = "query"
+when = "tests C2 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "caption"
-at = 13.8
+when = "C3 at queue"
+delay = 0.091
 title = "6 · One position, two carriers"
 text = "The third carrier stops on the same queue position as the second one: the second is not physically there, it went straight on along the Main-Lane."
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C3 sent"
+delay = 1.7
+carrier = "C3"
+
+[[step]]
 action = "caption"
-at = 17.8
+when = "pipette sp done"
+delay = 0.2
 title = "7 · Sample Complete"
 text = "Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point."
 
 [[step]]
+action = "message"
+type = "sample_complete"
+when = "pipette sp done"
+delay = 0.2
+carrier = "C1"
+
+[[step]]
 action = "move"
-at = 19.0
+when = "sample_complete C1 sent"
+delay = 1.2
 carrier = "C1"
 to = "spur_top_in"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
-carrier = "C1"
-to = "merge"
-ease = "linear"
-
-[[step]]
-action = "move"
-start = "after"
-carrier = "C1"
-to = "gone"
-ease = "out"
-
-[[step]]
-action = "move"
-at = 20.0
+when = "sample_complete C1 arrived"
+delay = 0.7
 carrier = "C2L"
 to = "sampling"
 ease = "inout"
@@ -193,7 +289,8 @@ duration = 1.2
 
 [[step]]
 action = "move"
-at = 20.0
+when = "sample_complete C1 arrived"
+delay = 0.7
 carrier = "C3"
 to = "sampling"
 ease = "inout"
@@ -201,21 +298,65 @@ duration = 1.2
 
 [[step]]
 action = "caption"
-at = 21.4
+when = "C3 at sampling"
+delay = 0.2
 title = "8 · Clear"
 text = "The interface expects the second sample at the sampling point, but finds the third one: the second never arrived. It sends Clear for the second sample and waits for the reply."
 
 [[step]]
+action = "message"
+type = "clear"
+when = "C3 at sampling"
+delay = 0.2
+carrier = "C2"
+
+[[step]]
+action = "move"
+when = "C1 at spur_top_in"
+carrier = "C1"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "clear C2 sent"
+delay = 1.6
+carrier = "C2"
+
+[[step]]
 action = "hide"
-at = 24.5
+when = "sample_ok C2 arrived"
 carrier = "C2L"
 duration = 0.6
 
 [[step]]
 action = "caption"
-at = 24.8
+when = "sample_ok C2 arrived"
+delay = 0.3
 title = "9 · Sample Acquisition"
 text = "Only after the reply to Clear the interface sends Sample Acquisition for the third sample."
+
+[[step]]
+action = "message"
+type = "sample_acquisition"
+when = "C3 at sampling"
+delay = 3.6
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+when = "sample_acquisition C3 arrived"
+delay = 0.1
+device = "sp"
+duration = 4.5
+
+[[step]]
+action = "move"
+when = "C1 at merge"
+carrier = "C1"
+to = "gone"
+ease = "out"
 
 [[step]]
 action = "caption"
@@ -224,161 +365,48 @@ title = "10 · Release"
 text = "The first carrier is back on the Main-Lane: Release."
 
 [[step]]
-action = "caption"
-at = 31.1
-title = "11 · Back to normal"
-text = "Sample Complete for the third sample: the carrier goes round the spur and, back on the Main-Lane, the interface sends Release."
-
-[[step]]
-action = "move"
-at = 32.6
-carrier = "C3"
-to = "spur_top_in"
-ease = "in"
-
-[[step]]
-action = "move"
-start = "after"
-carrier = "C3"
-to = "merge"
-ease = "linear"
-
-[[step]]
-action = "move"
-start = "after"
-carrier = "C3"
-to = "gone"
-ease = "out"
-
-[[step]]
-action = "message"
-type = "prepare"
-when = "C1 at nsd"
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 4.7
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "prepare"
-at = 5.5
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "query"
-at = 6.0
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 7.1
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 7.8
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "prepare"
-when = "C3 at nsd"
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "query"
-at = 9.4
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 10.1
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 11.1
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_acquisition"
-at = 11.2
-carrier = "C1"
-
-[[step]]
-action = "pipette"
-at = 12.6
-device = "sp"
-duration = 5.0
-
-[[step]]
-action = "message"
-type = "query"
-at = 12.7
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 14.4
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "sample_complete"
-at = 17.8
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "clear"
-at = 21.4
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 23.0
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_acquisition"
-at = 24.8
-carrier = "C3"
-
-[[step]]
-action = "pipette"
-at = 26.4
-device = "sp"
-duration = 4.5
-
-[[step]]
 action = "message"
 type = "release"
 when = "C1 at merge"
 carrier = "C1"
 
 [[step]]
+action = "caption"
+when = "pipette sp done"
+delay = 0.2
+title = "11 · Back to normal"
+text = "Sample Complete for the third sample: the carrier goes round the spur and, back on the Main-Lane, the interface sends Release."
+
+[[step]]
 action = "message"
 type = "sample_complete"
-at = 31.1
+when = "pipette sp done"
+delay = 0.2
 carrier = "C3"
+
+[[step]]
+action = "move"
+when = "sample_complete C3 arrived"
+carrier = "C3"
+to = "spur_top_in"
+ease = "in"
+
+[[step]]
+action = "move"
+when = "C3 at spur_top_in"
+carrier = "C3"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "move"
+when = "C3 at merge"
+carrier = "C3"
+to = "gone"
+ease = "out"
 
 [[step]]
 action = "message"
 type = "release"
 when = "C3 at merge"
 carrier = "C3"
-

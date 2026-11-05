@@ -56,10 +56,22 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
 to = "sampling"
 ease = "out"
+
+[[step]]
+action = "highlight"
+when = "C1 at nsd"
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "message"
+type = "prepare"
+when = "C1 at nsd"
+carrier = "C1"
 
 [[step]]
 action = "move"
@@ -69,11 +81,37 @@ to = "nsd"
 ease = "linear"
 
 [[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C1 sent"
+delay = 1.629
+carrier = "C1"
+
+[[step]]
 action = "move"
-start = "after"
+when = "C2 at nsd"
 carrier = "C2"
 to = "queue"
 ease = "out"
+
+[[step]]
+action = "highlight"
+when = "C2 at nsd"
+device = "nsd"
+duration = 2.0
+
+[[step]]
+action = "message"
+type = "prepare"
+when = "C2 at nsd"
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "query"
+when = "sample_ok C1 arrived"
+delay = 0.2
+carrier = "C1"
 
 [[step]]
 action = "move"
@@ -83,23 +121,25 @@ to = "nsd"
 ease = "linear"
 
 [[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C2 sent"
+delay = 1.591
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "tests"
+when = "query C1 sent"
+delay = 1.7
+carrier = "C1"
+
+[[step]]
 action = "move"
-start = "after"
+when = "C3 at nsd"
 carrier = "C3"
 to = "queue2"
 ease = "out"
-
-[[step]]
-action = "highlight"
-when = "C1 at nsd"
-device = "nsd"
-duration = 2.0
-
-[[step]]
-action = "highlight"
-when = "C2 at nsd"
-device = "nsd"
-duration = 2.0
 
 [[step]]
 action = "highlight"
@@ -108,20 +148,64 @@ device = "nsd"
 duration = 2.0
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C3 at nsd"
+carrier = "C3"
+
+[[step]]
+action = "message"
+type = "query"
+when = "tests C1 arrived"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C3 sent"
+delay = 1.591
+carrier = "C3"
+
+[[step]]
 action = "caption"
-at = 11.4
+when = "query C2 arrived"
+delay = 0.2
 title = "2 · Sample Acquisition"
 text = "The first carrier is at the sampling point, the other two queue up below it. The interface sends Sample Acquisition for the first sample."
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C2 sent"
+delay = 1.7
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "sample_acquisition"
+when = "C1 at sampling"
+delay = 2.462
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "query"
+when = "tests C2 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "caption"
-at = 14.4
+when = "C3 at queue2"
+delay = 1.138
 title = "3 · Carrier run-away"
 text = "Before the needle goes down, the first carrier runs away round the spur and back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red."
 
 [[step]]
 action = "move"
-at = 14.4
+when = "sample_acquisition C1 arrived"
+delay = 1.3
 carrier = "C1"
 to = "gone"
 ease = "linear"
@@ -130,13 +214,22 @@ runaway = true
 
 [[step]]
 action = "status"
-at = 14.4
+when = "C3 at queue2"
+delay = 1.138
 device = "interface"
 state = "error"
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C3 sent"
+delay = 1.7
+carrier = "C3"
+
+[[step]]
 action = "move"
-at = 15.3
+when = "C2 at queue"
+delay = 4.181
 carrier = "C2"
 to = "sampling"
 ease = "inout"
@@ -144,7 +237,8 @@ duration = 1.2
 
 [[step]]
 action = "move"
-at = 15.5
+when = "C3 at queue2"
+delay = 2.238
 carrier = "C3"
 to = "queue"
 ease = "inout"
@@ -152,179 +246,112 @@ duration = 1.2
 
 [[step]]
 action = "caption"
-at = 16.8
+when = "C3 at queue"
+delay = 0.1
 title = "4 · The wrong sample is aspirated"
 text = "The analyzer pipettes the tube under the needle: the second sample, while it believes it is sampling the first one."
 
 [[step]]
+action = "pipette"
+when = "C3 at queue"
+delay = 0.3
+device = "sp"
+duration = 4.5
+
+[[step]]
 action = "caption"
-at = 21.7
+when = "pipette sp done"
+delay = 0.2
 title = "5 · Sample Complete — Cancel"
 text = "The analyzer sends Sample Complete for the first sample. The interface knows the first carrier is gone: it sends Cancel for the first sample, and the analyzer replies OK."
 
 [[step]]
+action = "message"
+type = "sample_complete"
+when = "pipette sp done"
+delay = 0.2
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "cancel"
+when = "sample_complete C1 arrived"
+delay = 0.2
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "cancel C1 sent"
+delay = 1.7
+carrier = "C1"
+
+[[step]]
 action = "caption"
-at = 26.8
+when = "sample_ok C1 arrived"
+delay = 0.2
 title = "6 · All carriers sent away — Clear All"
 text = "The interface sends every carrier away round the spur, without sampling. When they are all back on the Main-Lane it sends Clear All (OK). Once they have left the interface, it turns grey again."
 
 [[step]]
 action = "move"
-at = 26.8
+when = "sample_ok C1 arrived"
+delay = 0.2
 carrier = "C2"
 to = "spur_top_in"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "sample_ok C1 arrived"
+delay = 1.7
+carrier = "C3"
+to = "spur_top_in"
+ease = "in"
+
+[[step]]
+action = "move"
+when = "C2 at spur_top_in"
 carrier = "C2"
 to = "merge"
 ease = "linear"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C3 at spur_top_in"
+carrier = "C3"
+to = "merge"
+ease = "linear"
+
+[[step]]
+action = "move"
+when = "C2 at merge"
 carrier = "C2"
 to = "gone"
 ease = "out"
 
 [[step]]
-action = "move"
-at = 28.3
-carrier = "C3"
-to = "spur_top_in"
-ease = "in"
+action = "message"
+type = "clear_all"
+when = "C2 at merge"
+delay = 2.356
 
 [[step]]
 action = "move"
-start = "after"
-carrier = "C3"
-to = "merge"
-ease = "linear"
-
-[[step]]
-action = "move"
-start = "after"
+when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
 
 [[step]]
 action = "status"
-at = 40.22
+when = "C3 at merge"
+delay = 0.669
 device = "interface"
 state = "normal"
 
 [[step]]
 action = "message"
-type = "prepare"
-when = "C1 at nsd"
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 4.7
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "prepare"
-when = "C2 at nsd"
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "query"
-at = 6.4
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 7.5
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 8.1
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "prepare"
-when = "C3 at nsd"
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "query"
-at = 9.7
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 10.5
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 11.4
-carrier = "C2"
-
-[[step]]
-action = "message"
-type = "sample_acquisition"
-at = 11.6
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "query"
-at = 13.0
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 14.7
-carrier = "C3"
-
-[[step]]
-action = "pipette"
-at = 17.0
-device = "sp"
-duration = 4.5
-
-[[step]]
-action = "message"
-type = "sample_complete"
-at = 21.7
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "cancel"
-at = 23.4
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 25.1
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "clear_all"
-at = 39.55
-
-[[step]]
-action = "message"
 type = "analyzer_ok"
-at = 41.25
-
+when = "clear_all sent"
+delay = 1.7

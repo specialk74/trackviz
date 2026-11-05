@@ -140,7 +140,7 @@ pub enum Action {
     Caption { title: String, text: String },
     /// `runaway`: the carrier escapes by itself (drawn in red, tag "RUN-AWAY").
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
-    Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
+    Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
     Pipette { device: String },
     Highlight { device: String },
@@ -180,8 +180,31 @@ pub enum StartMode {
     AfterAll,
     /// Absolute start time in seconds (`at = ...`); `delay` is added on top.
     At(f64),
-    /// `when = "C1 at merge"`: when the carrier reaches the point.
-    When { carrier: String, point: String },
+    /// `when = ...`: when something earlier in the file happens.
+    When(Anchor),
+}
+
+/// What a `when` refers to.
+#[derive(Clone, PartialEq)]
+pub enum Anchor {
+    /// "C1 at merge": the carrier reaches the point.
+    Arrival { carrier: String, point: String },
+    /// "query C1 sent", "query C1 arrived", "pipette sp done": the latest matching
+    /// step before this one in the file, at its start or at its end.
+    Event { key: String, end: bool },
+}
+
+impl Anchor {
+    fn parse(w: &str) -> Option<Anchor> {
+        let t: Vec<&str> = w.split_whitespace().collect();
+        match t[..] {
+            [carrier, "at", point] => Some(Anchor::Arrival { carrier: carrier.into(), point: point.into() }),
+            [ref who @ .., "sent"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" "), end: false }),
+            [ref who @ .., "arrived"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" "), end: true }),
+            [kind @ ("pipette" | "rotate" | "needle"), device, "done"] => Some(Anchor::Event { key: format!("{kind} {device}"), end: true }),
+            _ => None,
+        }
+    }
 }
 
 pub struct Step {
@@ -437,6 +460,7 @@ impl Scene {
                         None => t,
                     };
                     Action::Message {
+                        kind: t.str_opt("type")?,
                         from: src.str_req("from")?,
                         to: src.str_req("to")?,
                         text: src.str_req("text")?,
@@ -494,10 +518,10 @@ impl Scene {
             }
             let mut delay = t.num_opt("delay")?.unwrap_or(0.0);
             let start = if let Some(w) = when {
-                match w.split_whitespace().collect::<Vec<_>>()[..] {
-                    [carrier, "at", point] => StartMode::When { carrier: carrier.into(), point: point.into() },
-                    _ => return Err(format!("{}: 'when' is written \"<carrier> at <point>\", not \"{w}\"", t.location())),
-                }
+                let anchor = Anchor::parse(&w).ok_or_else(|| {
+                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] sent|arrived\" or \"pipette|rotate|needle <device> done\", not \"{w}\"", t.location())
+                })?;
+                StartMode::When(anchor)
             } else if let Some(at) = at {
                 StartMode::At(at)
             } else if let Some(d) = after_start {
@@ -807,7 +831,21 @@ impl CarrierPath {
     /// When the carrier reaches distance s along its route, among the moves
     /// laid out so far.
     fn reaches(&self, s: f64) -> Option<f64> {
-        self.moves.iter().find(|m| m.s1 >= s - 1e-9).map(|m| if (m.s1 - s).abs() < 1e-9 { m.t1 } else { self.time_at_s(m, s) })
+        let m = self.moves.iter().find(|m| m.s1 >= s - 1e-9)?;
+        if s <= m.s0 {
+            return Some(m.t0);
+        }
+        // Bisection: the position grows monotonically during a move.
+        let (mut lo, mut hi) = (m.t0, m.t1);
+        for _ in 0..50 {
+            let t = (lo + hi) / 2.0;
+            if self.s_at(t) < s {
+                lo = t;
+            } else {
+                hi = t;
+            }
+        }
+        Some(hi)
     }
     /// First time within move m at which the carrier reaches distance s.
     fn time_at_s(&self, m: &MoveSeg, s: f64) -> f64 {
@@ -947,13 +985,19 @@ impl Timeline {
 
         let mut events = Vec::new();
         let (mut prev_start, mut prev_end, mut max_end) = (0.0f64, 0.0f64, 0.0f64);
-        let mut row = 0usize;
         let mut first = true;
+        // What a `when` can refer to: (key, start, end) of the steps so far.
+        let mut history: Vec<(String, f64, f64)> = Vec::new();
 
         for st in &sc.steps {
             let base = match &st.start {
                 StartMode::At(at) => *at,
-                StartMode::When { carrier, point } => {
+                StartMode::When(Anchor::Event { key, end }) => {
+                    let &(_, a, b) = history.iter().rev().find(|h| h.0 == *key)
+                        .ok_or_else(|| format!("{}: no earlier step matches '{key}' (it must come before this step in the file)", st.loc))?;
+                    if *end { b } else { a }
+                }
+                StartMode::When(Anchor::Arrival { carrier, point }) => {
                     let ci = sc.need_carrier(carrier, &st.loc)?;
                     let i = sc.carriers[ci].route.iter().position(|p| p == point)
                         .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
@@ -1013,7 +1057,7 @@ impl Timeline {
                     let tag = if *runaway { "  (run-away)" } else { "" };
                     (d, Ev::Wait, format!("move      {carrier} -> {to}{tag}"))
                 }
-                Action::Message { from, to, text, params, reply, carrier, color, needle } => {
+                Action::Message { from, to, text, params, reply, carrier, color, needle, .. } => {
                     let (fi, ti) = (sc.need_actor(from, &st.loc)?, sc.need_actor(to, &st.loc)?);
                     if fi == ti {
                         return Err(format!("{}: message from an actor to itself is not supported; use a note", st.loc));
@@ -1022,14 +1066,12 @@ impl Timeline {
                     let text = subst(text, sc, ci, *needle).map_err(|e| format!("{}: {e}", st.loc))?;
                     let params = subst(params, sc, ci, *needle).map_err(|e| format!("{}: {e}", st.loc))?;
                     let desc = format!("message   {from} -> {to}  {text}  {params}");
-                    let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row, color: color.clone() };
-                    row += 1;
+                    let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row: 0, color: color.clone() };
                     (st.duration.unwrap_or(1.5), ev, desc)
                 }
                 Action::Note { actor, text } => {
                     let ai = sc.need_actor(actor, &st.loc)?;
-                    let ev = Ev::Note { actor: ai, text: text.clone(), row };
-                    row += 1;
+                    let ev = Ev::Note { actor: ai, text: text.clone(), row: 0 };
                     (st.duration.unwrap_or(1.5), ev, format!("note      {actor}: {text}"))
                 }
                 Action::Pipette { device } => {
@@ -1081,6 +1123,18 @@ impl Timeline {
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
             };
             let t1 = t0 + dur;
+            match &st.action {
+                Action::Message { kind: Some(k), carrier, .. } => {
+                    history.push((k.clone(), t0, t1));
+                    if let Some(c) = carrier {
+                        history.push((format!("{k} {c}"), t0, t1));
+                    }
+                }
+                Action::Pipette { device } => history.push((format!("pipette {device}"), t0, t1)),
+                Action::Rotate { device } => history.push((format!("rotate {device}"), t0, t1)),
+                Action::Needle { device, .. } => history.push((format!("needle {device}"), t0, t1)),
+                _ => {}
+            }
             log.push(format!("{t0:7.2}s - {t1:7.2}s  {desc}"));
             // The analyzer shows what it is doing on its lifeline.
             let note = match ev {
@@ -1090,14 +1144,23 @@ impl Timeline {
             events.push(Timed { t0, t1, ev });
             if let Some((ai, text)) = note {
                 log.push(format!("{t0:7.2}s - {t1:7.2}s  note      {}: {text}", sc.actors[ai].id));
-                events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row } });
-                row += 1;
+                events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row: 0 } });
             }
             prev_start = t0;
             prev_end = t1;
             max_end = max_end.max(t1);
         }
         simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
+
+        // Rows of the sequence diagram in time order (same start: file order).
+        let mut order: Vec<usize> = (0..events.len()).filter(|&i| matches!(events[i].ev, Ev::Message { .. } | Ev::Note { .. })).collect();
+        order.sort_by(|&a, &b| events[a].t0.total_cmp(&events[b].t0));
+        for (r, &i) in order.iter().enumerate() {
+            if let Ev::Message { row, .. } | Ev::Note { row, .. } = &mut events[i].ev {
+                *row = r;
+            }
+        }
+        let rows = order.len();
 
         // The gate in front of a turnstile holds carriers while the analyzer is
         // sampling there: nobody may drive into the wheel during a pipette.
@@ -1187,7 +1250,7 @@ impl Timeline {
             }
             gates.push((di, iv));
         }
-        Ok(Timeline { events, carriers, wheels, gates, rows: row, duration: max_end + sc.video.tail, log: std::mem::take(log) })
+        Ok(Timeline { events, carriers, wheels, gates, rows, duration: max_end + sc.video.tail, log: std::mem::take(log) })
     }
 }
 

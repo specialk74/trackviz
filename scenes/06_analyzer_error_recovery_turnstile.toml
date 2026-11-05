@@ -38,7 +38,7 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
 to = "pit_wait"
 ease = "out"
@@ -64,13 +64,15 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 6.77
+when = "prepare C1 sent"
+delay = 1.997
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "query"
-at = 8.57
+when = "sample_ok C1 arrived"
+delay = 0.3
 carrier = "C1"
 
 [[step]]
@@ -95,12 +97,14 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "tests"
-at = 11.1
+when = "query C1 sent"
+delay = 2.53
 carrier = "C1"
 
 [[step]]
 action = "move"
-at = 12.4
+when = "C1 at pit_wait"
+delay = 1.777
 carrier = "C1"
 to = "ts.in"
 ease = "inout"
@@ -108,135 +112,156 @@ duration = 2.0
 
 [[step]]
 action = "rotate"
-at = 14.55
+when = "C1 at ts.in"
+delay = 0.15
 device = "ts"
 
 [[step]]
 action = "caption"
-at = 16.6
+when = "rotate ts done"
+delay = 0.05
 title = "4 · Sample Acquisition"
 text = "The carrier is under the needle: the interface sends Sample Acquisition and the analyzer starts aspirating."
 
 [[step]]
 action = "message"
 type = "sample_acquisition"
-at = 16.8
+when = "rotate ts done"
+delay = 0.25
 carrier = "C1"
 
 [[step]]
 action = "needle"
-at = 18.400000000000002
+when = "sample_acquisition C1 arrived"
+delay = 0.1
 device = "ts"
 to = "down"
 
 [[step]]
 action = "note"
-at = 18.400000000000002
+when = "sample_acquisition C1 arrived"
+delay = 0.1
 actor = "AN"
 text = "Pipetting"
 duration = 2.6
 
 [[step]]
 action = "caption"
-at = 21.0
+when = "needle ts done"
+delay = 1.7
 title = "5 · Instrument error"
 text = "During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status."
 
 [[step]]
 action = "status"
-at = 21.0
+when = "needle ts done"
+delay = 1.7
 device = "analyzer"
 state = "error"
 
 [[step]]
 action = "message"
 type = "status_error"
-at = 21.0
+when = "needle ts done"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "sample_complete"
-at = 21.5
+when = "status_error C1 sent"
+delay = 0.5
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "interface_ok"
-at = 22.8
+when = "status_error C1 sent"
+delay = 1.8
 carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 24.6
+when = "interface_ok C1 arrived"
+delay = 0.3
 title = "6 · Operator recovery"
 text = "Sample Complete is not enough: with the analyzer in error the wheel does not rotate, the needle is still in the tube. An operator comes to the instrument for a recovery: the needle goes back up."
 
 [[step]]
 action = "note"
-at = 24.6
+when = "interface_ok C1 arrived"
+delay = 0.3
 actor = "AN"
 text = "Operator recovery"
 duration = 6.0
 
 [[step]]
 action = "operator"
-at = 24.6
+when = "interface_ok C1 arrived"
+delay = 0.3
 device = "analyzer"
 duration = 7.0
 
 [[step]]
 action = "needle"
-at = 27.1
+when = "interface_ok C1 arrived"
+delay = 2.8
 device = "ts"
 to = "up"
 duration = 1.2
 
 [[step]]
 action = "caption"
-at = 30.900000000000002
+when = "needle ts done"
+delay = 2.6
 title = "7 · Instrument ready"
 text = "The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released."
 
 [[step]]
 action = "status"
-at = 30.900000000000002
+when = "needle ts done"
+delay = 2.6
 device = "analyzer"
 state = "ready"
 
 [[step]]
 action = "message"
 type = "status_ready"
-at = 30.900000000000002
+when = "needle ts done"
+delay = 2.6
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "interface_ok"
-at = 32.6
+when = "status_ready C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 34.3
+when = "interface_ok C1 arrived"
+delay = 0.2
 title = "8 · Carrier released — Release"
 text = "The wheel brings the carrier to the exit and the interface releases it. As soon as it is back on the Main-Lane, the interface sends Release."
 
 [[step]]
 action = "rotate"
-at = 34.3
+when = "status_ready C1 arrived"
+delay = 1.9
 device = "ts"
 
 [[step]]
 action = "move"
-at = 36.5
+when = "rotate ts done"
+delay = 0.2
 carrier = "C1"
 to = "merge"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at merge"
 carrier = "C1"
 to = "gone"
 ease = "out"
@@ -246,4 +271,3 @@ action = "message"
 type = "release"
 when = "C1 at merge"
 carrier = "C1"
-

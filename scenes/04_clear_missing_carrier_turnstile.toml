@@ -72,29 +72,8 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
-to = "pit_wait"
-ease = "out"
-
-[[step]]
-action = "move"
-at = 9.07
-carrier = "C2"
-to = "gone"
-ease = "linear"
-
-[[step]]
-action = "move"
-at = 11.57
-carrier = "C3"
-to = "nsd"
-ease = "linear"
-
-[[step]]
-action = "move"
-start = "after"
-carrier = "C3"
 to = "pit_wait"
 ease = "out"
 
@@ -119,14 +98,23 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 6.77
+when = "prepare C1 sent"
+delay = 1.997
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "query"
-at = 8.57
+when = "sample_ok C1 arrived"
+delay = 0.3
 carrier = "C1"
+
+[[step]]
+action = "move"
+at = 9.07
+carrier = "C2"
+to = "gone"
+ease = "linear"
 
 [[step]]
 action = "caption"
@@ -150,24 +138,35 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "tests"
-at = 11.1
+when = "query C1 sent"
+delay = 2.53
 carrier = "C1"
 
 [[step]]
+action = "move"
+at = 11.57
+carrier = "C3"
+to = "nsd"
+ease = "linear"
+
+[[step]]
 action = "caption"
-at = 12.0
+when = "tests C1 sent"
+delay = 0.9
 title = "4 · Physically straight, logically diverted"
 text = "The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is."
 
 [[step]]
 action = "highlight"
-at = 12.0
+when = "tests C1 sent"
+delay = 0.9
 device = "nsd"
 duration = 2.0
 
 [[step]]
 action = "show"
-at = 12.0
+when = "tests C1 sent"
+delay = 0.9
 carrier = "C2L"
 duration = 0.4
 
@@ -181,12 +180,13 @@ ease = "out"
 [[step]]
 action = "message"
 type = "prepare"
-at = 12.0
+when = "C2 at nsd"
 carrier = "C2"
 
 [[step]]
 action = "move"
-at = 12.4
+when = "C1 at pit_wait"
+delay = 1.777
 carrier = "C1"
 to = "ts.in"
 ease = "inout"
@@ -195,13 +195,16 @@ duration = 2.0
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 13.6
+when = "prepare C2 sent"
+delay = 1.6
 carrier = "C2"
 
 [[step]]
-action = "rotate"
-at = 14.55
-device = "ts"
+action = "move"
+when = "C3 at nsd"
+carrier = "C3"
+to = "pit_wait"
+ease = "out"
 
 [[step]]
 action = "caption"
@@ -222,40 +225,59 @@ when = "C3 at nsd"
 carrier = "C3"
 
 [[step]]
+action = "rotate"
+when = "C1 at ts.in"
+delay = 0.15
+device = "ts"
+
+[[step]]
 action = "message"
 type = "query"
-at = 15.2
+when = "sample_ok C2 arrived"
+delay = 0.1
 carrier = "C2"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 16.1
+when = "prepare C3 sent"
+delay = 1.597
 carrier = "C3"
 
 [[step]]
 action = "caption"
-at = 16.8
+when = "query C2 arrived"
+delay = 0.1
 title = "6 · Sample Acquisition"
 text = "The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates. The second (expected) carrier reaches the antenna: nothing is read, it is not physically there."
 
 [[step]]
 action = "message"
 type = "sample_acquisition"
-at = 16.8
+when = "rotate ts done"
+delay = 0.25
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "tests"
-at = 17.4
+when = "query C2 sent"
+delay = 2.2
 carrier = "C2"
 
 [[step]]
 action = "pipette"
-at = 18.4
+when = "sample_acquisition C1 arrived"
+delay = 0.1
 device = "ts"
 duration = 6.6
+
+[[step]]
+action = "message"
+type = "query"
+when = "tests C2 arrived"
+delay = 0.1
+carrier = "C3"
 
 [[step]]
 action = "caption"
@@ -271,61 +293,62 @@ duration = 1.5
 
 [[step]]
 action = "message"
-type = "query"
-at = 19.0
-carrier = "C3"
-
-[[step]]
-action = "message"
 type = "clear"
-at = 20.55
+when = "C3 at pit_wait"
+delay = 0.197
 carrier = "C2"
 
 [[step]]
 action = "message"
 type = "tests"
-at = 20.7
+when = "query C3 sent"
+delay = 1.7
 carrier = "C3"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 22.1
+when = "clear C2 sent"
+delay = 1.55
 carrier = "C2"
 
 [[step]]
 action = "hide"
-at = 23.6
+when = "sample_ok C2 arrived"
 carrier = "C2L"
 duration = 0.6
 
 [[step]]
 action = "caption"
-at = 23.6
+when = "sample_ok C2 arrived"
 title = "8 · Prepare again for the third carrier"
 text = "Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete."
 
 [[step]]
 action = "message"
 type = "prepare_again"
-at = 23.8
+when = "sample_ok C2 arrived"
+delay = 0.2
 carrier = "C3"
 
 [[step]]
 action = "caption"
-at = 25.2
+when = "pipette ts done"
+delay = 0.2
 title = "9 · Sample Complete — enter — rotate"
 text = "Sample Complete for the first sample. The gate opens, the third carrier enters the wheel, then the wheel rotates: the third sample goes under the needle, the first one to the exit."
 
 [[step]]
 action = "message"
 type = "sample_complete"
-at = 25.2
+when = "pipette ts done"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "move"
-at = 26.6
+when = "sample_complete C1 sent"
+delay = 1.4
 carrier = "C3"
 to = "ts.in"
 ease = "inout"
@@ -333,46 +356,52 @@ duration = 2.0
 
 [[step]]
 action = "rotate"
-at = 28.75
+when = "C3 at ts.in"
+delay = 0.15
 device = "ts"
 
 [[step]]
 action = "move"
-at = 30.9
+when = "rotate ts done"
+delay = 0.15
 carrier = "C1"
 to = "merge"
 ease = "in"
 
 [[step]]
-action = "move"
-start = "after"
-carrier = "C1"
-to = "gone"
-ease = "out"
-
-[[step]]
 action = "message"
 type = "sample_acquisition"
-at = 31.0
+when = "rotate ts done"
+delay = 0.25
 carrier = "C3"
 
 [[step]]
 action = "pipette"
-at = 32.6
+when = "sample_acquisition C3 arrived"
+delay = 0.1
 device = "ts"
 duration = 4.5
 
 [[step]]
 action = "caption"
-at = 37.3
+when = "pipette ts done"
+delay = 0.2
 title = "10 · Back to normal"
 text = "The first carrier is back on the Main-Lane: Release. Sample Complete for the third sample: the wheel brings it to the exit, and back on the Main-Lane the interface sends Release."
 
 [[step]]
 action = "message"
 type = "sample_complete"
-at = 37.3
+when = "pipette ts done"
+delay = 0.2
 carrier = "C3"
+
+[[step]]
+action = "move"
+when = "C1 at merge"
+carrier = "C1"
+to = "gone"
+ease = "out"
 
 [[step]]
 action = "message"
@@ -382,19 +411,21 @@ carrier = "C1"
 
 [[step]]
 action = "rotate"
-at = 38.9
+when = "sample_complete C3 arrived"
+delay = 0.1
 device = "ts"
 
 [[step]]
 action = "move"
-at = 41.1
+when = "rotate ts done"
+delay = 0.2
 carrier = "C3"
 to = "merge"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
@@ -404,4 +435,3 @@ action = "message"
 type = "release"
 when = "C3 at merge"
 carrier = "C3"
-

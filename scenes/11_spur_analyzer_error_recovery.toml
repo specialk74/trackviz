@@ -38,7 +38,7 @@ ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at nsd"
 carrier = "C1"
 to = "sampling"
 ease = "out"
@@ -56,83 +56,175 @@ device = "nsd"
 duration = 2.0
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C1 at nsd"
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "sample_ok"
+when = "prepare C1 sent"
+delay = 1.829
+carrier = "C1"
+
+[[step]]
 action = "caption"
-at = 6.3
+when = "sample_ok C1 sent"
+delay = 1.4
 title = "3 · Test query"
 text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample."
 
 [[step]]
+action = "message"
+type = "query"
+when = "sample_ok C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "tests"
+when = "query C1 sent"
+delay = 1.5
+carrier = "C1"
+
+[[step]]
 action = "caption"
-at = 9.4
+when = "C1 at sampling"
+delay = 0.262
 title = "4 · Sampling point — Sample Acquisition"
 text = "The carrier stops at the sampling point. The interface sends Sample Acquisition and the analyzer starts aspirating."
 
 [[step]]
+action = "message"
+type = "sample_acquisition"
+when = "C1 at sampling"
+delay = 0.46
+carrier = "C1"
+
+[[step]]
 action = "needle"
-at = 11.2
+when = "sample_acquisition C1 arrived"
+delay = 0.102
 device = "sp"
 to = "down"
 
 [[step]]
+action = "note"
+when = "sample_acquisition C1 arrived"
+delay = 0.102
+actor = "AN"
+text = "Pipetting"
+duration = 2.6
+
+[[step]]
 action = "caption"
-at = 13.8
+when = "needle sp done"
+delay = 1.7
 title = "5 · Instrument error"
 text = "During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status."
 
 [[step]]
 action = "status"
-at = 13.8
+when = "needle sp done"
+delay = 1.7
 device = "analyzer"
 state = "error"
 
 [[step]]
+action = "message"
+type = "status_error"
+when = "needle sp done"
+delay = 1.7
+
+[[step]]
+action = "message"
+type = "sample_complete"
+when = "status_error sent"
+delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "status_error sent"
+delay = 1.8
+
+[[step]]
 action = "caption"
-at = 17.4
+when = "interface_ok arrived"
+delay = 0.3
 title = "6 · Operator recovery"
 text = "Sample Complete is not enough: with the analyzer in error the carrier stays still, the needle is in the tube. An operator comes to the instrument for a recovery: the needle goes back up."
 
 [[step]]
 action = "operator"
-at = 17.4
+when = "interface_ok arrived"
+delay = 0.3
 device = "analyzer"
 duration = 7.0
 
 [[step]]
+action = "note"
+when = "interface_ok arrived"
+delay = 0.3
+actor = "AN"
+text = "Operator recovery"
+duration = 6.0
+
+[[step]]
 action = "needle"
-at = 19.9
+when = "interface_ok arrived"
+delay = 2.8
 device = "sp"
 to = "up"
 duration = 1.2
 
 [[step]]
 action = "caption"
-at = 23.7
+when = "needle sp done"
+delay = 2.6
 title = "7 · Instrument ready"
 text = "The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released."
 
 [[step]]
 action = "status"
-at = 23.7
+when = "needle sp done"
+delay = 2.6
 device = "analyzer"
 state = "ready"
 
 [[step]]
+action = "message"
+type = "status_ready"
+when = "needle sp done"
+delay = 2.6
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "status_ready sent"
+delay = 1.7
+
+[[step]]
 action = "move"
-at = 27.1
+when = "status_ready arrived"
+delay = 1.9
 carrier = "C1"
 to = "spur_top_in"
 ease = "in"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at spur_top_in"
 carrier = "C1"
 to = "merge"
 ease = "linear"
 
 [[step]]
 action = "move"
-start = "after"
+when = "C1 at merge"
 carrier = "C1"
 to = "gone"
 ease = "out"
@@ -145,78 +237,6 @@ text = "The carrier went round the spur and is back on the Main-Lane: the interf
 
 [[step]]
 action = "message"
-type = "prepare"
-when = "C1 at nsd"
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_ok"
-at = 4.9
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "query"
-at = 6.5
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 8.0
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "sample_acquisition"
-when = "C1 at sampling"
-delay = 0.46
-carrier = "C1"
-
-[[step]]
-action = "note"
-at = 11.2
-actor = "AN"
-text = "Pipetting"
-duration = 2.6
-
-[[step]]
-action = "message"
-type = "status_error"
-at = 13.8
-
-[[step]]
-action = "message"
-type = "sample_complete"
-at = 14.3
-carrier = "C1"
-
-[[step]]
-action = "message"
-type = "interface_ok"
-at = 15.6
-
-[[step]]
-action = "note"
-at = 17.4
-actor = "AN"
-text = "Operator recovery"
-duration = 6.0
-
-[[step]]
-action = "message"
-type = "status_ready"
-at = 23.7
-
-[[step]]
-action = "message"
-type = "interface_ok"
-at = 25.4
-
-[[step]]
-action = "message"
 type = "release"
 when = "C1 at merge"
 carrier = "C1"
-

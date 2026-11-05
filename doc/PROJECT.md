@@ -116,7 +116,7 @@ trackviz/
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── toml.rs           # parser del sottoinsieme TOML
-    ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, righe fuori ordine, ...)
+    ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
     └── render.rs         # generazione dell'SVG di un fotogramma (con i suoi test)
@@ -132,7 +132,7 @@ trackviz <scene.toml> --still <sec> --svg -o f.svg
 trackviz <scene.toml>... --check                  # valida e stampa la timeline
 ```
 
-**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, righe del diagramma fuori ordine, didascalie tagliate, Query prima della risposta alla precedente, Sample Acquisition prima dei test. Un test verifica che nessuna scena ne abbia.
+**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate, Query prima della risposta alla precedente, Sample Acquisition prima dei test. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
@@ -168,7 +168,9 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Gate e antenna** (`gate`, `antenna`, con `at`): nessuno step dedicato. Il gate è aperto negli intervalli in cui un carrier lo attraversa (calcolati in `Timeline::gates` proiettando il punto del gate sulla route di ogni carrier: da 60 px prima a 45 px dopo, con apertura/chiusura di 0,4 s). L'antenna mostra la lettura quando un carrier è fermo sul suo punto.
 
-**`when`:** `when = "C1 at merge"` fa partire lo step quando il carrier raggiunge il punto, anche a metà di un move (più `delay`). Il move deve stare prima dello step nel file, altrimenti è un errore. Prepare, Prepare viola, Sample Acquisition, Release, highlight e didascalie che coincidono con un arrivo usano `when` e seguono il carrier se cambia una velocità. Restano assoluti i move, `pipette` e le risposte che li seguono: una modifica ai tempi può richiedere di ritoccarli.
+**`when` e catena delle cause:** `when` fa partire uno step da ciò che lo causa, più `delay`: `"C1 at merge"` (il carrier raggiunge il punto, anche a metà di un move), `"query C1 sent"` / `"query C1 arrived"` (un messaggio con nome parte / arriva; il carrier è opzionale), `"pipette sp done"` (fine di `pipette`, `rotate` o `needle` su quel device). Si riferisce all'ultimo step corrispondente **prima** di esso nel file: gli step delle scene sono scritti in ordine di tempo. Se la causa manca è un errore.
+
+Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la Sample Acquisition, la Sample Complete la fine della `pipette`, un `move` l'arrivo del carrier (con la sosta come `delay`) o la sua causa. Restano assoluti solo le prime partenze dei carrier e le didascalie iniziali. Cambiando una velocità o una durata la scena si sposta a catena; se nasce un conflitto fisico (carrier che si toccano, ruota che gira con un carrier nel cerchio) `--check` lo segnala. Un test lo verifica sulla scena 09.
 
 **`at`, `after_start`, `after_end`:** uno step con `at = <secondi>` parte a un istante assoluto; con `after_start = <secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start = "with"` + `delay`), con `after_end = <secondi>` dopo la sua **fine** (equivale a `start = "after"` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end`, `when` e `start`; valori negativi di `after_*` sono rifiutati.
 
@@ -184,7 +186,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Operatore** (`operator`): operatore di laboratorio stilizzato (camice bianco lungo, guanti blu sottili, capelli scuri, chiave inglese) che entra a piedi dal bordo destro del pannello, si ferma a destra dell'analizzatore, lavora (braccio che oscilla e scintille ambra sul bordo) e se ne va. Ogni camminata dura min(2 s, durata/3).
 
-**Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata nell'ordine del file.
+**Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata in ordine di tempo (a parità di tempo, nell'ordine del file).
 
 **Segnaposto:** `{SampleId}` e `{CarrierId}` in `text`/`params` vengono sostituiti con i valori del carrier indicato in `carrier`, o del primo carrier se non è indicato; `{Needle}` con la chiave `needle` dello step (obbligatoria in quel caso).
 
@@ -231,7 +233,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.toml"` prende solo le scene. Le scene 03, 07 e 08 hanno geometrie uniche e le tengono nel proprio file.
 
-**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.toml` (`[[message]]`) e gli step li richiamano con `type`, più `carrier` e, se il messaggio contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer = true`; la nota occupa la riga subito dopo la posizione del `pipette` nel file.
+**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.toml` (`[[message]]`) e gli step li richiamano con `type`, più `carrier` e, se il messaggio contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer = true`; la nota compare alla stessa riga di tempo del `pipette`.
 
 | Sezione | Chiavi |
 |---|---|

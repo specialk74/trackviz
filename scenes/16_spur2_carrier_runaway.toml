@@ -68,13 +68,6 @@ to = "nsd"
 ease = "linear"
 
 [[step]]
-action = "move"
-at = 2.44
-carrier = "C1"
-to = "d1"
-ease = "out"
-
-[[step]]
 action = "highlight"
 when = "C1 at nsd"
 device = "nsd"
@@ -88,7 +81,14 @@ carrier = "C1"
 
 [[step]]
 action = "move"
-at = 3.35
+when = "C1 at nsd"
+carrier = "C1"
+to = "d1"
+ease = "out"
+
+[[step]]
+action = "move"
+when = "C4 at nsd"
 carrier = "C4"
 to = "w1"
 ease = "out"
@@ -115,18 +115,20 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 4.14
+when = "prepare C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 5.05
+when = "prepare C4 sent"
+delay = 1.7
 carrier = "C4"
 
 [[step]]
 action = "move"
-at = 5.35
+when = "C2 at nsd"
 carrier = "C2"
 to = "w1b"
 ease = "out"
@@ -153,18 +155,20 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "query"
-at = 5.84
+when = "sample_ok C1 arrived"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 7.05
+when = "prepare C2 sent"
+delay = 1.7
 carrier = "C2"
 
 [[step]]
 action = "move"
-at = 7.35
+when = "C3 at nsd"
 carrier = "C3"
 to = "w1c"
 ease = "out"
@@ -184,7 +188,8 @@ carrier = "C3"
 [[step]]
 action = "message"
 type = "tests"
-at = 7.54
+when = "query C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
@@ -203,26 +208,37 @@ carrier = "C1"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 9.05
+when = "prepare C3 sent"
+delay = 1.7
 carrier = "C3"
 
 [[step]]
 action = "move"
-at = 9.125
+when = "C1 at d1"
+delay = 0.6
 carrier = "C1"
 to = "s1"
 ease = "inout"
 
 [[step]]
+action = "message"
+type = "query"
+when = "tests C1 arrived"
+delay = 0.1
+carrier = "C4"
+
+[[step]]
 action = "move"
-at = 10.025
+when = "C4 at w1"
+delay = 1.376
 carrier = "C4"
 to = "d1"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 10.125
+when = "C2 at w1b"
+delay = 0.523
 carrier = "C2"
 to = "w1"
 ease = "inout"
@@ -234,49 +250,49 @@ device = "div1"
 duration = 0.6
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C4 sent"
+delay = 1.7
+carrier = "C4"
+
+[[step]]
 action = "move"
-at = 11.211
+when = "C4 at d1"
+delay = 0.401
 carrier = "C4"
 to = "d2"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 11.373
+when = "C3 at w1c"
+delay = 0.556
 carrier = "C3"
 to = "w1b"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 12.311
+when = "C2 at w1"
+delay = 1.139
 carrier = "C2"
 to = "d1"
 ease = "inout"
 
 [[step]]
+action = "message"
+type = "query"
+when = "tests C4 arrived"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
 action = "caption"
-at = 12.5
+when = "query C2 sent"
+delay = 0.06
 title = "2 · Sample Acquisition"
 text = "The first carrier is at sampling point 1: Sample Acquisition with Needle=1. The next ones queue up behind it; the one for needle 2 goes on."
-
-[[step]]
-action = "message"
-type = "query"
-at = 9.14
-carrier = "C4"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 10.84
-carrier = "C4"
-
-[[step]]
-action = "message"
-type = "query"
-at = 12.44
-carrier = "C2"
 
 [[step]]
 action = "message"
@@ -288,7 +304,8 @@ carrier = "C1"
 
 [[step]]
 action = "move"
-at = 12.511
+when = "C3 at w1b"
+delay = 0.353
 carrier = "C3"
 to = "w1"
 ease = "inout"
@@ -308,22 +325,24 @@ carrier = "C2"
 
 [[step]]
 action = "move"
-at = 13.697
+when = "C2 at d1"
+delay = 0.601
 carrier = "C2"
 to = "q1"
 ease = "inout"
+
+[[step]]
+action = "message"
+type = "tests"
+when = "query C2 sent"
+delay = 1.7
+carrier = "C2"
 
 [[step]]
 action = "highlight"
 when = "C4 at d2"
 device = "div2"
 duration = 0.6
-
-[[step]]
-action = "message"
-type = "tests"
-at = 14.14
-carrier = "C2"
 
 [[step]]
 action = "message"
@@ -334,14 +353,16 @@ carrier = "C4"
 
 [[step]]
 action = "move"
-at = 14.797
+when = "C3 at w1"
+delay = 1.239
 carrier = "C3"
 to = "d1"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 14.953
+when = "C4 at d2"
+delay = 0.6
 carrier = "C4"
 to = "s2"
 ease = "inout"
@@ -360,15 +381,24 @@ delay = 0.1
 carrier = "C3"
 
 [[step]]
+action = "message"
+type = "query"
+when = "tests C2 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "move"
-at = 16.183
+when = "C3 at d1"
+delay = 0.601
 carrier = "C3"
 to = "q2"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 16.188
+when = "sample_acquisition_needle C1 arrived"
+delay = 2.187
 carrier = "C1"
 to = "d2"
 ease = "inout"
@@ -377,41 +407,40 @@ runaway = true
 
 [[step]]
 action = "caption"
-at = 16.19
+when = "C2 at q1"
+delay = 0.202
 title = "3 · Carrier run-away"
 text = "Before needle 1 goes down the first carrier runs away. The interface notices it: that part of the interface turns red. The next carrier slides under needle 1."
 
 [[step]]
 action = "status"
-at = 16.19
+when = "C2 at q1"
+delay = 0.202
 device = "zone1"
 state = "error"
 
 [[step]]
 action = "move"
-at = 17.088
+when = "C2 at q1"
+delay = 1.1
 carrier = "C2"
 to = "s1"
 ease = "inout"
 
 [[step]]
+action = "message"
+type = "tests"
+when = "query C3 sent"
+delay = 1.7
+carrier = "C3"
+
+[[step]]
 action = "move"
-at = 17.592
+when = "C3 at q2"
+delay = 0.1
 carrier = "C3"
 to = "q1"
 ease = "inout"
-
-[[step]]
-action = "message"
-type = "query"
-at = 15.74
-carrier = "C3"
-
-[[step]]
-action = "message"
-type = "tests"
-at = 17.44
-carrier = "C3"
 
 [[step]]
 action = "message"
@@ -423,7 +452,8 @@ carrier = "C4"
 
 [[step]]
 action = "pipette"
-at = 18.87
+when = "C3 at q1"
+delay = 0.296
 device = "sp1"
 duration = 4.0
 
@@ -435,7 +465,8 @@ duration = 0.6
 
 [[step]]
 action = "move"
-at = 19.491
+when = "C1 at d2"
+delay = 0.3
 carrier = "C1"
 to = "gone"
 ease = "linear"
@@ -444,13 +475,15 @@ runaway = true
 
 [[step]]
 action = "pipette"
-at = 19.83
+when = "sample_acquisition_needle C4 arrived"
+delay = 0.101
 device = "sp2"
 duration = 4.0
 
 [[step]]
 action = "caption"
-at = 23.07
+when = "pipette sp1 done"
+delay = 0.2
 title = "4 · Sample Complete — Cancel"
 text = "The analyzer sends Sample Complete for the first sample, but needle 1 aspirated the second one. The interface sends Cancel for the first sample, and the analyzer replies OK."
 
@@ -458,32 +491,36 @@ text = "The analyzer sends Sample Complete for the first sample, but needle 1 as
 action = "message"
 type = "sample_complete_needle"
 needle = 1
-at = 23.07
+when = "pipette sp1 done"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "message"
 type = "sample_complete_needle"
 needle = 2
-at = 24.03
+when = "pipette sp2 done"
+delay = 0.2
 carrier = "C4"
 
 [[step]]
 action = "message"
 type = "cancel"
-at = 24.77
+when = "sample_complete_needle C1 arrived"
+delay = 0.2
 carrier = "C1"
 
 [[step]]
 action = "move"
-at = 25.43
+when = "sample_complete_needle C1 arrived"
+delay = 0.86
 carrier = "C4"
 to = "pt2u"
 ease = "in"
 
 [[step]]
 action = "move"
-at = 26.412
+when = "C4 at pt2u"
 carrier = "C4"
 to = "merge"
 ease = "linear"
@@ -491,18 +528,21 @@ ease = "linear"
 [[step]]
 action = "message"
 type = "sample_ok"
-at = 26.47
+when = "cancel C1 sent"
+delay = 1.7
 carrier = "C1"
 
 [[step]]
 action = "caption"
-at = 28.17
+when = "sample_ok C1 arrived"
+delay = 0.2
 title = "5 · Pit-lane emptied — Clear All"
 text = "The carriers of needle 1 are sent away without sampling; once they have left its pit-lane, it turns grey. With both on the Main-Lane: Clear All. Needle 2 goes on."
 
 [[step]]
 action = "move"
-at = 28.17
+when = "sample_ok C1 arrived"
+delay = 0.2
 carrier = "C2"
 to = "d2"
 ease = "inout"
@@ -515,31 +555,27 @@ duration = 0.6
 
 [[step]]
 action = "move"
-at = 32.825
+when = "C2 at d2"
+delay = 0.401
 carrier = "C2"
 to = "rj2"
 ease = "in"
 
 [[step]]
 action = "move"
-at = 33.725
+when = "sample_ok C1 arrived"
+delay = 5.755
 carrier = "C3"
 to = "d2"
 ease = "inout"
 
 [[step]]
 action = "move"
-at = 34.789
+when = "C2 at rj2"
+delay = 0.001
 carrier = "C2"
 to = "merge"
 ease = "linear"
-
-[[step]]
-action = "move"
-at = 35.07
-carrier = "C4"
-to = "gone"
-ease = "out"
 
 [[step]]
 action = "message"
@@ -548,8 +584,17 @@ when = "C4 at merge"
 carrier = "C4"
 
 [[step]]
+action = "move"
+when = "C4 at merge"
+delay = 0.001
+carrier = "C4"
+to = "gone"
+ease = "out"
+
+[[step]]
 action = "status"
-at = 37.17
+when = "release C4 arrived"
+delay = 0.601
 device = "zone1"
 state = "normal"
 
@@ -561,21 +606,22 @@ duration = 0.6
 
 [[step]]
 action = "move"
-at = 39.165
+when = "C3 at d2"
+delay = 0.4
 carrier = "C3"
 to = "rj2"
 ease = "in"
 
 [[step]]
 action = "move"
-at = 41.129
+when = "C3 at rj2"
 carrier = "C3"
 to = "merge"
 ease = "linear"
 
 [[step]]
 action = "move"
-at = 42.113
+when = "C2 at merge"
 carrier = "C2"
 to = "gone"
 ease = "out"
@@ -583,11 +629,12 @@ ease = "out"
 [[step]]
 action = "message"
 type = "clear_all"
-at = 48.45
+when = "C2 at gone"
+delay = 3.981
 
 [[step]]
 action = "move"
-at = 48.453
+when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
@@ -595,5 +642,5 @@ ease = "out"
 [[step]]
 action = "message"
 type = "analyzer_ok"
-at = 50.15
-
+when = "clear_all sent"
+delay = 1.7
