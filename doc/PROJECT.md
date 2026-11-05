@@ -91,6 +91,7 @@ Comportamento descritto dall'utente:
 trackviz/
 ├── Cargo.toml            # edition 2021, dipendenze: resvg, dejavu (build: sha2)
 ├── README.md             # guida rapida e riferimento del formato
+├── doc/IMPROVEMENTS.md   # miglioramenti proposti e punti da confermare
 ├── build.rs              # scarica Inter (SHA-256 verificato) in OUT_DIR
 ├── fonts/                # README e licenze dei font (i .ttf non sono in git)
 ├── PROJECT.md            # questo documento
@@ -401,6 +402,8 @@ Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyz
 ---
 
 ## 11. Roadmap (evoluzioni concordate o previste)
+
+Miglioramenti proposti e punti da confermare: vedi [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
 
 1. **Risposta negativa al Prepare** (campione da non processare): ramo alternativo, con il carrier che attraversa la Pit-Lane senza campionamento.
 2. **Messaggi di stato**: entrambe le modalità, su richiesta dell'Interfaccia o spontanea al cambio di stato.
