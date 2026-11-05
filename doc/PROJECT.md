@@ -123,13 +123,16 @@ trackviz/
 ### CLI
 
 ```
-trackviz <scene.toml> [-o out.mp4] [-j jobs]      # video completo (senza -o: out/<nome del .toml>.mp4)
+trackviz <scene.toml>... [-o out.mp4] [-j jobs]   # video completo (senza -o: out/<nome del .toml>.mp4)
+trackviz "scenes/*.toml"                          # più scene in parallelo (* e ? nel nome del file)
 trackviz <scene.toml> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.toml> --still <sec> --svg -o f.svg
-trackviz <scene.toml> --check                     # valida e stampa la timeline
+trackviz <scene.toml>... --check                  # valida e stampa la timeline
 ```
 
-La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi.
+La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
+
+**Più scene:** i caratteri jolly `*` e `?` sono espansi dal programma (solo nel nome del file), così funzionano anche tra virgolette e su Windows. I thread di `-j` sono divisi tra le scene: `min(scene, jobs)` in contemporanea, `jobs / scene` thread ciascuna, almeno 1. Una scena che fallisce non ferma le altre: gli errori sono elencati alla fine, con codice d'uscita 1. Due scene che scriverebbero lo stesso video sono un errore; `-o` e `--still` accettano una sola scena. L'help mostra versione e repository, letti da `Cargo.toml`.
 
 ---
 

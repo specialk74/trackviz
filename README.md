@@ -33,6 +33,21 @@ $B scenes/01_prepare_sample_release.toml -o other.mp4        # full video, chose
 
 Without `-o` the video goes to `out/<scene file name>.mp4` (`out/` is created if missing).
 
+Several scenes can be given at once, also with the wildcards `*` and `?` in the file
+name; they are rendered in parallel:
+
+```sh
+$B "scenes/*.toml"            # all the scenes
+$B "scenes/1?_spur*.toml"     # some of them
+$B a.toml b.toml --check      # validate several scenes
+```
+
+Use the quotes to let trackviz expand the wildcards (needed on Windows); without them
+the shell does it, with the same result. The `-j` threads are shared among the scenes:
+`min(scenes, jobs)` run at the same time, with `jobs / scenes` threads each (at least 1).
+A scene that fails doesn't stop the others: all the failures are listed at the end and
+the exit code is 1. `-o` and `--still` take a single scene.
+
 `--check` prints every step with its start and end time. Use it as the event
 log when tuning timings.
 
