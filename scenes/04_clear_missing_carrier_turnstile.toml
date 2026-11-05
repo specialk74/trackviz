@@ -451,15 +451,6 @@ text = "Pipetting"
 duration = 6.6
 
 [[step]]
-action = "message"
-at = 18.7
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
-carrier = "C3"
-
-[[step]]
 action = "caption"
 at = 20.35
 title = "7 · Antenna reads the third carrier — Clear"
@@ -473,13 +464,12 @@ duration = 1.5
 
 [[step]]
 action = "message"
-at = 20.2
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
+at = 19.0
+from = "AN"
+to = "DMX"
+text = "Query"
 params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
@@ -489,6 +479,16 @@ to = "AN"
 text = "Clear"
 params = "SampleId={SampleId}"
 carrier = "C2"
+
+[[step]]
+action = "message"
+at = 20.7
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
 
 [[step]]
 action = "message"

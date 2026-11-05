@@ -482,7 +482,7 @@ carrier = "C3"
 
 [[step]]
 action = "message"
-at = 9.0
+at = 9.4
 from = "AN"
 to = "DMX"
 text = "Query"
@@ -501,7 +501,7 @@ reply = true
 
 [[step]]
 action = "message"
-at = 10.6
+at = 11.1
 from = "DMX"
 to = "AN"
 text = "Tests to perform"
@@ -519,15 +519,6 @@ params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
-action = "message"
-at = 11.8
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
-carrier = "C3"
-
-[[step]]
 action = "note"
 at = 12.6
 actor = "AN"
@@ -536,7 +527,16 @@ duration = 5.0
 
 [[step]]
 action = "message"
-at = 13.4
+at = 12.7
+from = "AN"
+to = "DMX"
+text = "Query"
+params = "SampleId={SampleId}"
+carrier = "C3"
+
+[[step]]
+action = "message"
+at = 14.4
 from = "DMX"
 to = "AN"
 text = "Tests to perform"

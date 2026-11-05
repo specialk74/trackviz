@@ -46,7 +46,7 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[video]` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times` |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = [ids], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
+| `[[device]]` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color`, `ghost` (bool, see below), `visible` (bool, default true), `tag` (tag text, default the SampleId) |
 | `[[step]]` | `action`, one of `start` / `at` / `after_start` / `after_end`, `delay`, `duration` + action keys (below) |
@@ -85,7 +85,7 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
-| `status` | `device` (an `analyzer` or a `zone`), `state` = `error` (red; ERROR badge on an analyzer) \| `ready` (green) \| `normal` (grey); lasts until the next `status` | 0 s |
+| `status` | `device` (an `analyzer`, a `zone`, or a `sampling` device for one needle), `state` = `error` (red; ERROR badge on an analyzer) \| `ready` (green) \| `normal` (grey); lasts until the next `status` | 0 s |
 | `operator` | `device` (an `analyzer`): a stylized lab operator (white coat, thin blue gloves) walks in from the right edge of the panel, works on the analyzer with a wrench, then walks away (walks take up to 2 s each) | 7 s |
 | `needle` | `device` (a `sampling` or `turnstile`), `to` = `down` \| `up`: the needle goes down and stays there until `up` | 0.9 s |
 | `wait` | — | `duration` is required |
@@ -148,6 +148,25 @@ of the analyzer's side and "Aspirating…" / "Needle down" are written inside th
 analyzer. If there is no room on the right of the analyzer, the `operator` works
 from below it. Carrier tags never cover the analyzer. `nsd` and `sampling`
 devices accept `label_x`, `label_y` to move their label.
+
+### Spur with several needles
+
+Scenes 13–16 show a spur serving **one analyzer with two sampling points** (the same
+pattern works for more). Every `sampling` device is one needle of the analyzer:
+needle 1 is the first one in the file. Each needle has its own pit-lane, leaving the
+up branch to the right and rejoining it above its divert. All messages go to the
+one analyzer actor; Sample Acquisition, Sample Complete and Status carry `Needle=n`.
+Which needles a sample visits depends on its tests.
+
+The entry of a pit-lane is a `divert` device (a standard divert): unlike the NSD
+every carrier stops on its point and is read (the device turns blue), then it is
+diverted or goes straight on while the next one stops behind. Use the point as a stop
+in the routes and move the carrier off it with a `move`.
+
+With several `sampling` devices the analyzer shows a band for each needle. A `status`
+on a `sampling` device concerns that needle only: its band turns red or green and its
+probe "Needle down", while the other needle keeps working. A `status` on the analyzer
+concerns the whole instrument. A `zone` around a pit-lane can turn red alone.
 
 ### Ghost carriers (logical position)
 

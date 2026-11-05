@@ -44,6 +44,8 @@ pub enum DeviceKind {
     Gate,
     /// Reader next to a lane; shows a reading animation while a carrier stands on its point.
     Antenna,
+    /// Standard diversion: every carrier stops here, is read, then is diverted or goes straight.
+    Divert,
 }
 
 pub struct Device {
@@ -248,14 +250,15 @@ impl Scene {
                 "turnstile" => DeviceKind::Turnstile,
                 "gate" => DeviceKind::Gate,
                 "antenna" => DeviceKind::Antenna,
-                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone|turnstile|gate|antenna)", t.location())),
+                "divert" => DeviceKind::Divert,
+                o => return Err(format!("{}: unknown device kind '{o}' (nsd|sampling|analyzer|zone|turnstile|gate|antenna|divert)", t.location())),
             };
             let id = t.str_req("id")?;
             let mut at = None;
             let mut rect = (0.0, 0.0, 0.0, 0.0);
             let mut entry_right = true;
             match kind {
-                DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Gate | DeviceKind::Antenna => {
+                DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Gate | DeviceKind::Antenna | DeviceKind::Divert => {
                     t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y"])?;
                     let a = t.str_req("at")?;
                     if !points.contains_key(&a) {
@@ -515,6 +518,10 @@ impl Scene {
             return Err(format!("{loc}: {action} needs an 'analyzer' device"));
         }
         Ok(di)
+    }
+    /// The analyzer of the scene (one instrument, possibly with several needles).
+    pub fn analyzer(&self) -> Option<usize> {
+        self.devices.iter().position(|d| d.kind == DeviceKind::Analyzer)
     }
     pub fn pt(&self, id: &str) -> (f64, f64) {
         let p = &self.points[id];
@@ -986,7 +993,7 @@ impl Timeline {
                     (d, Ev::Wait, format!("{verb:<9} {carrier}"))
                 }
                 Action::Status { device, state } => {
-                    let di = sc.need_device(device, &st.loc, "status", &[(DeviceKind::Analyzer, "analyzer"), (DeviceKind::Zone, "zone")])?;
+                    let di = sc.need_device(device, &st.loc, "status", &[(DeviceKind::Analyzer, "analyzer"), (DeviceKind::Zone, "zone"), (DeviceKind::Sampling, "sampling")])?;
                     (st.duration.unwrap_or(0.0), Ev::Status { device: di, state: *state }, format!("status    {device} {}", state.name()))
                 }
                 Action::Needle { device, down } => {

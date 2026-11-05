@@ -167,29 +167,50 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 }
                 let sw = if badge.is_some() { 3.5 } else { 2.0 };
                 let ly = if badge.is_some() { y + h / 2.0 - 4.0 } else { y + h / 2.0 + 9.0 };
-                let _ = write!(
-                    o,
-                    r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/><text x="{}" y="{ly}" font-size="26" font-weight="700" text-anchor="middle" fill="#334155">{}</text>"##,
-                    x + w / 2.0, esc(&d.label)
-                );
+                let _ = write!(o, r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>"##);
+                // Several needles: a band of the instrument for each one, which
+                // shows the status of that needle.
+                let bands = needle_bands(sc, di);
+                if bands.len() > 1 {
+                    for (n, &(sd, y0, y1)) in bands.iter().enumerate() {
+                        let band = device_state(tl, sd, t);
+                        let (fill, stroke, badge) = match band.map(|s| s.0) {
+                            Some(AnalyzerState::Error) => ("#FEE2E2", "#DC2626", Some(("ERROR", "#DC2626"))),
+                            Some(AnalyzerState::Ready) => ("#DCFCE7", "#16A34A", Some(("READY", "#16A34A"))),
+                            _ => ("none", "none", None),
+                        };
+                        if badge.is_some() {
+                            let _ = write!(o, r##"<rect x="{x}" y="{y0}" width="{w}" height="{}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="3.5"/>"##, y1 - y0);
+                        }
+                        let (_, sy) = sc.pt(sc.devices[sd].at.as_deref().unwrap());
+                        let _ = write!(o, r##"<text x="{}" y="{}" font-size="15" font-weight="600" text-anchor="middle" fill="{MUTED}">Needle {}</text>"##, x + w / 2.0, sy - 34.0, n + 1);
+                        if let Some((text, col)) = badge {
+                            status_badge(o, x + w / 2.0, sy + 20.0, text, col);
+                        }
+                    }
+                }
+                if bands.len() > 1 {
+                    // The title sits on the edge between two bands.
+                    let _ = write!(o, r##"<rect x="{}" y="{}" width="170" height="38" rx="10" fill="#E8EDF3"/>"##, x + w / 2.0 - 85.0, ly - 28.0);
+                }
+                let _ = write!(o, r##"<text x="{}" y="{ly}" font-size="26" font-weight="700" text-anchor="middle" fill="#334155">{}</text>"##, x + w / 2.0, esc(&d.label));
                 if let Some((text, col)) = badge {
-                    let _ = write!(
-                        o,
-                        r##"<rect x="{}" y="{}" width="96" height="28" rx="14" fill="{col}"/><text x="{}" y="{}" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#FFFFFF">{text}</text>"##,
-                        x + w / 2.0 - 48.0, ly + 14.0, x + w / 2.0, ly + 33.5
-                    );
+                    status_badge(o, x + w / 2.0, ly + 14.0, text, col);
                 }
             }
-            DeviceKind::Nsd => {
+            DeviceKind::Nsd | DeviceKind::Divert => {
                 let (x, y) = sc.pt(d.at.as_deref().unwrap());
                 if let Some(a) = glow {
                     let _ = write!(o, r#"<rect x="{}" y="{}" width="84" height="76" rx="12" fill="none" stroke="{ACCENT}" stroke-width="10" opacity="{a:.2}"/>"#, x - 42.0, y - 38.0);
                 }
-                let col = if glow.is_some() { ACCENT } else { "#475569" };
+                // A diversion turns blue while it reads the carrier stopped on it.
+                let read = d.kind == DeviceKind::Divert && carrier_stopped_at(sc, tl, (x, y), t);
+                let col = if glow.is_some() { ACCENT } else if read { "#2563EB" } else { "#475569" };
+                let (lx, ly) = d.label_pos.unwrap_or((x, y + 58.0));
                 let _ = write!(
                     o,
-                    r##"<rect x="{}" y="{}" width="72" height="64" rx="9" fill="#FFFFFF" fill-opacity="0.35" stroke="{col}" stroke-width="3"/><text x="{x}" y="{}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
-                    x - 36.0, y - 32.0, d.label_pos.map_or(y + 58.0, |p| p.1), esc(&d.label)
+                    r##"<rect x="{}" y="{}" width="72" height="64" rx="9" fill="#FFFFFF" fill-opacity="0.35" stroke="{col}" stroke-width="3"/><text x="{lx}" y="{ly}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
+                    x - 36.0, y - 32.0, esc(&d.label)
                 );
             }
             DeviceKind::Sampling => {
@@ -255,13 +276,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 // Small reader above the lane; waves while a carrier stands on its point.
                 let (ax, ay) = sc.pt(d.at.as_deref().unwrap());
                 let by = ay - 36.0;
-                let reading = (0..sc.carriers.len()).any(|ci| {
-                    if !tl.carriers[ci].physical(t) {
-                        return false;
-                    }
-                    let (x, y) = tl.carrier_pos(ci, t);
-                    ((x - ax).powi(2) + (y - ay).powi(2)).sqrt() < 3.0 && !tl.carriers[ci].moving(t)
-                });
+                let reading = carrier_stopped_at(sc, tl, (ax, ay), t);
                 if let Some(a) = glow {
                     let _ = write!(o, r#"<circle cx="{ax}" cy="{by}" r="22" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
                 }
@@ -395,11 +410,6 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 
     // Analyzer probe (drawn above the carrier): a `pipette` (down, aspirate,
     // up) or the needle moved by `needle` steps (it stays down in between).
-    let error = sc
-        .devices
-        .iter()
-        .enumerate()
-        .any(|(di, d)| d.kind == DeviceKind::Analyzer && device_state(tl, di, t).is_some_and(|s| s.0 == AnalyzerState::Error));
     for (device, sd) in sc.devices.iter().enumerate() {
         if !matches!(sd.kind, DeviceKind::Sampling | DeviceKind::Turnstile) {
             continue;
@@ -416,6 +426,9 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             };
             aspirating = (0.2..0.8).contains(&u);
         }
+        let Some(an_idx) = sc.analyzer() else { continue };
+        // In error: the whole instrument, or just this needle.
+        let error = [an_idx, device].iter().any(|&d| device_state(tl, d, t).is_some_and(|s| s.0 == AnalyzerState::Error));
         let mut needle = 0.0;
         for e in tl.events.iter().filter(|e| e.t0 <= t) {
             if let Ev::Needle { device: d, down } = e.ev {
@@ -434,8 +447,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
             continue;
         }
         let (sx, sy) = sc.pt(sd.at.as_deref().unwrap());
-        let an = sc.devices.iter().find(|d| d.kind == DeviceKind::Analyzer).unwrap();
-        let (ax, ay, aw, ah) = an.rect;
+        let (ax, ay, aw, ah) = sc.devices[an_idx].rect;
         // The probe leaves the analyzer from the side nearest to the sampling
         // point: the bottom (analyzer above the lane) or a side (e.g. a spur).
         let vertical = sy >= ay + ah || sy <= ay;
@@ -472,8 +484,10 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" fill="{fill}">{text}</text>"##, sx + 22.0, by + 105.0);
             } else {
                 // Probe from a side (e.g. a spur): the lane side is busy with
-                // carriers and tags, so the label goes inside the analyzer.
-                let _ = write!(o, r##"<text x="{}" y="{}" font-size="17" font-weight="600" text-anchor="middle" fill="{fill}">{text}</text>"##, ax + aw / 2.0, ay + ah / 2.0 + 64.0);
+                // carriers and tags, so the label goes inside the analyzer, in
+                // the band of this needle if it has several.
+                let ly = if needle_bands(sc, an_idx).len() > 1 { sy + 6.0 } else { ay + ah / 2.0 + 64.0 };
+                let _ = write!(o, r##"<text x="{}" y="{ly}" font-size="17" font-weight="600" text-anchor="middle" fill="{fill}">{text}</text>"##, ax + aw / 2.0);
             }
         }
     }
@@ -561,6 +575,41 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
         }
     }
     let _ = write!(o, r##"<text x="{x:.1}" y="{:.1}" font-size="14" font-weight="600" text-anchor="middle" fill="{MUTED}">Operator</text>"##, y + 54.0 - bob);
+}
+
+/// ERROR / READY pill centered on x, with its top at y.
+fn status_badge(o: &mut String, x: f64, y: f64, text: &str, col: &str) {
+    let _ = write!(
+        o,
+        r##"<rect x="{}" y="{y}" width="96" height="28" rx="14" fill="{col}"/><text x="{x}" y="{}" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#FFFFFF">{text}</text>"##,
+        x - 48.0, y + 19.5
+    );
+}
+
+/// Sampling devices (the needles, in file order) with the vertical band
+/// (y0, y1) of the analyzer that belongs to each one.
+fn needle_bands(sc: &Scene, an: usize) -> Vec<(usize, f64, f64)> {
+    let (_, ay, _, ah) = sc.devices[an].rect;
+    let ids: Vec<usize> = sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Sampling).map(|(i, _)| i).collect();
+    let y_of = |i: usize| sc.pt(sc.devices[i].at.as_deref().unwrap()).1;
+    let edge = |i: usize, sign: f64| {
+        // Half way to the nearest needle in that direction, or the analyzer edge.
+        let y = y_of(i);
+        ids.iter()
+            .map(|&o| y_of(o))
+            .filter(|&v| (v - y) * sign > 0.0)
+            .min_by(|a, b| (a - y).abs().total_cmp(&(b - y).abs()))
+            .map_or(if sign < 0.0 { ay } else { ay + ah }, |v| (v + y) / 2.0)
+    };
+    ids.iter().map(|&i| (i, edge(i, -1.0), edge(i, 1.0))).collect()
+}
+
+/// A physical carrier is standing still on point p.
+fn carrier_stopped_at(sc: &Scene, tl: &Timeline, p: (f64, f64), t: f64) -> bool {
+    (0..sc.carriers.len()).any(|ci| {
+        let (x, y) = tl.carrier_pos(ci, t);
+        tl.carriers[ci].physical(t) && !tl.carriers[ci].moving(t) && ((x - p.0).powi(2) + (y - p.1).powi(2)).sqrt() < 3.0
+    })
 }
 
 /// Last `status` of a device (analyzer or zone) at time t, with the time it was set.
@@ -780,6 +829,26 @@ mod tests {
         let base = SAMPLING.replace("id = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "id = \"sp\"\nkind = \"sampling\"\nat = \"s\"\nlabel = \"Sampling point\"\nlabel_x = 123\nlabel_y = 456");
         let (sc, tl) = ok(&base, "[[step]]\naction = \"wait\"\nduration = 1\n");
         assert!(frame(&sc, &tl, 0.5).contains(r#"<text x="123" y="456""#));
+    }
+
+    #[test]
+    fn a_diversion_turns_blue_while_a_carrier_is_stopped_on_it() {
+        let base = SAMPLING.replace("id = \"nsd\"\nkind = \"nsd\"\nat = \"b\"", "id = \"nsd\"\nkind = \"divert\"\nat = \"b\"\nlabel = \"D\"");
+        let (sc, tl) = ok(&base, "[[step]]\naction = \"move\"\ncarrier = \"C1\"\nto = \"b\"\nduration = 2\n[[step]]\naction = \"move\"\nat = 5\ncarrier = \"C1\"\nto = \"s\"\n");
+        let read = r##"fill="#2563EB">D</text>"##;
+        assert!(!frame(&sc, &tl, 1.0).contains(read));
+        assert!(frame(&sc, &tl, 3.0).contains(read));
+        assert!(!frame(&sc, &tl, 6.0).contains(read));
+    }
+
+    #[test]
+    fn with_two_needles_the_status_of_one_leaves_the_other_working() {
+        let base = SAMPLING.replace("[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "[[device]]\nid = \"sp2\"\nkind = \"sampling\"\nat = \"c\"\n[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"");
+        let steps = "[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp\"\nto = \"down\"\n[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp2\"\nto = \"down\"\n[[step]]\naction = \"status\"\nat = 2\ndevice = \"sp\"\nstate = \"error\"\n";
+        let (sc, tl) = ok(&base, steps);
+        let f = frame(&sc, &tl, 3.0);
+        assert!(f.contains(">ERROR<") && f.contains("Needle down") && f.contains("Aspirating…"), "{f}");
+        assert!(f.contains(">Needle 1<") && f.contains(">Needle 2<"));
     }
 
     #[test]

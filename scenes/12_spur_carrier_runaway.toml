@@ -442,7 +442,7 @@ carrier = "C3"
 
 [[step]]
 action = "message"
-at = 9.5
+at = 9.7
 from = "AN"
 to = "DMX"
 text = "Query"
@@ -461,7 +461,7 @@ reply = true
 
 [[step]]
 action = "message"
-at = 11.2
+at = 11.4
 from = "DMX"
 to = "AN"
 text = "Tests to perform"
@@ -480,7 +480,7 @@ carrier = "C1"
 
 [[step]]
 action = "message"
-at = 12.3
+at = 13.0
 from = "AN"
 to = "DMX"
 text = "Query"
@@ -489,7 +489,7 @@ carrier = "C3"
 
 [[step]]
 action = "message"
-at = 13.9
+at = 14.7
 from = "DMX"
 to = "AN"
 text = "Tests to perform"

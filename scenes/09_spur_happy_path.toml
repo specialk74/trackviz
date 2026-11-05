@@ -287,7 +287,7 @@ carrier = "C1"
 
 [[step]]
 action = "message"
-at = 8.3
+at = 8.0
 from = "DMX"
 to = "AN"
 text = "Tests to perform"

@@ -336,7 +336,7 @@ carrier = "C3"
 
 [[step]]
 action = "message"
-at = 11.6
+at = 11.8
 from = "AN"
 to = "DMX"
 text = "Query"
@@ -354,20 +354,20 @@ carrier = "C3"
 reply = true
 
 [[step]]
+action = "caption"
+at = 13.5
+title = "5 · Sample Acquisition — the others queue up"
+text = "The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up behind it."
+
+[[step]]
 action = "message"
-at = 13.4
+at = 13.5
 from = "DMX"
 to = "AN"
 text = "Tests to perform"
 params = "SampleId={SampleId}"
 carrier = "C2"
 reply = true
-
-[[step]]
-action = "caption"
-at = 13.5
-title = "5 · Sample Acquisition — the others queue up"
-text = "The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up behind it."
 
 [[step]]
 action = "message"
@@ -401,16 +401,6 @@ text = "Pipetting"
 duration = 5.0
 
 [[step]]
-action = "message"
-at = 16.6
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
-carrier = "C3"
-reply = true
-
-[[step]]
 action = "caption"
 at = 18.3
 title = "6 · One position, two carriers"
@@ -421,6 +411,16 @@ action = "caption"
 at = 21.2
 title = "7 · Sample Complete"
 text = "Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point."
+
+[[step]]
+action = "message"
+at = 16.8
+from = "DMX"
+to = "AN"
+text = "Tests to perform"
+params = "SampleId={SampleId}"
+carrier = "C3"
+reply = true
 
 [[step]]
 action = "message"

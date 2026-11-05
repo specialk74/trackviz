@@ -29,6 +29,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
 | **Gate + antenna** | Davanti alla ruota. Il carrier si ferma **sempre** all'antenna, che lo legge: l'Interfaccia manda **di nuovo Prepare** (in futuro con un'informazione in più; per ora è disegnato in viola). Se sotto l'ago non c'è un campionamento in corso il gate si apre e il carrier entra nella tasca d'ingresso; altrimenti aspetta il Sample Complete. Solo dopo che il carrier in attesa è entrato la ruota gira (in ingresso → ago, campionato → uscita). |
 | **Spur** | Ramo a U **perpendicolare** alla Main-Lane (come nell'NCCLS). L'NSD devia il carrier, senza fermarlo, in un breve tratto di pit-lane che gira di 90° nel ramo d'andata; sul ramo d'andata c'è il punto di campionamento con l'**analizzatore alla sua destra**; in cima il carrier attraversa e scende dal ramo di ritorno fino alla Main-Lane. |
+| **Deviazione standard** | Deviazione usata dentro lo spur con più punti di campionamento: a differenza dell'NSD **ogni** carrier si ferma e viene letto, poi viene deviato nella pit-lane di un ago o prosegue dritto, mentre il successivo si ferma dietro. Vale anche per chi rientra da un ago e incontra la deviazione successiva. |
 | **Interfaccia** | Il modulo di automazione Inpeco davanti all'analizzatore (NSD + Pit-Lane + rientro). È anche l'attore che scambia i messaggi con l'analizzatore. |
 | **Analizzatore / strumento** | Lo strumento di terze parti che esegue i test. |
 | **DMX** | Il nome Inpeco del **LIS**. Comunica con lo strumento: gli dice quali test eseguire e ne riceve i risultati. |
@@ -105,7 +106,11 @@ trackviz/
 │   ├── 09_spur_happy_path.toml
 │   ├── 10_spur_clear_missing_carrier.toml
 │   ├── 11_spur_analyzer_error_recovery.toml
-│   └── 12_spur_carrier_runaway.toml
+│   ├── 12_spur_carrier_runaway.toml
+│   ├── 13_spur2_happy_path.toml
+│   ├── 14_spur2_clear_missing_carrier.toml
+│   ├── 15_spur2_analyzer_error_recovery.toml
+│   └── 16_spur2_carrier_runaway.toml
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -220,7 +225,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = nsd\|sampling (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
+| `[[device]]` | `id`, `kind` = nsd\|sampling\|divert (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `[[actor]]` | `id`, `label`, `sub`, `color` |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
 | `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `delay`, `duration` + le chiavi specifiche dell'azione |
@@ -235,7 +240,7 @@ La timeline viene sempre stampata su stderr (inizio/fine di ogni step) e serve c
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
-| `status` | `device` (analyzer o zone), `state` = error\|ready\|normal (vale fino al `status` successivo) |
+| `status` | `device` (analyzer, zone o sampling = un solo ago), `state` = error\|ready\|normal (vale fino al `status` successivo) |
 | `needle` | `device` (sampling o turnstile), `to` = down\|up (default 0,9 s) |
 | `operator` | `device` (analyzer); default 7 s, minimo 2 s |
 | `wait` | (solo `duration`) |
@@ -348,6 +353,18 @@ Geometria comune: Main-Lane a y 760 (NSD a x 800, rientro a x 290); deviazione d
 - **11** errore dello strumento con l'ago giù e recovery (≈ 46 s): come la 05; l'operatore lavora sotto l'analizzatore.
 - **12** carrier run-away → Cancel, Clear All (≈ 48 s): come la 07, con l'interfaccia rossa dalla fuga finché tutti i carrier ne sono usciti.
 
+## 9g. Scene 13–16 — spur con un analizzatore e due punti di campionamento
+
+Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyzer` a destra dei due punti di campionamento. Ramo d'andata a x 440 con due deviazioni standard (`div1` a y 650, `div2` a y 410). Da ognuna parte verso destra una pit-lane che sale passando dal punto di campionamento (x 600) e rientra nel ramo **sopra** la deviazione; chi esce dall'ago 1 si ferma quindi anche a `div2`. Velocità 120 px/s.
+
+- **Messaggi:** Prepare all'NSD e di nuovo (viola) a ogni deviazione che devia il carrier; alle altre il carrier è solo letto. Una Sample Acquisition per ogni ago. `Needle=n` compare in Sample Acquisition, Sample Complete e Status. Un solo Release per carrier. Clear, Cancel e Clear All non hanno `Needle`.
+- **Quali aghi** dipende dai test del campione: uno solo o entrambi.
+- Le deviazioni standard sono etichettate "Divert 1" e "Divert 2". Un carrier può entrare in una pit-lane mentre l'ago sta campionando il carrier precedente. Soste ai divert brevi: 0,6 s con il Prepare viola, 0,4 s se il carrier è solo letto (il carrier non aspetta l'arrivo della freccia).
+- **13** happy path (≈ 51 s): C1 usa entrambi gli aghi, C2 solo l'ago 2; C1 entra nella seconda pit-lane mentre C2 è in campionamento.
+- **14** Clear (≈ 51 s): il fantasma di C2 si ferma a `div1`, C3 ci si ferma sopra; alla lettura di C3 Clear di C2 → OK → Prepare viola di C3.
+- **15** errore (≈ 50 s): errore **dell'ago 1** (`status` sul device `sampling`: diventa rossa solo la sua fascia dell'analizzatore), l'ago 2 continua durante la recovery.
+- **16** run-away (≈ 55 s): C1 scappa dall'ago 1 e si ferma comunque a `div2`; il carrier dopo finisce sotto l'ago. Via solo i carrier della pit-lane dell'ago 1, che è rossa dalla fuga finché non si è svuotata. L'ago 2 continua.
+
 ---
 
 ## 10. Assunzioni da confermare (scelte non specificate dall'utente)
@@ -362,6 +379,7 @@ Geometria comune: Main-Lane a y 760 (NSD a x 800, rientro a x 290); deviazione d
 | A6 | SampleId `SID-000123` e durata della pipettatura 4,5 s | Segnaposto |
 | A7 | Messaggi di stato dell'analizzatore omessi | Da aggiungere |
 | A8 | Il secondo Prepare (all'antenna) non ha risposta OK; l'informazione in più che porterà è ancora da definire | Da confermare |
+| A10 | L'Analizzatore manda una Query a DMX alla volta: la successiva solo dopo aver ricevuto la risposta alla precedente (regola dell'utente, verificata da un test su tutte le scene). La Sample Acquisition di un campione parte dopo che i suoi test sono noti | Confermata la prima parte |
 | A9 | La risposta dell'Analizzatore al Clear si chiama "OK" (scene 03/04) | Scelta dell'utente |
 
 ---
