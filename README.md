@@ -57,7 +57,7 @@ Parts shared by several scenes live in `scenes/common/` and are pulled in with a
 top-level `include`, written before the first section:
 
 ```toml
-include = ["common/video.toml", "common/actors.toml", "common/spur.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/spur.toml"]
 
 [video]
 subtitle = "My scene"     # added to the included [video]
@@ -77,6 +77,7 @@ and lanes (scenes 03, 07 and 08 keep theirs in the scene file).
 |---|---|
 | `video.toml` | title, size, fps, tail, clock |
 | `actors.toml` | Interface, Analyzer, DMX |
+| `messages.toml` | the named messages (below) |
 | `sampling.toml` | Pit-Lane with a simple sampling point |
 | `turnstile.toml` | Pit-Lane with turnstile, gate and antenna |
 | `spur.toml` | spur with one sampling point |
@@ -91,7 +92,8 @@ x 30–950 and y 120–885. `[video] width/height` only scales the output.
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = [ids], `label_x`, `label_y` |
 | `[[device]]` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
-| `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right) |
+| `[[actor]]` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (bool: this actor gets the "Pipetting" note) |
+| `[[message]]` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |
 | `[[carrier]]` | `id`, `tube` (bool), `sample_id`, `route` = [point ids], `start`, `speed` (px/s), `cap_color`, `ghost` (bool, see below), `visible` (bool, default true), `tag` (tag text, default the SampleId) |
 | `[[step]]` | `action`, one of `start` / `at` / `after_start` / `after_end`, `delay`, `duration` + action keys (below) |
 
@@ -123,9 +125,9 @@ step of the file starts at 0 s. To start a step together with the previous one u
 |---|---|---|
 | `caption` | `title`, `text` | stays until the next caption |
 | `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed`, `runaway` (bool: the carrier escapes by itself; red pulsing ring and tag "… · RUN-AWAY" while it moves) | computed from length and speed |
-| `message` | `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
+| `message` | `type` (a named message), `carrier`, `needle`; or, without `type`: `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `needle`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
-| `pipette` | `device` (a `sampling` or `turnstile` device) | 3 s |
+| `pipette` | `device` (a `sampling` or `turnstile` device). Also adds the note "Pipetting" on the `analyzer` actor, with the same timing ("Pipetting · Needle n" when there are several sampling points) | 3 s |
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
@@ -135,7 +137,31 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `wait` | — | `duration` is required |
 
 `{SampleId}` and `{CarrierId}` inside `text` and `params` are replaced with the
-carrier's values.
+carrier's values, `{Needle}` with the `needle` key of the step (required then).
+
+### Named messages
+
+Messages are defined once in `scenes/common/messages.toml` and used by name, so a
+change there applies to every scene:
+
+```toml
+[[message]]
+id = "sample_acquisition_needle"
+from = "IF"
+to = "AN"
+text = "Sample Acquisition"
+params = "SampleId={SampleId} Needle={Needle}"
+
+[[step]]
+action = "message"
+type = "sample_acquisition_needle"
+at = 13.2
+carrier = "C1"
+needle = 1
+```
+
+A step with `type` can't redefine the message: only `carrier` and `needle`, plus
+the timing keys, are allowed. Steps without `type` still work for one-off messages.
 
 ### Turnstile
 

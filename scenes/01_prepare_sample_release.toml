@@ -3,7 +3,7 @@
 # Carrier flow: right to left, Pit-Lane above the Main-Lane.
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 
-include = ["common/video.toml", "common/actors.toml", "common/sampling.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/sampling.toml"]
 
 [video]
 subtitle = "Single carrier with sample tube — happy path"
@@ -53,20 +53,13 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "prepare"
 start = "with"
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 delay = 0.5
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
-reply = true
 
 [[step]]
 action = "caption"
@@ -76,21 +69,14 @@ text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must b
 
 [[step]]
 action = "message"
+type = "query"
 start = "with"
 delay = 0.3
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 
 [[step]]
 action = "message"
+type = "tests"
 delay = 0.5
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
-reply = true
 
 [[step]]
 action = "caption"
@@ -101,12 +87,9 @@ text = "The carrier stops at the sampling point. The interface sends Sample Acqu
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 start = "with"
 delay = 0.3
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 
 [[step]]
 action = "caption"
@@ -121,13 +104,6 @@ device = "sp"
 duration = 4.5
 
 [[step]]
-action = "note"
-start = "with"
-actor = "AN"
-text = "Pipetting"
-duration = 4.5
-
-[[step]]
 action = "caption"
 delay = 0.3
 title = "6 · Sample Complete"
@@ -135,12 +111,9 @@ text = "When aspiration is finished the analyzer sends Sample Complete. Only aft
 
 [[step]]
 action = "message"
+type = "sample_complete"
 start = "with"
 delay = 0.3
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 
 [[step]]
 action = "caption"
@@ -170,11 +143,8 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "release"
 start = "with"
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 
 [[step]]
 action = "caption"
@@ -193,7 +163,4 @@ duration = 1.5
 
 [[step]]
 action = "message"
-from = "AN"
-to = "DMX"
-text = "Results"
-params = "SampleId={SampleId}"
+type = "results"

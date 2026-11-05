@@ -9,7 +9,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml"]
 
 [video]
 subtitle = "A carrier expected in the Pit-Lane is missing — Clear (sampling point)"
@@ -207,22 +207,15 @@ duration = 2.0
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 4.77
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 6.4
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 # C2 reaches the NSD: logically diverted (ghost appears), physically straight on.
 [[step]]
@@ -252,41 +245,27 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 7.8
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "query"
 at = 8.3
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 9.5
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "tests"
 at = 10.2
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "caption"
@@ -302,31 +281,21 @@ duration = 2.0
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 11.0
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "query"
 at = 11.8
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 12.7
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "caption"
@@ -336,43 +305,26 @@ text = "The first carrier is at the sampling point: Sample Acquisition, and the 
 
 [[step]]
 action = "message"
+type = "tests"
 at = 13.5
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 14.4
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "query"
 at = 15.1
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "pipette"
 at = 16.0
 device = "sp"
-duration = 5.0
-
-[[step]]
-action = "note"
-at = 16.0
-actor = "AN"
-text = "Pipetting"
 duration = 5.0
 
 [[step]]
@@ -389,21 +341,14 @@ text = "Sampling is finished: Sample Complete. The first carrier is released, an
 
 [[step]]
 action = "message"
+type = "tests"
 at = 16.8
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 21.2
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -444,22 +389,15 @@ text = "The interface expects the second sample at the sampling point, but finds
 
 [[step]]
 action = "message"
+type = "clear"
 at = 26.8
-from = "IF"
-to = "AN"
-text = "Clear"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 28.4
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "hide"
@@ -475,33 +413,20 @@ text = "Only after the reply to Clear the interface sends Sample Acquisition for
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 30.2
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "release"
 at = 30.42
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "pipette"
 at = 31.8
 device = "sp"
-duration = 4.5
-
-[[step]]
-action = "note"
-at = 31.8
-actor = "AN"
-text = "Pipetting"
 duration = 4.5
 
 [[step]]
@@ -512,11 +437,8 @@ text = "Sample Complete for the third sample: the carrier is released and, back 
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 36.5
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
@@ -535,9 +457,6 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "release"
 at = 45.92
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C3"

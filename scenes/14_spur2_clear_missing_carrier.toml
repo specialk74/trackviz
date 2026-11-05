@@ -6,7 +6,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml", "common/spur2.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/spur2.toml"]
 
 [video]
 subtitle = "Spur with two sampling points — a carrier expected in the spur is missing, Clear"
@@ -92,11 +92,8 @@ duration = 1.6
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 2.44
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -120,11 +117,8 @@ duration = 1.6
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 3.35
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
@@ -135,13 +129,9 @@ duration = 0.4
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 4.14
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "move"
@@ -152,21 +142,14 @@ ease = "linear"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 5.05
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "query"
 at = 5.84
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -184,32 +167,21 @@ duration = 1.6
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 6.35
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 7.54
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 8.05
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "highlight"
@@ -219,13 +191,9 @@ duration = 0.6
 
 [[step]]
 action = "message"
+type = "prepare_again"
 at = 8.62
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
-color = "#9333EA"
 
 [[step]]
 action = "move"
@@ -243,30 +211,21 @@ ease = "inout"
 
 [[step]]
 action = "message"
+type = "query"
 at = 9.14
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 10.84
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition_needle"
+needle = 1
 at = 12.4
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId} Needle=1"
 carrier = "C1"
 
 [[step]]
@@ -283,20 +242,14 @@ duration = 0.6
 
 [[step]]
 action = "message"
+type = "query"
 at = 12.44
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "clear"
 at = 12.63
-from = "IF"
-to = "AN"
-text = "Clear"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
@@ -306,31 +259,16 @@ device = "sp1"
 duration = 6.0
 
 [[step]]
-action = "note"
-at = 14.0
-actor = "AN"
-text = "Pipetting · Needle 1"
-duration = 6.0
-
-[[step]]
 action = "message"
+type = "tests"
 at = 14.14
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 14.23
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "hide"
@@ -340,13 +278,9 @@ duration = 0.6
 
 [[step]]
 action = "message"
+type = "prepare_again"
 at = 15.83
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C3"
-color = "#9333EA"
 
 [[step]]
 action = "caption"
@@ -363,11 +297,9 @@ ease = "inout"
 
 [[step]]
 action = "message"
+type = "sample_complete_needle"
+needle = 1
 at = 20.2
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId} Needle=1"
 carrier = "C1"
 
 [[step]]
@@ -392,24 +324,15 @@ ease = "inout"
 
 [[step]]
 action = "message"
+type = "sample_acquisition_needle"
+needle = 1
 at = 24.29
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId} Needle=1"
 carrier = "C3"
 
 [[step]]
 action = "pipette"
 at = 25.89
 device = "sp1"
-duration = 4.0
-
-[[step]]
-action = "note"
-at = 25.89
-actor = "AN"
-text = "Pipetting · Needle 1"
 duration = 4.0
 
 [[step]]
@@ -434,11 +357,9 @@ ease = "linear"
 
 [[step]]
 action = "message"
+type = "sample_complete_needle"
+needle = 1
 at = 30.09
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId} Needle=1"
 carrier = "C3"
 
 [[step]]
@@ -456,11 +377,8 @@ ease = "inout"
 
 [[step]]
 action = "message"
+type = "release"
 at = 35.64
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -492,11 +410,8 @@ ease = "linear"
 
 [[step]]
 action = "message"
+type = "release"
 at = 45.53
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]

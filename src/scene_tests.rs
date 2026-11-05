@@ -531,3 +531,48 @@ fn the_videos_do_not_mention_the_nsd() {
         }
     }
 }
+
+const TYPES: &str = "[[message]]\nid = \"acq\"\nfrom = \"IF\"\nto = \"AN\"\ntext = \"Acquire\"\nparams = \"SampleId={SampleId} Needle={Needle}\"\nreply = true\ncolor = \"#123456\"\n";
+
+#[test]
+fn named_messages_take_everything_from_their_type() {
+    let (_, tl) = ok(SAMPLING, &format!("{TYPES}[[step]]\naction = \"message\"\ntype = \"acq\"\ncarrier = \"G\"\nneedle = 2\n"));
+    match &tl.events[0].ev {
+        Ev::Message { from, to, text, params, reply, color, .. } => {
+            assert_eq!((*from, *to, text.as_str(), params.as_str(), *reply), (0, 1, "Acquire", "SampleId=SID-2 Needle=2", true));
+            assert_eq!(color.as_deref(), Some("#123456"));
+        }
+        _ => panic!("not a message"),
+    }
+}
+
+#[test]
+fn named_message_errors() {
+    let step = "[[step]]\naction = \"message\"\n";
+    err(SAMPLING, &format!("{step}type = \"nope\"\n"), "unknown message type 'nope'");
+    err(SAMPLING, &format!("{TYPES}{step}type = \"acq\"\n"), "add a 'needle' key");
+    // A step with a type doesn't redefine it.
+    err(SAMPLING, &format!("{TYPES}{step}type = \"acq\"\nneedle = 1\ntext = \"x\"\n"), "unknown key 'text'");
+    err(SAMPLING, &format!("{TYPES}{TYPES}{step}type = \"acq\"\nneedle = 1\n"), "duplicate message id 'acq'");
+}
+
+fn notes(tl: &Timeline) -> Vec<(String, f64, f64)> {
+    tl.events.iter().filter_map(|e| match &e.ev { Ev::Note { text, .. } => Some((text.clone(), e.t0, e.t1)), _ => None }).collect()
+}
+
+#[test]
+fn pipette_adds_its_note_on_the_analyzer_actor() {
+    let steps = "[[step]]\naction = \"pipette\"\nat = 1\ndevice = \"sp\"\nduration = 4\n";
+    let with_actor = SAMPLING.replace("label = \"Analyzer\"\n[[carrier]]", "label = \"Analyzer\"\nanalyzer = true\n[[carrier]]");
+    assert_ne!(with_actor, SAMPLING);
+    let (_, tl) = ok(&with_actor, steps);
+    assert_eq!(notes(&tl), vec![("Pipetting".to_string(), 1.0, 5.0)]);
+    assert_eq!(tl.rows, 1);
+    // Several sampling points: it names the needle.
+    let two = with_actor.replace("[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "[[device]]\nid = \"sp1\"\nkind = \"sampling\"\nat = \"c\"\n[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"");
+    let (_, tl) = ok(&two, steps);
+    assert_eq!(notes(&tl)[0].0, "Pipetting · Needle 2");
+    // No analyzer actor: no note.
+    let (_, tl) = ok(SAMPLING, steps);
+    assert!(notes(&tl).is_empty());
+}

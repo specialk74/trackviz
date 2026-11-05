@@ -10,6 +10,7 @@ id = "AN"
 label = "Analyzer"
 sub = "Instrument"
 color = "#EA580C"
+analyzer = true
 
 [[actor]]
 id = "DMX"

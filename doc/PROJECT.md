@@ -181,7 +181,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata nell'ordine del file.
 
-**Segnaposto:** `{SampleId}` e `{CarrierId}` in `text`/`params` vengono sostituiti con i valori del carrier indicato in `carrier`, o del primo carrier se non è indicato.
+**Segnaposto:** `{SampleId}` e `{CarrierId}` in `text`/`params` vengono sostituiti con i valori del carrier indicato in `carrier`, o del primo carrier se non è indicato; `{Needle}` con la chiave `needle` dello step (obbligatoria in quel caso).
 
 **Durata totale** = fine dell'ultimo step + `tail`.
 
@@ -226,13 +226,16 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.toml"` prende solo le scene. Le scene 03, 07 e 08 hanno geometrie uniche e le tengono nel proprio file.
 
+**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.toml` (`[[message]]`) e gli step li richiamano con `type`, più `carrier` e, se il messaggio contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer = true`; la nota occupa la riga subito dopo la posizione del `pipette` nel file.
+
 | Sezione | Chiavi |
 |---|---|
 | `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `[[point]]` | `id`, `x`, `y` |
 | `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
 | `[[device]]` | `id`, `kind` = nsd\|sampling\|divert (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
-| `[[actor]]` | `id`, `label`, `sub`, `color` |
+| `[[actor]]` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
+| `[[message]]` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |
 | `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
 | `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `delay`, `duration` + le chiavi specifiche dell'azione |
 
@@ -240,9 +243,9 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 |---|---|
 | `caption` | `title`, `text` |
 | `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed`, `runaway` (false: carrier che scappa, anello rosso pulsante e cartellino "… · RUN-AWAY" durante il movimento) |
-| `message` | `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `color` (colore del mittente) |
+| `message` | `type`, `carrier`, `needle`; oppure, senza `type`: `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `needle`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
-| `pipette` | `device` sampling o turnstile |
+| `pipette` | `device` sampling o turnstile (aggiunge la nota "Pipetting") |
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |

@@ -7,7 +7,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml", "common/spur.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/spur.toml"]
 
 [video]
 subtitle = "Spur — a carrier expected in the spur is missing, Clear"
@@ -151,12 +151,6 @@ title = "5 · Sample Acquisition — the others queue up"
 text = "The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up below it."
 
 [[step]]
-action = "pipette"
-at = 12.6
-device = "sp"
-duration = 5.0
-
-[[step]]
 action = "caption"
 at = 13.8
 title = "6 · One position, two carriers"
@@ -224,12 +218,6 @@ title = "9 · Sample Acquisition"
 text = "Only after the reply to Clear the interface sends Sample Acquisition for the third sample."
 
 [[step]]
-action = "pipette"
-at = 26.4
-device = "sp"
-duration = 4.5
-
-[[step]]
 action = "caption"
 at = 29.39
 title = "10 · Release"
@@ -264,202 +252,133 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 3.07
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 4.7
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 5.5
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "query"
 at = 6.0
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 7.1
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "tests"
 at = 7.8
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 8.5
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "query"
 at = 9.4
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 10.1
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
+type = "tests"
 at = 11.1
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 11.2
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
-action = "note"
+action = "pipette"
 at = 12.6
-actor = "AN"
-text = "Pipetting"
+device = "sp"
 duration = 5.0
 
 [[step]]
 action = "message"
+type = "query"
 at = 12.7
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 14.4
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 17.8
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "clear"
 at = 21.4
-from = "IF"
-to = "AN"
-text = "Clear"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 23.0
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 24.8
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
-action = "note"
+action = "pipette"
 at = 26.4
-actor = "AN"
-text = "Pipetting"
+device = "sp"
 duration = 4.5
 
 [[step]]
 action = "message"
+type = "release"
 at = 29.39
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 31.1
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "release"
 at = 42.99
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C3"
 

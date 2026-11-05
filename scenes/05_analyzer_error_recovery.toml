@@ -7,7 +7,7 @@
 # Carrier flow: right to left, Pit-Lane above the Main-Lane.
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 
-include = ["common/video.toml", "common/actors.toml", "common/sampling.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/sampling.toml"]
 
 [video]
 subtitle = "Single carrier — analyzer error with the needle down, operator recovery"
@@ -58,22 +58,15 @@ duration = 2.0
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 4.77
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 6.77
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "caption"
@@ -83,22 +76,15 @@ text = "After Prepare, the analyzer queries DMX (LIS) to know which tests must b
 
 [[step]]
 action = "message"
+type = "query"
 at = 8.8
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 10.8
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "caption"
@@ -108,11 +94,8 @@ text = "The carrier stops at the sampling point. The interface sends Sample Acqu
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 13.6
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -142,30 +125,21 @@ state = "error"
 
 [[step]]
 action = "message"
+type = "status_error"
 at = 17.8
-from = "AN"
-to = "IF"
-text = "Status"
-params = "State=Error"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 18.3
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
 at = 19.6
-from = "IF"
-to = "AN"
-text = "OK"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "caption"
@@ -207,21 +181,15 @@ state = "ready"
 
 [[step]]
 action = "message"
+type = "status_ready"
 at = 27.700000000000003
-from = "AN"
-to = "IF"
-text = "Status"
-params = "State=Ready"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
 at = 29.400000000000002
-from = "IF"
-to = "AN"
-text = "OK"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "caption"
@@ -245,10 +213,7 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "release"
 at = 39.02
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 

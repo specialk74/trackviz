@@ -85,6 +85,8 @@ pub struct Actor {
     pub label: String,
     pub sub: String,
     pub color: String,
+    /// The actor of the analyzer: `pipette` adds its "Pipetting" note here.
+    pub analyzer: bool,
 }
 
 pub struct Carrier {
@@ -138,7 +140,7 @@ pub enum Action {
     Caption { title: String, text: String },
     /// `runaway`: the carrier escapes by itself (drawn in red, tag "RUN-AWAY").
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
-    Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String> },
+    Message { from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
     Pipette { device: String },
     Highlight { device: String },
@@ -210,12 +212,12 @@ impl Scene {
             }
         }
         for k in doc.arrays.keys() {
-            if !["point", "lane", "device", "actor", "carrier", "step"].contains(&k.as_str()) {
+            if !["point", "lane", "device", "actor", "carrier", "message", "step"].contains(&k.as_str()) {
                 return Err(format!("unknown section [[{k}]]"));
             }
         }
         // Included files make it easy to define the same thing twice.
-        for section in ["lane", "device", "actor", "carrier"] {
+        for section in ["lane", "device", "actor", "carrier", "message"] {
             let mut seen = Vec::new();
             for t in arr(doc, section) {
                 if let Some(id) = t.str_opt("id")? {
@@ -344,12 +346,13 @@ impl Scene {
 
         let mut actors = Vec::new();
         for t in arr(doc, "actor") {
-            t.check_keys(&["id", "label", "sub", "color"])?;
+            t.check_keys(&["id", "label", "sub", "color", "analyzer"])?;
             actors.push(Actor {
                 id: t.str_req("id")?,
                 label: t.str_req("label")?,
                 sub: t.str_opt("sub")?.unwrap_or_default(),
                 color: t.str_opt("color")?.unwrap_or_else(|| "#334155".into()),
+                analyzer: t.bool_opt("analyzer")?.unwrap_or(false),
             });
         }
 
@@ -378,6 +381,16 @@ impl Scene {
             });
         }
 
+        // Named messages: a `message` step with `type` takes everything from here.
+        let mut msg_types = HashMap::new();
+        for t in arr(doc, "message") {
+            t.check_keys(&["id", "from", "to", "text", "params", "reply", "color"])?;
+            for k in ["from", "to", "text"] {
+                t.str_req(k)?;
+            }
+            msg_types.insert(t.str_req("id")?, t);
+        }
+
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
             let common = ["action", "start", "at", "after_start", "after_end", "delay", "duration"];
@@ -385,7 +398,8 @@ impl Scene {
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed", "runaway"],
-                "message" => &["from", "to", "text", "params", "reply", "carrier", "color"],
+                "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
+                "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle"],
                 "note" => &["actor", "text"],
                 "pipette" => &["device"],
                 "highlight" => &["device"],
@@ -414,15 +428,23 @@ impl Scene {
                     speed: t.num_opt("speed")?,
                     runaway: t.bool_opt("runaway")?.unwrap_or(false),
                 },
-                "message" => Action::Message {
-                    from: t.str_req("from")?,
-                    to: t.str_req("to")?,
-                    text: t.str_req("text")?,
-                    params: t.str_opt("params")?.unwrap_or_default(),
-                    reply: t.bool_opt("reply")?.unwrap_or(false),
-                    carrier: t.str_opt("carrier")?,
-                    color: t.str_opt("color")?,
-                },
+                "message" => {
+                    // Without `type` the keys are on the step itself.
+                    let src = match t.str_opt("type")? {
+                        Some(ty) => *msg_types.get(&ty).ok_or_else(|| format!("{}: unknown message type '{ty}'", t.location()))?,
+                        None => t,
+                    };
+                    Action::Message {
+                        from: src.str_req("from")?,
+                        to: src.str_req("to")?,
+                        text: src.str_req("text")?,
+                        params: src.str_opt("params")?.unwrap_or_default(),
+                        reply: src.bool_opt("reply")?.unwrap_or(false),
+                        carrier: t.str_opt("carrier")?,
+                        color: src.str_opt("color")?,
+                        needle: t.num_opt("needle")?.map(|n| n as u32),
+                    }
+                }
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
                 "pipette" => Action::Pipette { device: t.str_req("device")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
@@ -530,6 +552,17 @@ impl Scene {
             return Err(format!("{loc}: {action} needs an 'analyzer' device"));
         }
         Ok(di)
+    }
+    /// Note shown while pipetting at device `di`, on the analyzer's actor. With
+    /// several sampling points it names the needle (needle 1 = first in the file).
+    fn pipetting_note(&self, di: usize) -> Option<(usize, String)> {
+        let ai = self.actors.iter().position(|a| a.analyzer)?;
+        let needles: Vec<usize> = (0..self.devices.len()).filter(|&i| self.devices[i].kind == DeviceKind::Sampling).collect();
+        let text = match needles.iter().position(|&i| i == di) {
+            Some(n) if needles.len() > 1 => format!("Pipetting · Needle {}", n + 1),
+            _ => "Pipetting".to_string(),
+        };
+        Some((ai, text))
     }
     /// The analyzer of the scene (one instrument, possibly with several needles).
     pub fn analyzer(&self) -> Option<usize> {
@@ -825,13 +858,15 @@ impl Timeline {
     }
 }
 
-fn subst(s: &str, sc: &Scene, carrier: Option<usize>) -> String {
-    let c = carrier.or(if sc.carriers.is_empty() { None } else { Some(0) });
-    match c {
-        Some(ci) => s
-            .replace("{SampleId}", &sc.carriers[ci].sample_id)
-            .replace("{CarrierId}", &sc.carriers[ci].id),
-        None => s.to_string(),
+fn subst(s: &str, sc: &Scene, carrier: Option<usize>, needle: Option<u32>) -> Result<String, String> {
+    let mut s = s.to_string();
+    if let Some(ci) = carrier.or(if sc.carriers.is_empty() { None } else { Some(0) }) {
+        s = s.replace("{SampleId}", &sc.carriers[ci].sample_id).replace("{CarrierId}", &sc.carriers[ci].id);
+    }
+    match needle {
+        Some(n) => Ok(s.replace("{Needle}", &n.to_string())),
+        None if s.contains("{Needle}") => Err("the message uses {Needle}: add a 'needle' key to the step".into()),
+        None => Ok(s),
     }
 }
 
@@ -956,14 +991,14 @@ impl Timeline {
                     let tag = if *runaway { "  (run-away)" } else { "" };
                     (d, Ev::Wait, format!("move      {carrier} -> {to}{tag}"))
                 }
-                Action::Message { from, to, text, params, reply, carrier, color } => {
+                Action::Message { from, to, text, params, reply, carrier, color, needle } => {
                     let (fi, ti) = (sc.need_actor(from, &st.loc)?, sc.need_actor(to, &st.loc)?);
                     if fi == ti {
                         return Err(format!("{}: message from an actor to itself is not supported; use a note", st.loc));
                     }
                     let ci = carrier.as_deref().map(|c| sc.need_carrier(c, &st.loc)).transpose()?;
-                    let text = subst(text, sc, ci);
-                    let params = subst(params, sc, ci);
+                    let text = subst(text, sc, ci, *needle).map_err(|e| format!("{}: {e}", st.loc))?;
+                    let params = subst(params, sc, ci, *needle).map_err(|e| format!("{}: {e}", st.loc))?;
                     let desc = format!("message   {from} -> {to}  {text}  {params}");
                     let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row, color: color.clone() };
                     row += 1;
@@ -1025,7 +1060,17 @@ impl Timeline {
             };
             let t1 = t0 + dur;
             log.push(format!("{t0:7.2}s - {t1:7.2}s  {desc}"));
+            // The analyzer shows what it is doing on its lifeline.
+            let note = match ev {
+                Ev::Pipette { device } => sc.pipetting_note(device),
+                _ => None,
+            };
             events.push(Timed { t0, t1, ev });
+            if let Some((ai, text)) = note {
+                log.push(format!("{t0:7.2}s - {t1:7.2}s  note      {}: {text}", sc.actors[ai].id));
+                events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row } });
+                row += 1;
+            }
             prev_start = t0;
             prev_end = t1;
             max_end = max_end.max(t1);

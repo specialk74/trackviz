@@ -9,7 +9,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml"]
 
 [video]
 subtitle = "Three carriers — carrier run-away during sampling, Cancel and Clear All (sampling point)"
@@ -267,12 +267,6 @@ title = "4 · The wrong sample is aspirated"
 text = "The analyzer pipettes the tube under the needle: the second sample, while it believes it is sampling the first one."
 
 [[step]]
-action = "pipette"
-at = 19.8
-device = "sp"
-duration = 4.5
-
-[[step]]
 action = "caption"
 at = 24.4
 title = "5 · Sample Complete — Cancel"
@@ -314,174 +308,113 @@ ease = "out"
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 4.77
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 6.42
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 7.73
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "query"
 at = 8.3
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 9.38
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "tests"
 at = 9.9
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 10.73
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "query"
 at = 11.5
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C2"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 12.38
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
 action = "message"
+type = "tests"
 at = 13.2
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C2"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 14.0
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "query"
 at = 14.8
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C3"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 16.5
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C3"
-reply = true
 
 [[step]]
-action = "note"
+action = "pipette"
 at = 19.8
-actor = "AN"
-text = "Pipetting"
+device = "sp"
 duration = 4.5
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 24.5
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "cancel"
 at = 26.2
-from = "IF"
-to = "AN"
-text = "Cancel"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 27.9
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "clear_all"
 at = 39.98
-from = "IF"
-to = "AN"
-text = "Clear All"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
 at = 41.68
-from = "AN"
-to = "IF"
-text = "OK"
-reply = true
 

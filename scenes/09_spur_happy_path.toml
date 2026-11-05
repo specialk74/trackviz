@@ -4,7 +4,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml", "common/spur.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/spur.toml"]
 
 [video]
 subtitle = "Spur — single carrier with sample tube, happy path"
@@ -67,12 +67,6 @@ title = "4 · Sampling point — Sample Acquisition"
 text = "The carrier stops at the sampling point on the up branch. The interface sends Sample Acquisition: the tube is in position and can be aspirated."
 
 [[step]]
-action = "pipette"
-at = 11.2
-device = "sp"
-duration = 4.5
-
-[[step]]
 action = "caption"
 at = 15.9
 title = "5 · Sample Complete"
@@ -107,73 +101,49 @@ text = "As soon as the carrier is back on the Main-Lane, the interface sends Rel
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 3.07
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 4.9
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "query"
 at = 6.5
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 8.0
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 9.6
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
-action = "note"
+action = "pipette"
 at = 11.2
-actor = "AN"
-text = "Pipetting"
+device = "sp"
 duration = 4.5
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 16.0
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "release"
 at = 27.99
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 

@@ -5,7 +5,7 @@
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
 
-include = ["common/video.toml", "common/actors.toml", "common/spur.toml"]
+include = ["common/video.toml", "common/actors.toml", "common/messages.toml", "common/spur.toml"]
 
 [video]
 subtitle = "Spur — analyzer error with the needle down, operator recovery"
@@ -145,49 +145,32 @@ text = "The carrier went round the spur and is back on the Main-Lane: the interf
 
 [[step]]
 action = "message"
+type = "prepare"
 at = 3.07
-from = "IF"
-to = "AN"
-text = "Prepare"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "sample_ok"
 at = 4.9
-from = "AN"
-to = "IF"
-text = "OK"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "query"
 at = 6.5
-from = "AN"
-to = "DMX"
-text = "Query"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "tests"
 at = 8.0
-from = "DMX"
-to = "AN"
-text = "Tests to perform"
-params = "SampleId={SampleId}"
 carrier = "C1"
-reply = true
 
 [[step]]
 action = "message"
+type = "sample_acquisition"
 at = 9.6
-from = "IF"
-to = "AN"
-text = "Sample Acquisition"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
@@ -199,28 +182,19 @@ duration = 2.6
 
 [[step]]
 action = "message"
+type = "status_error"
 at = 13.8
-from = "AN"
-to = "IF"
-text = "Status"
-params = "State=Error"
 
 [[step]]
 action = "message"
+type = "sample_complete"
 at = 14.3
-from = "AN"
-to = "IF"
-text = "Sample Complete"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
 at = 15.6
-from = "IF"
-to = "AN"
-text = "OK"
-reply = true
 
 [[step]]
 action = "note"
@@ -231,26 +205,17 @@ duration = 6.0
 
 [[step]]
 action = "message"
+type = "status_ready"
 at = 23.7
-from = "AN"
-to = "IF"
-text = "Status"
-params = "State=Ready"
 
 [[step]]
 action = "message"
+type = "interface_ok"
 at = 25.4
-from = "IF"
-to = "AN"
-text = "OK"
-reply = true
 
 [[step]]
 action = "message"
+type = "release"
 at = 37.49
-from = "IF"
-to = "AN"
-text = "Release"
-params = "SampleId={SampleId}"
 carrier = "C1"
 
