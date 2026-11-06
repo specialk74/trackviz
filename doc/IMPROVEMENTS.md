@@ -7,34 +7,25 @@ descritte in `README.md` e `PROJECT.md`; qui sono solo riassunte in fondo.
 
 In ordine di utilità.
 
-### 1.1 Anteprima veloce
-
-Oggi per vedere una scena serve un video completo (la più corta richiede 5 s) o un
-singolo fotogramma con `--still`.
-
-- `--from 15 --to 25`: genera solo un tratto.
-- `--preview`: bassa risoluzione e meno fotogrammi.
-- `--watch`: rigenera quando il file viene salvato.
-
-### 1.2 Highlight agganciato all'evento
+### 1.1 Highlight agganciato all'evento
 
 59 `highlight` su 66 erano a ridosso di un messaggio (circa 350 righe).
 
 - Una chiave sullo step, `highlight = "nsd"`, al posto di uno step separato.
 - In alternativa il riquadro dell'NSD si accende da solo al passaggio del carrier.
 
-### 1.3 Scheletro di una nuova scena
+### 1.2 Scheletro di una nuova scena
 
 `trackviz new mia_scena --geometry spur2` crea il file con gli `include`, i carrier
 e una prima didascalia.
 
-### 1.4 Autocompletamento nell'editor
+### 1.3 Autocompletamento nell'editor
 
 Schema per i file `.toml` e snippet che suggeriscono azioni, chiavi e i 20 tipi di
 messaggio, segnalando gli errori di battitura mentre si scrive. Utile solo con un
 editor compatibile, come VS Code.
 
-### 1.5 Risolvere i conflitti che la catena segnala
+### 1.4 Risolvere i conflitti che la catena segnala
 
 Rallentando i carrier del 25% due scene danno un conflitto fisico: i tempi si spostano
 a catena, ma il conflitto va risolto a mano con un `delay`.
@@ -104,4 +95,5 @@ Scelte fatte senza un'indicazione esplicita.
 
 Parti comuni con `include`, messaggi con nome e `{Needle}`, nota "Pipetting" automatica,
 tempi legati agli eventi con `when`, scene come catena di cause, righe del diagramma in
-ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly.
+ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly,
+anteprima veloce (`--preview`, `--from`, `--to`, `--watch`).

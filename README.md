@@ -33,6 +33,19 @@ $B scenes/01_prepare_sample_release.toml -o other.mp4        # full video, chose
 
 Without `-o` the video goes to `out/<scene file name>.mp4` (`out/` is created if missing).
 
+To look at a scene quickly while writing it:
+
+```sh
+$B scenes/a.toml --preview                # half size, 15 fps
+$B scenes/a.toml --from 15 --to 25        # only that part, full quality
+$B scenes/a.toml --preview --from 15 --to 25 --watch
+```
+
+These write `out/<scene file name>_preview.mp4`, so the full video is kept. `--watch`
+repeats the command every time the scene or a file it includes is saved; if the file
+has an error it prints it and keeps watching. Stop it with Ctrl-C. It takes one scene
+and also works with `--check` and `--still`.
+
 Several scenes can be given at once, also with the wildcards `*` and `?` in the file
 name; they are rendered in parallel:
 

@@ -131,11 +131,14 @@ trackviz "scenes/*.toml"                          # più scene in parallelo (* e
 trackviz <scene.toml> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.toml> --still <sec> --svg -o f.svg
 trackviz <scene.toml>... --check                  # valida e stampa la timeline
+trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima veloce
 ```
 
 **Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate, Query prima della risposta alla precedente, Sample Acquisition prima dei test. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
+
+**Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 
 **Più scene:** i caratteri jolly `*` e `?` sono espansi dal programma (solo nel nome del file), così funzionano anche tra virgolette e su Windows. I thread di `-j` sono divisi tra le scene: `min(scene, jobs)` in contemporanea, `jobs / scene` thread ciascuna, almeno 1. Una scena che fallisce non ferma le altre: gli errori sono elencati alla fine, con codice d'uscita 1. Due scene che scriverebbero lo stesso video sono un errore; `-o` e `--still` accettano una sola scena. L'help mostra versione e repository, letti da `Cargo.toml`.
 

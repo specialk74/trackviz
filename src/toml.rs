@@ -27,6 +27,8 @@ pub struct Table {
 pub struct Doc {
     pub tables: BTreeMap<String, Table>,
     pub arrays: BTreeMap<String, Vec<Table>>,
+    /// The files read to build this document (the scene and its includes).
+    pub files: Vec<PathBuf>,
 }
 
 enum Cur {
@@ -61,7 +63,7 @@ fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<
     root.entries.remove("include");
 
     stack.push(real);
-    let mut doc = Doc::default();
+    let mut doc = Doc { files: vec![path.to_path_buf()], ..Default::default() };
     for inc in &includes {
         let target = path.parent().unwrap_or(Path::new("")).join(inc);
         let d = parse_included(&target, inc, stack)?;
@@ -74,6 +76,7 @@ fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<
 
 /// Adds `other` after `doc`: arrays are appended, table keys override.
 fn merge(doc: &mut Doc, other: Doc) {
+    doc.files.extend(other.files);
     for (k, t) in other.tables {
         match doc.tables.get_mut(&k) {
             Some(d) => d.entries.extend(t.entries),
@@ -398,6 +401,7 @@ id = "p2"
         // Nested first, then in include order, then the scene's own.
         assert_eq!(ids, vec!["c", "a", "b", "s"]);
         assert!(doc.tables[""].entries.is_empty(), "include is consumed");
+        assert_eq!(doc.files.len(), 4, "{:?}", doc.files);
         // Errors in an included table name its file.
         assert!(doc.arrays["point"][1].location().contains("common/a.toml"), "{}", doc.arrays["point"][1].location());
         std::fs::remove_dir_all(dir).unwrap();

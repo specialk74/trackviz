@@ -4,6 +4,8 @@
 //!   trackviz <scene.toml>... [-o out.mp4] [-j jobs]   (default: out/<scene name>.mp4)
 //!   trackviz <scene.toml> --still <seconds> [-o frame.png]
 //!   trackviz <scene.toml>... --check         (validate + print the timeline)
+//!   trackviz <scene.toml> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
+//!   trackviz <scene.toml> --preview --watch  (regenerate when the scene or its includes change)
 //!
 //! Scene arguments may contain the wildcards `*` and `?` in the file name: several
 //! scenes are rendered in parallel, sharing the `-j` threads.
@@ -19,10 +21,11 @@ mod toml;
 use resvg::{tiny_skia, usvg};
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{mpsc, Mutex};
+use std::time::{Duration, SystemTime};
 
 /// Version and repository from Cargo.toml.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -33,8 +36,12 @@ fn usage() -> String {
         "trackviz {VERSION}\n\
          {REPOSITORY}\n\
          usage: trackviz <scene.toml>... [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
+         \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch]\n\
          \x20 scene files may use the wildcards * and ? (e.g. \"scenes/*.toml\"): they are rendered in parallel\n\
-         \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)"
+         \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)\n\
+         \x20 --from/--to render only that part, --preview at half size and 15 fps: both write\n\
+         \x20 out/<scene name>_preview.mp4, so the full video is kept\n\
+         \x20 --watch repeats the command when the scene or a file it includes changes (one scene)"
     )
 }
 
@@ -123,16 +130,59 @@ fn timeline_text(sc: &scene::Scene, tl: &scene::Timeline) -> String {
     t
 }
 
-/// Default video path: out/<scene file name>.mp4
-fn default_out(scene_path: &str) -> String {
+/// What to render of a scene.
+#[derive(Clone, Copy, Default)]
+struct VideoOpts {
+    from: Option<f64>,
+    to: Option<f64>,
+    preview: bool,
+}
+
+impl VideoOpts {
+    /// Not the full video.
+    fn partial(&self) -> bool {
+        self.from.is_some() || self.to.is_some() || self.preview
+    }
+}
+
+/// Default video path: out/<scene file name>.mp4, or _preview.mp4 for a partial
+/// render, which must not replace the full video.
+fn default_out(scene_path: &str, opts: VideoOpts) -> String {
     let stem = Path::new(scene_path).file_stem().and_then(|s| s.to_str()).unwrap_or("out");
-    format!("out/{stem}.mp4")
+    let tail = if opts.partial() { "_preview" } else { "" };
+    format!("out/{stem}{tail}.mp4")
+}
+
+/// Frames to render: size, rate, first instant and count.
+#[derive(Debug)]
+struct Plan {
+    w: u32,
+    h: u32,
+    fps: u32,
+    start: f64,
+    frames: usize,
+}
+
+const PREVIEW_FPS: u32 = 15;
+
+fn plan(video: &scene::Video, duration: f64, opts: VideoOpts) -> Result<Plan, String> {
+    let (start, end) = (opts.from.unwrap_or(0.0), opts.to.unwrap_or(duration).min(duration));
+    if start < 0.0 || start >= end {
+        return Err(format!("nothing to render from {start:.1}s to {end:.1}s (the scene lasts {duration:.1}s)"));
+    }
+    // Half size, kept even as libx264 requires.
+    let half = |v: u32| (v / 2).max(2) & !1;
+    let (w, h, fps) = if opts.preview {
+        (half(video.width), half(video.height), PREVIEW_FPS.min(video.fps))
+    } else {
+        (video.width, video.height, video.fps)
+    };
+    Ok(Plan { w, h, fps, start, frames: ((end - start) * fps as f64).ceil() as usize })
 }
 
 /// Renders one scene to a video with `jobs` threads.
-fn render_video(sc: &scene::Scene, tl: &scene::Timeline, out: &str, jobs: usize, opt: &usvg::Options, progress: bool) -> Result<(), String> {
-    let (w, h, fps) = (sc.video.width, sc.video.height, sc.video.fps);
-    let n = (tl.duration * fps as f64).ceil() as usize;
+fn render_video(sc: &scene::Scene, tl: &scene::Timeline, out: &str, opts: VideoOpts, jobs: usize, opt: &usvg::Options, progress: bool) -> Result<(), String> {
+    let Plan { w, h, fps, start, frames: n } = plan(&sc.video, tl.duration, opts)?;
     let mut ff = Command::new("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba"])
         .args(["-s", &format!("{w}x{h}"), "-framerate", &fps.to_string(), "-i", "-"])
@@ -154,7 +204,7 @@ fn render_video(sc: &scene::Scene, tl: &scene::Timeline, out: &str, jobs: usize,
                 if i >= n {
                     break;
                 }
-                let svg = render::frame(sc, tl, i as f64 / fps as f64);
+                let svg = render::frame(sc, tl, start + i as f64 / fps as f64);
                 // Raw RGBA straight to ffmpeg: the background is opaque, so
                 // premultiplied and straight alpha are the same here.
                 let r = rasterize(opt, &svg, w, h).map(|pm| (i, pm.take()));
@@ -205,8 +255,8 @@ fn share_jobs(jobs: usize, scenes: usize) -> (usize, usize) {
 
 /// Renders several scenes in parallel. Every scene is attempted: a failure does
 /// not stop the others, and all the failures are reported at the end.
-fn render_many(files: &[String], jobs: usize) -> Result<(), String> {
-    let mut outs: Vec<String> = files.iter().map(|f| default_out(f)).collect();
+fn render_many(files: &[String], opts: VideoOpts, jobs: usize) -> Result<(), String> {
+    let mut outs: Vec<String> = files.iter().map(|f| default_out(f, opts)).collect();
     outs.sort();
     if let Some(w) = outs.windows(2).find(|w| w[0] == w[1]) {
         return Err(format!("two scenes would write the same video: {}", w[0]));
@@ -221,12 +271,12 @@ fn render_many(files: &[String], jobs: usize) -> Result<(), String> {
         for _ in 0..parallel {
             s.spawn(|| {
                 while let Some(path) = files.get(next.fetch_add(1, Ordering::SeqCst)) {
-                    let out = default_out(path);
+                    let out = default_out(path, opts);
                     let r = load(path).and_then(|(sc, tl)| {
                         for w in lint::warnings(&sc, &tl) {
                             eprintln!("warning: {path}: {w}");
                         }
-                        render_video(&sc, &tl, &out, each, &opt, false)
+                        render_video(&sc, &tl, &out, opts, each, &opt, false)
                     });
                     match r {
                         Ok(()) => eprintln!("wrote {out}"),
@@ -256,6 +306,8 @@ fn run() -> Result<(), String> {
     let mut still: Option<f64> = None;
     let mut svg_out = false;
     let mut check = false;
+    let mut watch = false;
+    let mut opts = VideoOpts::default();
     let mut jobs = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2);
     let mut i = 0;
     while i < args.len() {
@@ -272,6 +324,16 @@ fn run() -> Result<(), String> {
                 i += 1;
                 still = Some(args.get(i).and_then(|s| s.parse().ok()).ok_or("--still needs seconds")?);
             }
+            "--from" => {
+                i += 1;
+                opts.from = Some(args.get(i).and_then(|s| s.parse().ok()).ok_or("--from needs seconds")?);
+            }
+            "--to" => {
+                i += 1;
+                opts.to = Some(args.get(i).and_then(|s| s.parse().ok()).ok_or("--to needs seconds")?);
+            }
+            "--preview" => opts.preview = true,
+            "--watch" => watch = true,
             "--svg" => svg_out = true,
             "--check" => check = true,
             "-h" | "--help" => {
@@ -294,54 +356,100 @@ fn run() -> Result<(), String> {
             }
         }
     }
-    if files.len() > 1 && (out.is_some() || still.is_some()) {
-        return Err(format!("-o and --still take a single scene, but {} were given", files.len()));
+    if files.len() > 1 && (out.is_some() || still.is_some() || watch) {
+        return Err(format!("-o, --still and --watch take a single scene, but {} were given", files.len()));
     }
+    if opts.partial() && (check || still.is_some()) {
+        return Err("--from, --to and --preview are for videos: not with --check or --still".into());
+    }
+    let job = Job { out, still, svg_out, check, jobs: jobs.max(1), opts };
+    if watch {
+        watch_scene(&files[0], &job);
+    }
+    job.run(&files)
+}
 
-    if check {
-        let mut failures = Vec::new();
-        for f in &files {
-            if files.len() > 1 {
-                eprintln!("== {f}");
-            }
-            match load(f) {
-                Ok((sc, tl)) => eprint!("{}", timeline_text(&sc, &tl)),
-                Err(e) if files.len() == 1 => return Err(e),
-                Err(e) => failures.push(e),
-            }
-        }
-        return report_failures(failures, files.len());
-    }
-    if files.len() > 1 {
-        return render_many(&files, jobs.max(1));
-    }
+/// What the command line asks for.
+struct Job {
+    out: Option<String>,
+    still: Option<f64>,
+    svg_out: bool,
+    check: bool,
+    jobs: usize,
+    opts: VideoOpts,
+}
 
-    let scene_path = &files[0];
-    let (sc, tl) = load(scene_path)?;
-    eprint!("{}", timeline_text(&sc, &tl));
-    if let Some(t) = still {
-        let (w, h) = (sc.video.width, sc.video.height);
-        let svg = render::frame(&sc, &tl, t);
-        let path = out.unwrap_or_else(|| if svg_out { "frame.svg".into() } else { "frame.png".into() });
-        if svg_out {
-            std::fs::write(&path, svg).map_err(|e| e.to_string())?;
-        } else {
-            let png = rasterize(&raster_options(), &svg, w, h)?.encode_png().map_err(|e| e.to_string())?;
-            std::fs::write(&path, png).map_err(|e| e.to_string())?;
+impl Job {
+    fn run(&self, files: &[String]) -> Result<(), String> {
+        if self.check {
+            let mut failures = Vec::new();
+            for f in files {
+                if files.len() > 1 {
+                    eprintln!("== {f}");
+                }
+                match load(f) {
+                    Ok((sc, tl)) => eprint!("{}", timeline_text(&sc, &tl)),
+                    Err(e) if files.len() == 1 => return Err(e),
+                    Err(e) => failures.push(e),
+                }
+            }
+            return report_failures(failures, files.len());
         }
-        eprintln!("wrote {path}");
-        return Ok(());
+        if files.len() > 1 {
+            return render_many(files, self.opts, self.jobs);
+        }
+
+        let scene_path = &files[0];
+        let (sc, tl) = load(scene_path)?;
+        eprint!("{}", timeline_text(&sc, &tl));
+        if let Some(t) = self.still {
+            let (w, h) = (sc.video.width, sc.video.height);
+            let svg = render::frame(&sc, &tl, t);
+            let path = self.out.clone().unwrap_or_else(|| if self.svg_out { "frame.svg".into() } else { "frame.png".into() });
+            if self.svg_out {
+                std::fs::write(&path, svg).map_err(|e| e.to_string())?;
+            } else {
+                let png = rasterize(&raster_options(), &svg, w, h)?.encode_png().map_err(|e| e.to_string())?;
+                std::fs::write(&path, png).map_err(|e| e.to_string())?;
+            }
+            eprintln!("wrote {path}");
+            return Ok(());
+        }
+        let out = match &self.out {
+            Some(o) => o.clone(),
+            None => {
+                std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
+                default_out(scene_path, self.opts)
+            }
+        };
+        render_video(&sc, &tl, &out, self.opts, self.jobs, &raster_options(), true)?;
+        eprintln!("wrote {out}");
+        Ok(())
     }
-    let out = match out {
-        Some(o) => o,
-        None => {
-            std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
-            default_out(scene_path)
+}
+
+/// Modification times of the scene and of everything it includes.
+fn stamps(files: &[PathBuf]) -> Vec<Option<SystemTime>> {
+    files.iter().map(|f| std::fs::metadata(f).and_then(|m| m.modified()).ok()).collect()
+}
+
+/// Runs the job, then again every time a file changes, until the user stops it.
+/// A broken scene only prints its error: it can be fixed while watching.
+fn watch_scene(path: &str, job: &Job) -> ! {
+    let mut files = vec![PathBuf::from(path)];
+    loop {
+        if let Ok(doc) = toml::parse_file(Path::new(path)) {
+            files = doc.files;
         }
-    };
-    render_video(&sc, &tl, &out, jobs, &raster_options(), true)?;
-    eprintln!("wrote {out}");
-    Ok(())
+        let seen = stamps(&files);
+        if let Err(e) = job.run(&[path.to_string()]) {
+            eprintln!("error: {e}");
+        }
+        eprintln!("watching {} file(s), Ctrl-C to stop", files.len());
+        while stamps(&files) == seen {
+            std::thread::sleep(Duration::from_millis(300));
+        }
+    }
 }
 
 fn main() {
@@ -392,6 +500,66 @@ mod tests {
         assert_eq!(share_jobs(10, 3), (3, 3));
         assert_eq!(share_jobs(10, 16), (10, 1));
         assert_eq!(share_jobs(1, 4), (1, 1));
+    }
+
+    fn video() -> scene::Video {
+        scene::Video { title: String::new(), subtitle: String::new(), width: 1920, height: 1080, fps: 30, tail: 0.0, show_clock: true, show_times: true }
+    }
+
+    #[test]
+    fn a_full_render_covers_the_whole_scene() {
+        let p = plan(&video(), 10.0, VideoOpts::default()).unwrap();
+        assert_eq!((p.w, p.h, p.fps, p.start, p.frames), (1920, 1080, 30, 0.0, 300));
+    }
+
+    #[test]
+    fn a_part_of_the_scene_and_the_preview_settings() {
+        let part = VideoOpts { from: Some(2.0), to: Some(4.0), preview: false };
+        let p = plan(&video(), 10.0, part).unwrap();
+        assert_eq!((p.w, p.fps, p.start, p.frames), (1920, 30, 2.0, 60));
+        let prev = VideoOpts { preview: true, ..VideoOpts::default() };
+        let p = plan(&video(), 10.0, prev).unwrap();
+        assert_eq!((p.w, p.h, p.fps, p.frames), (960, 540, 15, 150));
+        // Beyond the end: cut at the end of the scene.
+        let late = VideoOpts { from: Some(8.0), to: Some(99.0), preview: false };
+        assert_eq!(plan(&video(), 10.0, late).unwrap().frames, 60);
+        // A slow scene is not sped up, odd sizes become even.
+        let odd = scene::Video { width: 1001, height: 501, fps: 10, ..video() };
+        let p = plan(&odd, 10.0, prev).unwrap();
+        assert_eq!((p.w, p.h, p.fps), (500, 250, 10));
+    }
+
+    #[test]
+    fn an_empty_range_is_an_error() {
+        for (from, to) in [(5.0, 2.0), (12.0, 20.0), (-1.0, 2.0)] {
+            let o = VideoOpts { from: Some(from), to: Some(to), preview: false };
+            assert!(plan(&video(), 10.0, o).unwrap_err().contains("nothing to render"));
+        }
+    }
+
+    #[test]
+    fn a_partial_render_keeps_the_full_video() {
+        assert_eq!(default_out("scenes/a.toml", VideoOpts::default()), "out/a.mp4");
+        let prev = VideoOpts { preview: true, ..VideoOpts::default() };
+        assert_eq!(default_out("scenes/a.toml", prev), "out/a_preview.mp4");
+        let part = VideoOpts { to: Some(3.0), ..VideoOpts::default() };
+        assert_eq!(default_out("scenes/a.toml", part), "out/a_preview.mp4");
+    }
+
+    #[test]
+    fn a_change_is_seen_in_every_watched_file() {
+        let dir = std::env::temp_dir().join(format!("trackviz_watch_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (a, b) = (dir.join("a.toml"), dir.join("b.toml"));
+        std::fs::write(&a, "x").unwrap();
+        std::fs::write(&b, "x").unwrap();
+        let files = vec![a, b.clone()];
+        let before = stamps(&files);
+        std::fs::File::options().write(true).open(&b).unwrap().set_modified(SystemTime::now() + Duration::from_secs(5)).unwrap();
+        assert_ne!(stamps(&files), before);
+        std::fs::remove_file(&b).unwrap();
+        assert_eq!(stamps(&files)[1], None, "a file being replaced doesn't stop the watch");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
