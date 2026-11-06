@@ -263,6 +263,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
+when = "prepare_again C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "tests"
 when = "query C1 sent"
 delay = 2.53
@@ -287,7 +294,7 @@ duration = 2.0
 [[step]]
 action = "message"
 type = "query"
-when = "tests C1 arrived"
+when = "sample_ok C2 arrived"
 delay = 0.1
 carrier = "C2"
 
@@ -351,6 +358,13 @@ delay = 0.2
 carrier = "C2"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C2 arrived"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
 action = "caption"
 when = "rotate ts done"
 delay = 0.05
@@ -362,6 +376,13 @@ action = "message"
 type = "sample_acquisition"
 when = "rotate ts done"
 delay = 0.25
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -417,8 +438,8 @@ text = "The analyzer pipettes the empty pocket: there is no tube under the needl
 
 [[step]]
 action = "pipette"
-when = "sample_acquisition C1 arrived"
-delay = 3.5
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 device = "ts"
 duration = 4.5
 
@@ -434,6 +455,13 @@ action = "message"
 type = "sample_complete"
 when = "pipette ts done"
 delay = 0.2
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -457,12 +485,6 @@ when = "sample_ok C1 arrived"
 delay = 0.1
 
 [[step]]
-action = "message"
-type = "analyzer_ok"
-when = "clear_all sent"
-delay = 1.7
-
-[[step]]
 action = "caption"
 when = "sample_ok C1 arrived"
 delay = 0.2
@@ -477,6 +499,19 @@ carrier = "C2"
 to = "ts.in"
 ease = "inout"
 duration = 2.0
+
+[[step]]
+action = "status"
+when = "clear_all sent"
+delay = 1.37
+device = "interface"
+state = "normal"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "clear_all sent"
+delay = 1.7
 
 [[step]]
 action = "rotate"
@@ -543,11 +578,4 @@ when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
-
-[[step]]
-action = "status"
-when = "clear_all sent"
-delay = 1.37
-device = "interface"
-state = "normal"
 

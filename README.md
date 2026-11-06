@@ -67,7 +67,8 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
 
 - two physical carriers overlapping on the track
 - captions too long for the band, which get cut
-- a Query sent before the reply to the previous one has arrived
+- a Query sent before the OK to its Prepare or the reply to the previous Query has
+  arrived
 
 ## Scene format (TOML subset)
 

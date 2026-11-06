@@ -105,15 +105,22 @@ delay = 0.28
 carrier = "C1"
 
 [[step]]
-action = "needle"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "needle"
+when = "analyzer_ok C1 arrived"
 delay = 0.1
 device = "sp"
 to = "down"
 
 [[step]]
 action = "note"
-when = "sample_acquisition C1 arrived"
+when = "analyzer_ok C1 arrived"
 delay = 0.1
 actor = "AN"
 text = "Pipetting"
@@ -145,6 +152,13 @@ action = "message"
 type = "sample_complete"
 when = "status_error C1 sent"
 delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -224,7 +238,7 @@ action = "caption"
 when = "interface_ok C1 arrived"
 delay = 0.2
 title = "8 · Carrier released — Release"
-text = "The interface releases the carrier. As soon as it is back on the Main-Lane, the interface sends Release."
+text = "The interface releases the carrier. As soon as it has left the interface module, the interface sends Release."
 
 [[step]]
 action = "move"
@@ -244,5 +258,13 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-when = "C1 at merge"
+when = "C1 at main_out"
 carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
+carrier = "C1"
+

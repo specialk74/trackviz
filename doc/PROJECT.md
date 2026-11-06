@@ -48,7 +48,7 @@ Comportamento descritto dall'utente:
 5. Quando il carrier arriva al **punto di campionamento**, l'**Interfaccia manda Sample Acquisition** all'Analizzatore.
 6. L'Analizzatore pipetta il materiale biologico dalla provetta.
 7. Quando arriva **Sample Complete** dall'Analizzatore all'Interfaccia, il carrier si muove e viene **rilasciato** dall'Interfaccia.
-8. Quando il carrier esce dall'Interfaccia e **arriva sulla Main-Lane**, l'**Interfaccia manda Release** all'Analizzatore.
+8. Quando il carrier **esce dal modulo dell'Interfaccia**, l'**Interfaccia manda Release** all'Analizzatore.
 9. Dopo l'analisi l'**Analizzatore manda i risultati a DMX**.
 
 **Messaggi di stato** (non inclusi nella scena 01): lo strumento comunica il proprio stato o **su richiesta dell'Interfaccia** oppure **quando lo stato cambia**. Quale dei due dipende da come è stato sviluppato l'analizzatore.
@@ -135,7 +135,7 @@ trackviz <scene.toml>... --check                  # valida e stampa la timeline
 trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima veloce
 ```
 
-**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
+**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima dell'OK al suo Prepare o della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
@@ -328,7 +328,7 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 
 ## 9b. Scena 02 — `02_turnstile_three_carriers.toml`
 
-Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento, con **antenna** (`pit_wait`, x 640) e **gate** (x 596) davanti. Tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40). Per ogni carrier: Prepare/OK all'NSD, Query/Tests to perform con DMX, **secondo Prepare (viola) all'antenna**, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro. C1 trova la ruota libera: sosta all'antenna, entra, la ruota gira. C2 e C3 aspettano al gate chiuso durante il pipettaggio del carrier precedente; dopo il Sample Complete entrano e solo allora la ruota gira. L'ultima rotazione avviene senza carrier in attesa. Messaggi, didascalie e rotazioni usano `at`. Durata ≈ 68 s, 27 righe nel sequence diagram (scorre).
+Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento, con **antenna** (`pit_wait`, x 640) e **gate** (x 596) davanti. Tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40). Per ogni carrier: Prepare/OK all'NSD, Query/Tests to perform con DMX, **secondo Prepare (viola) all'antenna**, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro. C1 trova la ruota libera: sosta all'antenna, entra, la ruota gira. C2 e C3 aspettano al gate chiuso durante il pipettaggio del carrier precedente; dopo il Sample Complete entrano e solo allora la ruota gira. L'ultima rotazione avviene senza carrier in attesa. Messaggi, didascalie e rotazioni usano `at`. Durata ≈ 78 s, sequence diagram a scorrimento (scorre).
 
 ## 9c. Scene 03 e 04 — carrier atteso che non arriva: Clear
 
@@ -340,7 +340,7 @@ Stessa situazione in due geometrie: 03 con il punto di campionamento semplice (g
 - **03:** dopo il Sample Complete di C1 fantasma e C3 avanzano insieme al punto di campionamento; l'Interfaccia manda **Clear** (SampleId di C2), l'Analizzatore risponde **OK** (il fantasma sparisce), poi Sample Acquisition di C3.
 - **04:** appena l'antenna legge C3 (C1 è ancora in pipettaggio) l'Interfaccia manda **Clear** di C2 → **OK** (il fantasma sparisce) → **Prepare viola** di C3. C3 aspetta al gate il Sample Complete di C1, entra, la ruota gira, Sample Acquisition di C3.
 - Per C2 non c'è Release.
-- Durate: 03 ≈ 54 s, 04 ≈ 56 s.
+- Durate: 03 ≈ 61 s, 04 ≈ 63 s.
 
 ## 9d. Scene 05 e 06 — errore dello strumento con l'ago giù, recovery
 
@@ -353,7 +353,7 @@ Un solo carrier; 05 con il punto di campionamento semplice (geometria della scen
 - Sulla Main-Lane l'Interfaccia manda **Release**.
 - Lo strumento resta verde 3 s dopo lo Status Ready, poi torna grigio.
 - I messaggi Status e i relativi OK non hanno SampleId (è lo stato dello strumento).
-- Durate: 05 ≈ 45 s, 06 ≈ 51 s.
+- Durate: 05 ≈ 50 s, 06 ≈ 53 s.
 
 ## 9e. Scene 07 e 08 — carrier run-away durante il campionamento
 
@@ -364,15 +364,15 @@ Tre carrier deviati (Prepare/OK, Query/Tests to perform per ciascuno); 07 con il
 - In entrambe l'analizzatore manda **Sample Complete** con il SampleId di C1; l'Interfaccia manda **Cancel** (SampleId di C1) → **OK**, poi manda via tutti i carrier senza campionarli (nella 08 C2 e C3 passano dalla ruota: entrano, rotazioni, escono; C3 si ferma all'antenna ma non riceve Prepare). Subito dopo l'OK al Cancel parte **Clear All** (senza parametri) → **OK**, mentre i carrier stanno uscendo. Nessun Release.
 - L'**interfaccia** (zona "Interface module") diventa **rossa** al momento della fuga (07: quando C1 lascia il punto di campionamento; 08: quando la ruota gira da sola) e torna **grigia** quando l'ultimo carrier è uscito completamente dal riquadro.
 - Nella 08 l'ultima rotazione parte solo quando C2 è uscito completamente dal cerchio della ruota.
-- Durate: 07 ≈ 48 s, 08 ≈ 60 s.
+- Durate: 07 ≈ 48 s, 08 ≈ 58 s.
 
 ## 9f. Scene 09–12 — spur
 
 Geometria comune: Main-Lane a y 760 (NSD a x 800, rientro a x 290); deviazione diagonale e curva di 90° nel ramo d'andata (x 660), con due posizioni di coda (`queue2` y 560, `queue` y 500) sotto il punto di campionamento (y 440); analizzatore a destra (x 730–930, y 330–550); traversa in cima (y 250) e ramo di ritorno (x 380). Velocità dei carrier 110 px/s (lo spur è più lungo); l'uscita dal punto di campionamento è un move `in` fino alla cima, `linear` fino al rientro e `out` fino all'uscita, senza fermate.
 
-- **09** happy path (≈ 36 s): come la 01.
-- **10** carrier mancante → Clear (≈ 51 s): come la 03.
-- **11** errore dello strumento con l'ago giù e recovery (≈ 46 s): come la 05; l'operatore lavora sotto l'analizzatore.
+- **09** happy path (≈ 39 s): come la 01.
+- **10** carrier mancante → Clear (≈ 57 s): come la 03.
+- **11** errore dello strumento con l'ago giù e recovery (≈ 47 s): come la 05; l'operatore lavora sotto l'analizzatore.
 - **12** carrier run-away → Cancel, Clear All (≈ 48 s): come la 07, con l'interfaccia rossa dalla fuga finché tutti i carrier ne sono usciti.
 
 ## 9g. Scene 13–16 — spur con un analizzatore e due punti di campionamento
@@ -382,10 +382,10 @@ Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyz
 - **Messaggi:** Prepare all'NSD e di nuovo (viola) a ogni deviazione che devia il carrier; alle altre il carrier è solo letto. Una Sample Acquisition per ogni ago. `Needle=n` compare in Sample Acquisition, Sample Complete e Status. Un solo Release per carrier. Clear, Cancel e Clear All non hanno `Needle`.
 - **Quali aghi** dipende dai test del campione: uno solo o entrambi.
 - Le deviazioni standard sono etichettate "Divert 1" e "Divert 2". Un carrier può entrare in una pit-lane mentre l'ago sta campionando il carrier precedente. Soste ai divert brevi: 0,6 s con il Prepare viola, 0,4 s se il carrier è solo letto (il carrier non aspetta l'arrivo della freccia).
-- **13** happy path (≈ 51 s): C1 usa entrambi gli aghi, C2 solo l'ago 2; C1 entra nella seconda pit-lane mentre C2 è in campionamento.
-- **14** Clear (≈ 51 s): il fantasma di C2 si ferma a `div1`, C3 ci si ferma sopra; alla lettura di C3 parte il Clear di C2 → OK → Prepare viola di C3, mentre C3 è già stato deviato: la sosta al divert non aspetta la risposta.
-- **15** errore (≈ 50 s): errore **dell'ago 1** (`status` sul device `sampling`: diventa rossa solo la sua fascia dell'analizzatore), l'ago 2 continua durante la recovery.
-- **16** run-away (≈ 55 s): C1 scappa dall'ago 1 e si ferma comunque a `div2`; il carrier dopo finisce sotto l'ago. Via solo i carrier della pit-lane dell'ago 1, che è rossa dalla fuga finché non si è svuotata. L'ago 2 continua.
+- **13** happy path (≈ 60 s): C1 usa entrambi gli aghi, C2 solo l'ago 2; C1 entra nella seconda pit-lane mentre C2 è in campionamento.
+- **14** Clear (≈ 60 s): il fantasma di C2 si ferma a `div1`, C3 ci si ferma sopra; alla lettura di C3 parte il Clear di C2 → OK → Prepare viola di C3, mentre C3 è già stato deviato: la sosta al divert non aspetta la risposta.
+- **15** errore (≈ 56 s): errore **dell'ago 1** (`status` sul device `sampling`: diventa rossa solo la sua fascia dell'analizzatore), l'ago 2 continua durante la recovery.
+- **16** run-away (≈ 54 s): C1 scappa dall'ago 1 e si ferma comunque a `div2`; il carrier dopo finisce sotto l'ago. Via solo i carrier della pit-lane dell'ago 1, che è rossa dalla fuga finché non si è svuotata. L'ago 2 continua.
 
 ---
 
@@ -393,15 +393,16 @@ Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyz
 
 | # | Assunzione | Stato |
 |---|---|---|
-| A1 | Nomi dei messaggi verso DMX: "Query", "Tests to perform", "Results" | Da sostituire con i nomi reali |
-| A2 | L'OK al Prepare arriva **prima** della query a DMX | Da confermare |
-| A3 | Sample Acquisition, Sample Complete e Release **non hanno risposta** | Da confermare |
-| A4 | Release parte quando il carrier raggiunge il punto di rientro (`merge`) | Coerente con la descrizione, da confermare |
-| A5 | I risultati a DMX sono mostrati alla fine, con la didascalia "Later…" | Scelta narrativa |
-| A6 | SampleId `SID-000123` e durata della pipettatura 4,5 s | Segnaposto |
-| A7 | Messaggi di stato dell'analizzatore omessi | Da aggiungere |
-| A8 | Il secondo Prepare (all'antenna) non ha risposta OK; l'informazione in più che porterà è ancora da definire | Da confermare |
-| A10 | L'Analizzatore manda una Query a DMX alla volta: la successiva solo dopo aver ricevuto la risposta alla precedente (regola dell'utente, verificata da un test su tutte le scene). La Sample Acquisition può arrivare allo strumento anche prima dei test da DMX | Confermata dall'utente |
+| A1 | Nomi dei messaggi verso DMX: "Query", "Tests to perform", "Results" | Confermata |
+| A2 | L'OK al Prepare arriva **prima** della Query a DMX | Confermata, verificata da `--check` |
+| A3 | Sample Acquisition, Sample Complete e Release **hanno una risposta OK senza parametri**. L'ago scende dopo l'OK alla Sample Acquisition, il carrier riparte dopo l'OK alla Sample Complete | Confermata |
+| A4 | Release parte quando il carrier è **uscito dal modulo dell'Interfaccia** | Confermata |
+| A5 | Results a DMX in tutte le scene, alla fine, uno dopo l'altro, per i campioni campionati regolarmente. Nessun Results per il campione cancellato nel run-away, per quello dell'errore e per quello del Clear | Confermata; sul campione del Clear è una deduzione |
+| A6 | SampleId `SID-000123` e durata della pipettatura 4–5 s | Confermati come valori di esempio |
+| A7 | Messaggi di stato dell'analizzatore: oggi solo Error e Ready | Scena dedicata in Roadmap |
+| A8 | Il secondo Prepare (all'antenna o al divert) ha una risposta OK senza parametri; l'informazione in più che porterà è ancora da definire | Confermata |
+| A9 | La risposta dell'Analizzatore al Clear si chiama "OK" | Scelta dell'utente |
+| A10 | L'Analizzatore manda una Query a DMX alla volta: la successiva solo dopo aver ricevuto la risposta alla precedente. La Sample Acquisition può arrivare allo strumento anche prima dei test da DMX | Confermata dall'utente |
 | A9 | La risposta dell'Analizzatore al Clear si chiama "OK" (scene 03/04) | Scelta dell'utente |
 
 ---

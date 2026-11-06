@@ -716,7 +716,7 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 }
 
 fn caption(o: &mut String, tl: &Timeline, t: f64) {
-    let cur = tl.events.iter().rev().find(|e| matches!(e.ev, Ev::Caption { .. }) && e.t0 <= t);
+    let cur = tl.events.iter().filter(|e| matches!(e.ev, Ev::Caption { .. }) && e.t0 <= t).max_by(|a, b| a.t0.total_cmp(&b.t0));
     let _ = write!(o, r#"<rect x="30" y="{CAPTION_Y}" width="1860" height="150" rx="16" fill="{INK}"/>"#);
     if let Some(e) = cur {
         if let Ev::Caption { title, text } = &e.ev {

@@ -137,6 +137,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
+when = "prepare_again C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "tests"
 when = "query C1 sent"
 delay = 2.53
@@ -148,6 +155,13 @@ at = 11.57
 carrier = "C3"
 to = "nsd"
 ease = "linear"
+
+[[step]]
+action = "move"
+at = 12.0
+carrier = "C2L"
+to = "pit_wait"
+ease = "out"
 
 [[step]]
 action = "caption"
@@ -169,13 +183,6 @@ when = "tests C1 sent"
 delay = 0.9
 carrier = "C2L"
 duration = 0.4
-
-[[step]]
-action = "move"
-at = 12.0
-carrier = "C2L"
-to = "pit_wait"
-ease = "out"
 
 [[step]]
 action = "message"
@@ -245,18 +252,25 @@ delay = 1.597
 carrier = "C3"
 
 [[step]]
-action = "caption"
-when = "query C2 arrived"
-delay = 0.1
-title = "6 · Sample Acquisition"
-text = "The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates. The second (expected) carrier reaches the antenna: nothing is read, it is not physically there."
-
-[[step]]
 action = "message"
 type = "sample_acquisition"
 when = "rotate ts done"
 delay = 0.25
 carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "caption"
+when = "query C2 arrived"
+delay = 0.1
+title = "6 · Sample Acquisition"
+text = "The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates. The second (expected) carrier reaches the antenna: nothing is read, it is not physically there."
 
 [[step]]
 action = "message"
@@ -267,7 +281,7 @@ carrier = "C2"
 
 [[step]]
 action = "pipette"
-when = "sample_acquisition C1 arrived"
+when = "analyzer_ok C1 arrived"
 delay = 0.1
 device = "ts"
 duration = 6.6
@@ -332,6 +346,13 @@ delay = 0.2
 carrier = "C3"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "caption"
 when = "pipette ts done"
 delay = 0.2
@@ -346,9 +367,15 @@ delay = 0.2
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "move"
-when = "sample_complete C1 sent"
-delay = 1.4
+when = "interface_ok C1 sent"
 carrier = "C3"
 to = "ts.in"
 ease = "inout"
@@ -376,8 +403,15 @@ delay = 0.25
 carrier = "C3"
 
 [[step]]
-action = "pipette"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+when = "analyzer_ok C3 arrived"
 delay = 0.1
 device = "ts"
 duration = 4.5
@@ -387,13 +421,20 @@ action = "caption"
 when = "pipette ts done"
 delay = 0.2
 title = "10 · Back to normal"
-text = "The first carrier is back on the Main-Lane: Release. Sample Complete for the third sample: the wheel brings it to the exit, and back on the Main-Lane the interface sends Release."
+text = "The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release."
 
 [[step]]
 action = "message"
 type = "sample_complete"
 when = "pipette ts done"
 delay = 0.2
+carrier = "C3"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C3 arrived"
+delay = 0.1
 carrier = "C3"
 
 [[step]]
@@ -406,13 +447,19 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-when = "C1 at merge"
+when = "C1 at main_out"
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
 action = "rotate"
-when = "sample_complete C3 arrived"
-delay = 0.1
+when = "interface_ok C3 sent"
 device = "ts"
 
 [[step]]
@@ -433,5 +480,34 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-when = "C3 at merge"
+when = "C3 at main_out"
 carrier = "C3"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "caption"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+title = "11 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "message"
+type = "results"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "results"
+when = "results C1 arrived"
+delay = 0.2
+carrier = "C3"
+

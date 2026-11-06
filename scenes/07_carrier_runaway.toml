@@ -294,6 +294,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "query"
 when = "tests C2 arrived"
 delay = 0.1
@@ -307,13 +314,6 @@ delay = 1.7
 carrier = "C3"
 
 [[step]]
-action = "caption"
-when = "C3 at queue2"
-delay = 0.23
-title = "3 · Carrier run-away"
-text = "Before the needle goes down, the first carrier runs away back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red."
-
-[[step]]
 action = "move"
 when = "sample_acquisition C1 arrived"
 delay = 1.5
@@ -322,6 +322,13 @@ to = "gone"
 ease = "linear"
 speed = 120
 runaway = true
+
+[[step]]
+action = "caption"
+when = "C3 at queue2"
+delay = 0.23
+title = "3 · Carrier run-away"
+text = "Before the needle goes down, the first carrier runs away back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red."
 
 [[step]]
 action = "status"
@@ -378,6 +385,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "cancel"
 when = "sample_complete C1 arrived"
 delay = 0.2
@@ -395,12 +409,6 @@ action = "message"
 type = "clear_all"
 when = "sample_ok C1 arrived"
 delay = 0.1
-
-[[step]]
-action = "message"
-type = "analyzer_ok"
-when = "clear_all sent"
-delay = 1.7
 
 [[step]]
 action = "caption"
@@ -426,6 +434,19 @@ to = "merge"
 ease = "in"
 
 [[step]]
+action = "status"
+when = "clear_all arrived"
+delay = 0.17
+device = "interface"
+state = "normal"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "clear_all sent"
+delay = 1.7
+
+[[step]]
 action = "move"
 when = "C2 at merge"
 carrier = "C2"
@@ -438,11 +459,4 @@ when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
-
-[[step]]
-action = "status"
-when = "clear_all arrived"
-delay = 0.17
-device = "interface"
-state = "normal"
 

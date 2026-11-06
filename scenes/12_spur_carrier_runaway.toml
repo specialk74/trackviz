@@ -17,14 +17,14 @@ subtitle = "Spur — carrier run-away during sampling, Cancel and Clear All"
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 
 [[carrier]]
 id = "C2"
 tube = true
 sample_id = "SID-000124"
-route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 cap_color = "#0EA5E9"
 
@@ -32,7 +32,7 @@ cap_color = "#0EA5E9"
 id = "C3"
 tube = true
 sample_id = "SID-000125"
-route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 cap_color = "#DB2777"
 
@@ -190,17 +190,17 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "query"
 when = "tests C2 arrived"
 delay = 0.1
 carrier = "C3"
-
-[[step]]
-action = "caption"
-when = "C3 at queue2"
-delay = 1.138
-title = "3 · Carrier run-away"
-text = "Before the needle goes down, the first carrier runs away round the spur and back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red."
 
 [[step]]
 action = "move"
@@ -211,6 +211,13 @@ to = "gone"
 ease = "linear"
 speed = 150
 runaway = true
+
+[[step]]
+action = "caption"
+when = "C3 at queue2"
+delay = 1.138
+title = "3 · Carrier run-away"
+text = "Before the needle goes down, the first carrier runs away round the spur and back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red."
 
 [[step]]
 action = "status"
@@ -274,6 +281,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "cancel"
 when = "sample_complete C1 arrived"
 delay = 0.2
@@ -291,12 +305,6 @@ action = "message"
 type = "clear_all"
 when = "sample_ok C1 arrived"
 delay = 0.1
-
-[[step]]
-action = "message"
-type = "analyzer_ok"
-when = "clear_all sent"
-delay = 1.7
 
 [[step]]
 action = "caption"
@@ -320,6 +328,12 @@ delay = 1.7
 carrier = "C3"
 to = "spur_top_in"
 ease = "in"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "clear_all sent"
+delay = 1.7
 
 [[step]]
 action = "move"

@@ -57,9 +57,12 @@ lo richiedono. Oggi tutti i testi dei video sono in inglese.
 
 ## 2. Da confermare
 
-Tutte le scelte sui messaggi, sugli scenari e sulla grafica sono state confermate. Restano
-aperte le assunzioni A1–A8 di `PROJECT.md`, sezione 10, tra cui i nomi reali dei messaggi
-verso DMX e l'ordine tra OK e Query.
+- **Results e Clear:** nessun Results per il campione del Clear (C2 nelle scene 03, 04, 10,
+  14). È una deduzione: il campione non è mai arrivato al punto di campionamento.
+- **Durata dei video:** con i nuovi OK e i Results alcune scene superano il minuto
+  (02: 78 s; 03: 61 s; 04: 63 s; 13: 60 s). Il limite iniziale era 1 minuto.
+
+Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 ## 3. Limiti noti
 

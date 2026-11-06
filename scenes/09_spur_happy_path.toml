@@ -14,7 +14,7 @@ subtitle = "Spur — single carrier with sample tube, happy path"
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 
 # ---------------------------------------------------------------- steps
@@ -103,9 +103,16 @@ delay = 0.46
 carrier = "C1"
 
 [[step]]
-action = "pipette"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition C1 arrived"
-delay = 0.102
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "pipette"
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 device = "sp"
 duration = 4.5
 
@@ -124,9 +131,15 @@ delay = 0.3
 carrier = "C1"
 
 [[step]]
-action = "move"
+action = "message"
+type = "interface_ok"
 when = "sample_complete C1 arrived"
 delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "move"
+when = "interface_ok C1 sent"
 carrier = "C1"
 to = "spur_top_in"
 ease = "in"
@@ -147,12 +160,34 @@ ease = "out"
 
 [[step]]
 action = "caption"
-when = "C1 at merge"
-title = "6 · Main-Lane — Release"
-text = "As soon as the carrier is back on the Main-Lane, the interface sends Release: the sample has left the analyzer interface."
+when = "C1 at iface_out"
+title = "6 · Release"
+text = "As soon as the carrier has left the interface module, the interface sends Release: the sample has left the analyzer interface."
 
 [[step]]
 action = "message"
 type = "release"
-when = "C1 at merge"
+when = "C1 at iface_out"
 carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "caption"
+when = "analyzer_ok C1 arrived"
+delay = 0.5
+title = "7 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "message"
+type = "results"
+when = "analyzer_ok C1 arrived"
+delay = 0.5
+carrier = "C1"
+

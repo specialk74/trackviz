@@ -58,7 +58,7 @@ fn cut_captions(tl: &Timeline) -> Vec<String> {
         .collect()
 }
 
-/// The analyzer sends one Query at a time.
+/// The analyzer sends one Query at a time, after the OK to the Prepare of that sample.
 fn queries(tl: &Timeline) -> Vec<String> {
     let mut msgs: Vec<(f64, f64, &str, &str)> = tl
         .events
@@ -76,6 +76,9 @@ fn queries(tl: &Timeline) -> Vec<String> {
             "Query" => {
                 if waiting || t0 < free_at {
                     out.push(format!("Query at {t0:.2}s ({params}) before the reply to the previous one has arrived"));
+                }
+                if !msgs.iter().any(|m| m.2 == "OK" && m.3 == params && m.1 <= t0) {
+                    out.push(format!("Query at {t0:.2}s ({params}) before the OK to its Prepare has arrived"));
                 }
                 waiting = true;
             }
@@ -129,15 +132,19 @@ mod tests {
     #[test]
     fn queries_are_sent_one_at_a_time() {
         let (q, t) = ("Query", "Tests to perform");
-        let good = [msg(q, 0.0, "SampleId=1"), msg(t, 2.0, "SampleId=1"), msg(q, 3.5, "SampleId=2"), msg(t, 5.0, "SampleId=2")];
+        let ok = |n: &str, at: f64| msg("OK", at, &format!("SampleId={n}"));
+        let good = [ok("1", -2.0), ok("2", -1.0), msg(q, 0.0, "SampleId=1"), msg(t, 2.0, "SampleId=1"), msg(q, 3.5, "SampleId=2"), msg(t, 5.0, "SampleId=2")];
         assert!(warned(&good.concat()).is_empty());
+        // Before the OK to its Prepare has arrived.
+        let w = warned(&[ok("1", 0.0), msg(q, 1.0, "SampleId=1")].concat());
+        assert!(w[0].contains("before the OK to its Prepare"), "{w:?}");
         // Before the first reply has been sent, and before it has arrived.
-        let w = warned(&[msg(q, 0.0, "SampleId=1"), msg(q, 1.0, "SampleId=2")].concat());
+        let w = warned(&[ok("1", -2.0), ok("2", -2.0), msg(q, 0.0, "SampleId=1"), msg(q, 1.0, "SampleId=2")].concat());
         assert!(w[0].contains("Query at 1.00s"), "{w:?}");
-        let w = warned(&[msg(q, 0.0, "SampleId=1"), msg(t, 1.0, "SampleId=1"), msg(q, 2.0, "SampleId=2")].concat());
+        let w = warned(&[ok("1", -2.0), ok("2", -2.0), msg(q, 0.0, "SampleId=1"), msg(t, 1.0, "SampleId=1"), msg(q, 2.0, "SampleId=2")].concat());
         assert!(w[0].contains("Query at 2.00s"), "{w:?}");
         // Sample Acquisition may come before the tests are known.
         let s = "Sample Acquisition";
-        assert!(warned(&[msg(q, 0.0, "SampleId=1"), msg(s, 0.5, "SampleId=1"), msg(t, 2.0, "SampleId=1")].concat()).is_empty());
+        assert!(warned(&[ok("1", -2.0), msg(q, 0.0, "SampleId=1"), msg(s, 0.5, "SampleId=1"), msg(t, 2.0, "SampleId=1")].concat()).is_empty());
     }
 }

@@ -16,14 +16,14 @@ subtitle = "Spur with two sampling points — carrier run-away on needle 1, Canc
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 
 [[carrier]]
 id = "C2"
 tube = true
 sample_id = "SID-000124"
-route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 cap_color = "#0EA5E9"
 
@@ -31,7 +31,7 @@ cap_color = "#0EA5E9"
 id = "C3"
 tube = true
 sample_id = "SID-000125"
-route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 cap_color = "#DB2777"
 
@@ -40,7 +40,7 @@ cap_color = "#DB2777"
 id = "C4"
 tube = true
 sample_id = "SID-000126"
-route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "w2", "d2", "qb2", "pc2", "qb1", "s2", "pt2u", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "w2", "d2", "qb2", "pc2", "qb1", "s2", "pt2u", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 cap_color = "#16A34A"
 
@@ -207,6 +207,13 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "analyzer_ok"
+when = "prepare_again C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "sample_ok"
 when = "prepare C3 sent"
 delay = 1.7
@@ -303,6 +310,13 @@ delay = 0.3
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition_needle C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "move"
 when = "C3 at w1b"
 delay = 0.353
@@ -320,6 +334,13 @@ duration = 0.6
 action = "message"
 type = "prepare_again"
 when = "C2 at d1"
+delay = 0.1
+carrier = "C2"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C2 arrived"
 delay = 0.1
 carrier = "C2"
 
@@ -352,6 +373,13 @@ delay = 0.1
 carrier = "C4"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C4 arrived"
+delay = 0.1
+carrier = "C4"
+
+[[step]]
 action = "move"
 when = "C3 at w1"
 delay = 1.239
@@ -377,6 +405,13 @@ duration = 0.6
 action = "message"
 type = "prepare_again"
 when = "C3 at d1"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C3 arrived"
 delay = 0.1
 carrier = "C3"
 
@@ -451,6 +486,13 @@ delay = 0.2
 carrier = "C4"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition_needle C4 arrived"
+delay = 0.1
+carrier = "C4"
+
+[[step]]
 action = "pipette"
 when = "C3 at q1"
 delay = 0.296
@@ -475,8 +517,8 @@ runaway = true
 
 [[step]]
 action = "pipette"
-when = "sample_acquisition_needle C4 arrived"
-delay = 0.101
+when = "analyzer_ok C4 arrived"
+delay = 0.1
 device = "sp2"
 duration = 4.0
 
@@ -497,10 +539,24 @@ carrier = "C1"
 
 [[step]]
 action = "message"
+type = "interface_ok"
+when = "sample_complete_needle C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "message"
 type = "sample_complete_needle"
 needle = 2
 when = "pipette sp2 done"
 delay = 0.2
+carrier = "C4"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete_needle C4 arrived"
+delay = 0.1
 carrier = "C4"
 
 [[step]]
@@ -512,8 +568,8 @@ carrier = "C1"
 
 [[step]]
 action = "move"
-when = "sample_complete_needle C1 arrived"
-delay = 0.86
+when = "interface_ok C1 sent"
+delay = 0.76
 carrier = "C4"
 to = "pt2u"
 ease = "in"
@@ -539,12 +595,6 @@ when = "sample_ok C1 arrived"
 delay = 0.1
 
 [[step]]
-action = "message"
-type = "analyzer_ok"
-when = "clear_all sent"
-delay = 1.7
-
-[[step]]
 action = "caption"
 when = "sample_ok C1 arrived"
 delay = 0.2
@@ -558,6 +608,12 @@ delay = 0.2
 carrier = "C2"
 to = "d2"
 ease = "inout"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "clear_all sent"
+delay = 1.7
 
 [[step]]
 action = "highlight"
@@ -590,18 +646,25 @@ to = "merge"
 ease = "linear"
 
 [[step]]
-action = "message"
-type = "release"
-when = "C4 at merge"
-carrier = "C4"
-
-[[step]]
 action = "move"
 when = "C4 at merge"
 delay = 0.001
 carrier = "C4"
 to = "gone"
 ease = "out"
+
+[[step]]
+action = "message"
+type = "release"
+when = "C4 at iface_out"
+carrier = "C4"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C4 arrived"
+delay = 0.1
+carrier = "C4"
 
 [[step]]
 action = "status"
@@ -644,4 +707,18 @@ when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
+
+[[step]]
+action = "caption"
+when = "analyzer_ok C4 arrived"
+delay = 0.5
+title = "6 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "message"
+type = "results"
+when = "analyzer_ok C4 arrived"
+delay = 0.5
+carrier = "C4"
 

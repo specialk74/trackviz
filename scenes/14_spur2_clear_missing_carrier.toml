@@ -16,7 +16,7 @@ subtitle = "Spur with two sampling points — a carrier expected in the spur is 
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 
 # The real C2: it is not diverted.
@@ -24,7 +24,7 @@ speed = 120
 id = "C2"
 tube = true
 sample_id = "SID-000124"
-route = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 cap_color = "#0EA5E9"
 
@@ -44,7 +44,7 @@ tag = "SID-000124 (expected)"
 id = "C3"
 tube = true
 sample_id = "SID-000125"
-route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "w1c", "w1b", "spur_in", "w1", "d1", "q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2", "rj2", "top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"]
 speed = 120
 cap_color = "#DB2777"
 
@@ -97,13 +97,6 @@ to = "d1"
 ease = "out"
 
 [[step]]
-action = "move"
-at = 3.35
-carrier = "C2L"
-to = "w1"
-ease = "out"
-
-[[step]]
 action = "caption"
 when = "prepare C1 sent"
 delay = 0.91
@@ -116,6 +109,13 @@ when = "prepare C1 sent"
 delay = 0.91
 device = "nsd"
 duration = 1.6
+
+[[step]]
+action = "move"
+at = 3.35
+carrier = "C2L"
+to = "w1"
+ease = "out"
 
 [[step]]
 action = "message"
@@ -204,6 +204,13 @@ delay = 0.1
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "move"
 when = "C1 at d1"
 delay = 0.6
@@ -242,6 +249,13 @@ delay = 0.2
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition_needle C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "caption"
 when = "C3 at d1"
 title = "4 · Read at the divert — Clear"
@@ -268,9 +282,17 @@ delay = 0.195
 carrier = "C2"
 
 [[step]]
+action = "move"
+when = "C3 at d1"
+delay = 0.6
+carrier = "C3"
+to = "q1"
+ease = "inout"
+
+[[step]]
 action = "pipette"
-when = "sample_acquisition_needle C1 arrived"
-delay = 0.099
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 device = "sp1"
 duration = 6.0
 
@@ -302,18 +324,17 @@ delay = 0.1
 carrier = "C3"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "prepare_again C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "caption"
 when = "prepare_again C3 sent"
 title = "5 · Prepare again for the third carrier"
 text = "The carrier does not wait for the reply to Clear: it is diverted right away, behind the first one. Once the reply has arrived the interface sends Prepare again for it."
-
-[[step]]
-action = "move"
-when = "C3 at d1"
-delay = 0.6
-carrier = "C3"
-to = "q1"
-ease = "inout"
 
 [[step]]
 action = "message"
@@ -324,6 +345,13 @@ delay = 0.2
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete_needle C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "caption"
 when = "sample_complete_needle C1 sent"
 title = "6 · Sample Complete"
@@ -331,15 +359,15 @@ text = "Sample Complete: the first carrier is released and the third moves up to
 
 [[step]]
 action = "move"
-when = "sample_complete_needle C1 arrived"
+when = "interface_ok C1 sent"
 carrier = "C1"
 to = "d2"
 ease = "inout"
 
 [[step]]
 action = "move"
-when = "sample_complete_needle C1 arrived"
-delay = 1.6
+when = "interface_ok C1 sent"
+delay = 1.5
 carrier = "C3"
 to = "s1"
 ease = "inout"
@@ -353,9 +381,16 @@ delay = 0.2
 carrier = "C3"
 
 [[step]]
-action = "pipette"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition_needle C3 arrived"
-delay = 0.105
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+when = "analyzer_ok C3 arrived"
+delay = 0.1
 device = "sp1"
 duration = 4.0
 
@@ -389,23 +424,24 @@ delay = 0.2
 carrier = "C3"
 
 [[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete_needle C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
 action = "caption"
 when = "sample_complete_needle C3 sent"
 title = "7 · Back to normal"
-text = "Sample Complete for the third sample: the carrier goes on up the spur, stops at the second divert and, back on the Main-Lane, gets its Release."
+text = "Sample Complete for the third sample: the carrier goes on up the spur, stops at the second divert and, once it has left the module, gets its Release."
 
 [[step]]
 action = "move"
-when = "sample_complete_needle C3 arrived"
+when = "interface_ok C3 sent"
 carrier = "C3"
 to = "d2"
 ease = "inout"
-
-[[step]]
-action = "message"
-type = "release"
-when = "C1 at merge"
-carrier = "C1"
 
 [[step]]
 action = "move"
@@ -413,6 +449,19 @@ when = "C1 at merge"
 carrier = "C1"
 to = "gone"
 ease = "out"
+
+[[step]]
+action = "message"
+type = "release"
+when = "C1 at iface_out"
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
+carrier = "C1"
 
 [[step]]
 action = "highlight"
@@ -437,14 +486,43 @@ to = "merge"
 ease = "linear"
 
 [[step]]
-action = "message"
-type = "release"
-when = "C3 at merge"
-carrier = "C3"
-
-[[step]]
 action = "move"
 when = "C3 at merge"
 carrier = "C3"
 to = "gone"
 ease = "out"
+
+[[step]]
+action = "message"
+type = "release"
+when = "C3 at iface_out"
+carrier = "C3"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "caption"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+title = "8 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "message"
+type = "results"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "results"
+when = "results C1 arrived"
+delay = 0.2
+carrier = "C3"
+

@@ -15,7 +15,7 @@ subtitle = "Spur — analyzer error with the needle down, operator recovery"
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 
 # ---------------------------------------------------------------- steps
@@ -104,16 +104,23 @@ delay = 0.46
 carrier = "C1"
 
 [[step]]
-action = "needle"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition C1 arrived"
-delay = 0.102
+delay = 0.1
+carrier = "C1"
+
+[[step]]
+action = "needle"
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 device = "sp"
 to = "down"
 
 [[step]]
 action = "note"
-when = "sample_acquisition C1 arrived"
-delay = 0.102
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 actor = "AN"
 text = "Pipetting"
 duration = 2.6
@@ -143,6 +150,13 @@ action = "message"
 type = "sample_complete"
 when = "status_error sent"
 delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -238,12 +252,20 @@ ease = "out"
 
 [[step]]
 action = "caption"
-when = "C1 at merge"
-title = "8 · Main-Lane — Release"
-text = "The carrier went round the spur and is back on the Main-Lane: the interface sends Release."
+when = "C1 at iface_out"
+title = "8 · Release"
+text = "The carrier went round the spur and has left the interface module: the interface sends Release."
 
 [[step]]
 action = "message"
 type = "release"
-when = "C1 at merge"
+when = "C1 at iface_out"
 carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
+carrier = "C1"
+

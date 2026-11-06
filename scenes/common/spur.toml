@@ -22,6 +22,11 @@ y = 760
 id = "merge"
 x = 290
 y = 760
+# A carrier here has completely left the interface module.
+[[point]]
+id = "iface_out"
+x = 227
+y = 760
 [[point]]
 id = "main_out"
 x = 65

@@ -17,7 +17,7 @@ subtitle = "Spur — a carrier expected in the spur is missing, Clear"
 id = "C1"
 tube = true
 sample_id = "SID-000123"
-route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 
 # The real C2: it is not diverted and goes straight on the Main-Lane.
@@ -25,7 +25,7 @@ speed = 110
 id = "C2"
 tube = true
 sample_id = "SID-000124"
-route = ["spawn", "main_in", "nsd", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 cap_color = "#0EA5E9"
 
@@ -45,7 +45,7 @@ cap_color = "#0EA5E9"
 id = "C3"
 tube = true
 sample_id = "SID-000125"
-route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "main_out", "gone"]
+route = ["spawn", "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone"]
 speed = 110
 cap_color = "#DB2777"
 
@@ -107,6 +107,12 @@ delay = 1.629
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "prepare"
+when = "C2 at nsd"
+carrier = "C2"
+
+[[step]]
 action = "highlight"
 when = "sample_ok C1 sent"
 delay = 0.8
@@ -136,15 +142,9 @@ ease = "out"
 
 [[step]]
 action = "message"
-type = "prepare"
-when = "C2 at nsd"
-carrier = "C2"
-
-[[step]]
-action = "message"
 type = "query"
-when = "sample_ok C1 sent"
-delay = 1.3
+when = "sample_ok C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -229,9 +229,16 @@ delay = 2.062
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "analyzer_ok"
+when = "sample_acquisition C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "pipette"
-when = "sample_acquisition C1 sent"
-delay = 1.4
+when = "analyzer_ok C1 arrived"
+delay = 0.1
 device = "sp"
 duration = 5.0
 
@@ -271,17 +278,23 @@ delay = 0.2
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "interface_ok"
+when = "sample_complete C1 arrived"
+delay = 0.1
+carrier = "C1"
+
+[[step]]
 action = "move"
-when = "sample_complete C1 sent"
-delay = 1.2
+when = "interface_ok C1 sent"
 carrier = "C1"
 to = "spur_top_in"
 ease = "in"
 
 [[step]]
 action = "move"
-when = "sample_complete C1 arrived"
-delay = 0.7
+when = "interface_ok C1 sent"
+delay = 0.6
 carrier = "C2L"
 to = "sampling"
 ease = "inout"
@@ -289,8 +302,8 @@ duration = 1.2
 
 [[step]]
 action = "move"
-when = "sample_complete C1 arrived"
-delay = 0.7
+when = "interface_ok C1 sent"
+delay = 0.6
 carrier = "C3"
 to = "sampling"
 ease = "inout"
@@ -345,8 +358,15 @@ delay = 3.6
 carrier = "C3"
 
 [[step]]
-action = "pipette"
+action = "message"
+type = "analyzer_ok"
 when = "sample_acquisition C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "pipette"
+when = "analyzer_ok C3 arrived"
 delay = 0.1
 device = "sp"
 duration = 4.5
@@ -360,14 +380,21 @@ ease = "out"
 
 [[step]]
 action = "caption"
-when = "C1 at merge"
+when = "C1 at iface_out"
 title = "10 · Release"
-text = "The first carrier is back on the Main-Lane: Release."
+text = "The first carrier has left the interface module: Release."
 
 [[step]]
 action = "message"
 type = "release"
-when = "C1 at merge"
+when = "C1 at iface_out"
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C1 arrived"
+delay = 0.1
 carrier = "C1"
 
 [[step]]
@@ -375,7 +402,7 @@ action = "caption"
 when = "pipette sp done"
 delay = 0.2
 title = "11 · Back to normal"
-text = "Sample Complete for the third sample: the carrier goes round the spur and, back on the Main-Lane, the interface sends Release."
+text = "Sample Complete for the third sample: the carrier goes round the spur and, once it has left the module, the interface sends Release."
 
 [[step]]
 action = "message"
@@ -385,8 +412,15 @@ delay = 0.2
 carrier = "C3"
 
 [[step]]
-action = "move"
+action = "message"
+type = "interface_ok"
 when = "sample_complete C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "move"
+when = "interface_ok C3 sent"
 carrier = "C3"
 to = "spur_top_in"
 ease = "in"
@@ -408,5 +442,34 @@ ease = "out"
 [[step]]
 action = "message"
 type = "release"
-when = "C3 at merge"
+when = "C3 at iface_out"
 carrier = "C3"
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "release C3 arrived"
+delay = 0.1
+carrier = "C3"
+
+[[step]]
+action = "caption"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+title = "12 · Results"
+text = "Later, when the analysis is complete, the analyzer sends the results to DMX."
+
+[[step]]
+action = "message"
+type = "results"
+when = "analyzer_ok C3 arrived"
+delay = 0.5
+carrier = "C1"
+
+[[step]]
+action = "message"
+type = "results"
+when = "results C1 arrived"
+delay = 0.2
+carrier = "C3"
+
