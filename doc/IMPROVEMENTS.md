@@ -40,10 +40,11 @@ a catena, ma il conflitto va risolto a mano con un `delay`.
 Un'immagine con un fotogramma per ogni didascalia, per controllare una scena in pochi
 secondi senza guardare il video.
 
-### 1.6 Esportare il sequence diagram
+### 1.6 Esportare il sequence diagram come immagine o PDF
 
-Il diagramma da solo, come immagine o PDF, da allegare alla documentazione per i
-produttori di analizzatori. È utile soprattutto a chi deve implementare i messaggi.
+Il diagramma come file Mermaid c'è già (`trackviz export`). Manca l'immagine o il PDF,
+da allegare alla documentazione per i produttori di analizzatori, senza dipendere da
+un visualizzatore Mermaid.
 
 ### 1.7 Indice dei video
 
@@ -66,6 +67,8 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 ## 3. Limiti noti
 
+- `trackviz export` non è stato provato con un visualizzatore Mermaid reale: il formato è
+  verificato solo dall'import del tool.
 - `when` si riferisce all'ultimo step corrispondente già scritto nel file: gli step vanno
   tenuti in ordine di tempo.
 - Una scena non può estendere una lane definita in un file comune: le scene 03, 07 e 08
@@ -86,4 +89,4 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 Parti comuni con `include`, messaggi con nome e `{Needle}`, nota "Pipetting" automatica,
 tempi legati agli eventi con `when`, scene come catena di cause, righe del diagramma in
 ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly,
-anteprima veloce (`--preview`, `--from`, `--to`, `--watch`).
+anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), export e import Mermaid.

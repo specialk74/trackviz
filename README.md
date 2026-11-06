@@ -33,6 +33,50 @@ $B scenes/01_prepare_sample_release.toml -o other.mp4        # full video, chose
 
 Without `-o` the video goes to `out/<scene file name>.mp4` (`out/` is created if missing).
 
+### Mermaid
+
+`trackviz export scenes/a.toml` writes the message sequence of a scene as a Mermaid
+diagram, `out/a.mmd` (`-o` for another file; wildcards work). Purple messages are
+framed in a colored `rect`.
+
+`trackviz import flow.mmd` builds `scenes/flow.toml` from a Mermaid diagram, and it
+never replaces an existing scene unless `-o` names it. Mermaid only describes the
+messages, so the physical side goes in `%%` comments, which don't appear in the
+diagram (see `examples/spur_happy_path.mmd`):
+
+```
+%% geometry spur
+sequenceDiagram
+    %% carrier C1 SID-000123
+    %% move C1 to nsd ease=in
+    %% with
+    %% highlight nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    AN-->>IF: OK SampleId=SID-000123
+    %% pipette sp duration=4
+```
+
+| Directive | Meaning |
+|---|---|
+| `geometry <name>` | `sampling`, `turnstile`, `spur`, `spur2`, or `--geometry` on the command line |
+| `title`, `subtitle` | the `[video]` texts |
+| `carrier <id> <sample id>` | options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
+| `move <carrier> to <point>` | options: `ease=`, `speed=`, `duration=`, `runaway` |
+| `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=` |
+| `needle <device> down\|up`, `status <device> <state>` | as the steps |
+| `show`, `hide <carrier>`, `wait <seconds>` | as the steps |
+| `caption <title> \| <text>` | a caption |
+| `when ...`, `at`, `with`, `after_start`, `after_end`, `delay` | timing of the **next** step; without them a step starts when the previous one ends |
+| `# text` | a plain comment |
+
+An unknown directive is an error, so that typos don't get lost. Participants are
+matched with the shared actors by id or label. Messages become named messages when
+they match `common/messages.toml`, and the second Prepare of a sample is the purple
+one. `SampleId=` must name a declared carrier. `alt`, `loop`, `opt` and `par` are
+refused: a scene is one path, so write one diagram for each case. The result is
+validated at once. A diagram exported from a scene has no directives, so it needs
+them before it can be imported.
+
 To look at a scene quickly while writing it:
 
 ```sh

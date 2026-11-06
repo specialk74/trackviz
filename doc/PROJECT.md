@@ -93,6 +93,7 @@ trackviz/
 ├── Cargo.toml            # edition 2021, dipendenze: resvg, dejavu (build: sha2)
 ├── README.md             # guida rapida e riferimento del formato
 ├── doc/IMPROVEMENTS.md   # miglioramenti proposti e punti da confermare
+├── examples/             # esempio di scena scritta in Mermaid
 ├── build.rs              # scarica Inter (SHA-256 verificato) in OUT_DIR
 ├── fonts/                # README e licenze dei font (i .ttf non sono in git)
 ├── PROJECT.md            # questo documento
@@ -118,6 +119,7 @@ trackviz/
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── toml.rs           # parser del sottoinsieme TOML
+    ├── mermaid.rs        # export e import dei sequence diagram Mermaid
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
@@ -138,6 +140,8 @@ trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima velo
 **Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima dell'OK al suo Prepare o della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
+
+**Mermaid:** `trackviz export <scene>...` scrive il sequence diagram in `out/<nome>.mmd`, `trackviz import <flusso.mmd> [--geometry g] [-o file]` genera una scena. Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%` (`src/mermaid.rs`, esempio in `examples/`). Una direttiva sconosciuta è un errore, `%% # testo` è un commento. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso. Le route di default per geometria sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate (lo verifica un test).
 
 **Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 

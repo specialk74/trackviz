@@ -4,3 +4,4 @@
 *.bak*%
 *.mp4
 *.ttf
+out/*.mmd

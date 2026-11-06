@@ -10,10 +10,14 @@
 //! Scene arguments may contain the wildcards `*` and `?` in the file name: several
 //! scenes are rendered in parallel, sharing the `-j` threads.
 //!
+//!   trackviz export <scene.toml>...          (the messages as a Mermaid diagram)
+//!   trackviz import <flow.mmd> [--geometry g] [-o scene.toml]   (a scene from a diagram)
+//!
 //! Frames are rasterized in-process with resvg; only `ffmpeg` is needed on PATH
 //! (and only for video output).
 
 mod lint;
+mod mermaid;
 mod render;
 mod scene;
 mod toml;
@@ -37,11 +41,15 @@ fn usage() -> String {
          {REPOSITORY}\n\
          usage: trackviz <scene.toml>... [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
          \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch]\n\
+         \x20      trackviz export <scene.toml>... [-o out.mmd]\n\
+         \x20      trackviz import <flow.mmd> [--geometry NAME] [-o scene.toml]\n\
          \x20 scene files may use the wildcards * and ? (e.g. \"scenes/*.toml\"): they are rendered in parallel\n\
          \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)\n\
          \x20 --from/--to render only that part, --preview at half size and 15 fps: both write\n\
          \x20 out/<scene name>_preview.mp4, so the full video is kept\n\
-         \x20 --watch repeats the command when the scene or a file it includes changes (one scene)"
+         \x20 --watch repeats the command when the scene or a file it includes changes (one scene)\n\
+         \x20 export writes the messages as a Mermaid diagram, by default out/<scene name>.mmd\n\
+         \x20 import builds a scene from a Mermaid diagram, by default scenes/<diagram name>.toml"
     )
 }
 
@@ -301,6 +309,11 @@ fn report_failures(failures: Vec<String>, total: usize) -> Result<(), String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("export") => return export_cmd(&args[1..]),
+        Some("import") => return import_cmd(&args[1..]),
+        _ => {}
+    }
     let mut scene_args = Vec::new();
     let mut out = None;
     let mut still: Option<f64> = None;
@@ -367,6 +380,103 @@ fn run() -> Result<(), String> {
         watch_scene(&files[0], &job);
     }
     job.run(&files)
+}
+
+/// `trackviz export`: the message sequence of scenes as Mermaid diagrams.
+fn export_cmd(args: &[String]) -> Result<(), String> {
+    let (mut out, mut patterns) = (None, Vec::new());
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "-o" => out = Some(it.next().ok_or("-o needs a file")?.clone()),
+            a if !a.starts_with('-') => patterns.push(a.to_string()),
+            a => return Err(format!("unexpected argument '{a}'")),
+        }
+    }
+    let mut files = Vec::new();
+    for p in &patterns {
+        files.extend(expand(p)?);
+    }
+    if files.is_empty() {
+        return Err(format!("missing scene file\n{}", usage()));
+    }
+    if out.is_some() && files.len() > 1 {
+        return Err(format!("-o takes a single scene, but {} were given", files.len()));
+    }
+    let mut failures = Vec::new();
+    for f in &files {
+        let r = load(f).and_then(|(sc, tl)| {
+            let path = match &out {
+                Some(o) => o.clone(),
+                None => {
+                    std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
+                    default_out(f, VideoOpts::default()).replace(".mp4", ".mmd")
+                }
+            };
+            std::fs::write(&path, mermaid::export(&sc, &tl)).map_err(|e| format!("{path}: {e}"))?;
+            eprintln!("wrote {path}");
+            Ok(())
+        });
+        if let Err(e) = r {
+            failures.push(e);
+        }
+    }
+    report_failures(failures, files.len())
+}
+
+/// The shared actors and messages next to a scene, for `import`.
+fn library(scene_dir: &Path) -> Result<mermaid::Library, String> {
+    let read = |name: &str| toml::parse_file(&scene_dir.join("common").join(name));
+    let (actors, messages) = (read("actors.toml")?, read("messages.toml")?);
+    let list = |d: &toml::Doc, k: &str| d.arrays.get(k).cloned().unwrap_or_default();
+    Ok(mermaid::Library {
+        actors: list(&actors, "actor").iter().map(|t| Ok((t.str_req("id")?, t.str_req("label")?))).collect::<Result<_, String>>()?,
+        messages: list(&messages, "message").iter().map(mermaid::MsgType::from_table).collect::<Result<_, String>>()?,
+    })
+}
+
+/// `trackviz import`: a scene from a Mermaid diagram.
+fn import_cmd(args: &[String]) -> Result<(), String> {
+    let (mut input, mut out, mut geometry) = (None, None, None);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "-o" => out = Some(it.next().ok_or("-o needs a file")?.clone()),
+            "--geometry" => geometry = Some(it.next().ok_or("--geometry needs a name")?.clone()),
+            a if !a.starts_with('-') && input.is_none() => input = Some(a.to_string()),
+            a => return Err(format!("unexpected argument '{a}'")),
+        }
+    }
+    let input = input.ok_or_else(|| format!("missing diagram file\n{}", usage()))?;
+    let src = std::fs::read_to_string(&input).map_err(|e| format!("{input}: {e}"))?;
+    let stem = Path::new(&input).file_stem().and_then(|s| s.to_str()).unwrap_or("scene").to_string();
+    // Never replace a scene unless asked to with -o.
+    let path = match out {
+        Some(o) => PathBuf::from(o),
+        None => {
+            let p = PathBuf::from(format!("scenes/{stem}.toml"));
+            if p.exists() {
+                return Err(format!("{} already exists: choose another file with -o", p.display()));
+            }
+            p
+        }
+    };
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let g = geometry.clone().or_else(|| mermaid::geometry_of(&src));
+    if let Some(g) = &g {
+        let f = dir.join("common").join(format!("{g}.toml"));
+        if !f.exists() {
+            return Err(format!("geometry '{g}': {} not found", f.display()));
+        }
+    }
+    let lib = library(dir)?;
+    let text = mermaid::import(&src, &stem, geometry.as_deref(), &lib).map_err(|e| format!("{input}: {e}"))?;
+    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let shown = path.to_string_lossy().into_owned();
+    eprintln!("wrote {shown}");
+    let (sc, tl) = load(&shown)?;
+    eprint!("{}", timeline_text(&sc, &tl));
+    Ok(())
 }
 
 /// What the command line asks for.

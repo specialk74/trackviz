@@ -1,0 +1,38 @@
+%% # A scene from a Mermaid diagram: trackviz import examples/spur_happy_path.mmd
+%% # The comments starting with %% describe the physical side and don't appear in
+%% # the diagram. A step starts when the previous one ends, unless a timing directive
+%% # (when, with, at, after_start, after_end, delay) comes before it.
+%% geometry spur
+%% title Analyzer interface · message exchange with the automation
+%% subtitle Spur — happy path, written in Mermaid
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123
+    %% caption 1 · Spur | The carrier travels along the Main-Lane towards the spur.
+    %% move C1 to nsd ease=in
+    %% move C1 to sampling ease=out
+    %% # Back to the moment the carrier passes the NSD.
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping: Prepare.
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    AN-->>IF: OK SampleId=SID-000123
+    AN->>DMX: Query SampleId=SID-000123
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C1 at sampling
+    %% caption 3 · Sample Acquisition | The carrier stops at the sampling point.
+    %% when C1 at sampling
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    AN-->>IF: OK
+    %% pipette sp duration=4
+    Note over AN: Pipetting
+    AN->>IF: Sample Complete SampleId=SID-000123
+    IF-->>AN: OK
+    %% caption 4 · Release | The carrier leaves the module: Release.
+    %% move C1 to iface_out ease=in
+    IF->>AN: Release SampleId=SID-000123
+    AN-->>IF: OK
+    AN->>DMX: Results SampleId=SID-000123
