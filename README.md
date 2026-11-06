@@ -68,7 +68,6 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
 - two physical carriers overlapping on the track
 - captions too long for the band, which get cut
 - a Query sent before the reply to the previous one has arrived
-- a Sample Acquisition sent before the tests of that sample are known
 
 ## Scene format (TOML subset)
 
@@ -161,7 +160,7 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
 | `status` | `device` (an `analyzer`, a `zone`, or a `sampling` device for one needle), `state` = `error` (red; ERROR badge on an analyzer) \| `ready` (green) \| `normal` (grey); lasts until the next `status` | 0 s |
-| `operator` | `device` (an `analyzer`): a stylized lab operator (white coat, thin blue gloves) walks in from the right edge of the panel, works on the analyzer with a wrench, then walks away (walks take up to 2 s each) | 7 s |
+| `operator` | `device` (an `analyzer`): a stylized lab operator (white coat, thin blue gloves) walks in from the right edge of the panel, works on the analyzer with one hand, then walks away (walks take up to 2 s each) | 7 s |
 | `needle` | `device` (a `sampling` or `turnstile`), `to` = `down` \| `up`: the needle goes down and stays there until `up` | 0.9 s |
 | `wait` | — | `duration` is required |
 

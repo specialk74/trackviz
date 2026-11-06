@@ -360,6 +360,13 @@ when = "status_ready_needle sent"
 delay = 1.7
 
 [[step]]
+action = "status"
+when = "status_ready_needle sent"
+delay = 3
+device = "sp1"
+state = "normal"
+
+[[step]]
 action = "move"
 when = "status_ready_needle arrived"
 delay = 1.8

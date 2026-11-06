@@ -500,7 +500,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
 
 /// Stylized clinical lab operator (front view: white lab coat, thin blue
 /// gloves): walks in during the first part of the step, works on the analyzer
-/// with a tool, then walks away.
+/// with one hand, then walks away.
 fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     use std::f64::consts::PI;
     let (ax, ay, aw, ah) = an.rect;
@@ -509,7 +509,7 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     // working with the arm raised.
     let x_out = TRACK.0 + TRACK.2 + 40.0;
     let below = ax + aw + 75.0 > TRACK.0 + TRACK.2;
-    let (x_work, y) = if below { (ax + aw - 45.0, ay + ah + 48.0) } else { (ax + aw + 42.0, ay + ah / 2.0 - 4.0) };
+    let (x_work, y) = if below { (ax + aw - 45.0, ay + ah + 38.0) } else { (ax + aw + 36.0, ay + ah / 2.0 - 4.0) };
     let (x, walking, facing_left) = if u < walk {
         (x_out + (x_work - x_out) * Ease::InOut.apply(u / walk), true, true)
     } else if u > dur - walk {
@@ -530,8 +530,7 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
             x + k * 5.0, y + 14.0, x + k * 6.0 + k * step * 6.0, y + 33.0
         );
     }
-    // Arms: the back one hangs down; the front one holds the wrench and,
-    // while working, swings it against the analyzer.
+    // Arms: the back one hangs down; the front one, while working, moves on the analyzer.
     let (bx, by) = (x - dir * 15.0 - dir * step * 4.0, y + 8.0);
     let _ = write!(
         o,
@@ -546,8 +545,7 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
         0.15 + 0.35 * (t * 2.0 * PI * 1.8).sin()
     };
     let (sx, sy) = (x + dir * 12.0, y - 12.0);
-    let (hx, hy) = (sx + dir * 20.0 * ang.cos(), sy + 20.0 * ang.sin());
-    let (wx, wy) = (hx + dir * 15.0 * (ang - 0.9).cos(), hy + 15.0 * (ang - 0.9).sin());
+    let (hx, hy) = (sx + dir * 24.0 * ang.cos(), sy + 24.0 * ang.sin());
     // Body: long white lab coat (open front, collar, pocket); head with hair.
     let _ = write!(
         o,
@@ -562,23 +560,8 @@ fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
     );
     let _ = write!(
         o,
-        r##"<line x1="{sx:.1}" y1="{sy:.1}" x2="{hx:.1}" y2="{hy:.1}" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/><line x1="{sx:.1}" y1="{sy:.1}" x2="{hx:.1}" y2="{hy:.1}" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/><line x1="{hx:.1}" y1="{hy:.1}" x2="{wx:.1}" y2="{wy:.1}" stroke="#64748B" stroke-width="4" stroke-linecap="round"/><circle cx="{wx:.1}" cy="{wy:.1}" r="4.5" fill="none" stroke="#64748B" stroke-width="3"/><circle cx="{hx:.1}" cy="{hy:.1}" r="3.8" fill="{GLOVE}"/>"##
+        r##"<line x1="{sx:.1}" y1="{sy:.1}" x2="{hx:.1}" y2="{hy:.1}" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/><line x1="{sx:.1}" y1="{sy:.1}" x2="{hx:.1}" y2="{hy:.1}" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/><circle cx="{hx:.1}" cy="{hy:.1}" r="3.8" fill="{GLOVE}"/>"##
     );
-    if !walking {
-        // Little sparks where the wrench touches the analyzer.
-        // They spread out of the analyzer edge, away from it.
-        let ph = (t * 1.8).fract();
-        let ((cx, cy), base) = if below { ((wx, ay + ah), PI / 2.0) } else { ((ax + aw, wy), PI) };
-        for k in 0..3 {
-            let a = base - 0.8 + k as f64 * 0.8;
-            let r0 = 6.0 + ph * 10.0;
-            let _ = write!(
-                o,
-                r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{ACCENT}" stroke-width="2.5" stroke-linecap="round" opacity="{:.2}"/>"##,
-                cx - r0 * a.cos(), cy + r0 * a.sin(), cx - (r0 + 6.0) * a.cos(), cy + (r0 + 6.0) * a.sin(), 1.0 - ph
-            );
-        }
-    }
     let _ = write!(o, r##"<text x="{x:.1}" y="{:.1}" font-size="14" font-weight="600" text-anchor="middle" fill="{MUTED}">Operator</text>"##, y + 54.0 - bob);
 }
 

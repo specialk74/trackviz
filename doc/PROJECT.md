@@ -30,6 +30,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Gate + antenna** | Davanti alla ruota. Il carrier si ferma **sempre** all'antenna, che lo legge: l'Interfaccia manda **di nuovo Prepare** (in futuro con un'informazione in più; per ora è disegnato in viola). Se sotto l'ago non c'è un campionamento in corso il gate si apre e il carrier entra nella tasca d'ingresso; altrimenti aspetta il Sample Complete. Solo dopo che il carrier in attesa è entrato la ruota gira (in ingresso → ago, campionato → uscita). |
 | **Spur** | Ramo a U **perpendicolare** alla Main-Lane (come nell'NCCLS). L'NSD devia il carrier, senza fermarlo, in un breve tratto di pit-lane che gira di 90° nel ramo d'andata; sul ramo d'andata c'è il punto di campionamento con l'**analizzatore alla sua destra**; in cima il carrier attraversa e scende dal ramo di ritorno fino alla Main-Lane. |
 | **Deviazione standard** | Deviazione usata dentro lo spur con più punti di campionamento: a differenza dell'NSD **ogni** carrier si ferma e viene letto, poi viene deviato nella pit-lane di un ago o prosegue dritto, mentre il successivo si ferma dietro. Vale anche per chi rientra da un ago e incontra la deviazione successiva. |
+| **Clear All** | Messaggio dell'Interfaccia senza parametri: vale per tutto lo strumento e **cancella tutti i Prepare**. Non interrompe mai un campionamento in corso. |
 | **Interfaccia** | Il modulo di automazione Inpeco davanti all'analizzatore (NSD + Pit-Lane + rientro). È anche l'attore che scambia i messaggi con l'analizzatore. |
 | **Analizzatore / strumento** | Lo strumento di terze parti che esegue i test. |
 | **DMX** | Il nome Inpeco del **LIS**. Comunica con lo strumento: gli dice quali test eseguire e ne riceve i risultati. |
@@ -134,7 +135,7 @@ trackviz <scene.toml>... --check                  # valida e stampa la timeline
 trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima veloce
 ```
 
-**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate, Query prima della risposta alla precedente, Sample Acquisition prima dei test. Un test verifica che nessuna scena ne abbia.
+**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
@@ -188,7 +189,7 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 **Stato dell'analizzatore e delle zone:** `status` vale anche per le zone (es. "Interface module": rossa in errore, verde in ready, grigia in normal). `status` colora l'analizzatore (error: rosso con "ERROR"; ready: verde con "READY"; pulsa per 1,5 s al cambio). `needle` porta giù o su l'ago e lo lascia lì; con l'ago giù e lo strumento non in errore compare "Aspirating…", in errore l'ago diventa rosso con "Needle down". `--check` rifiuta una rotazione della ruota, o un carrier che lascia il punto di campionamento, tra l'inizio di un `needle down` e la fine del `needle up` successivo.
 
-**Operatore** (`operator`): operatore di laboratorio stilizzato (camice bianco lungo, guanti blu sottili, capelli scuri, chiave inglese) che entra a piedi dal bordo destro del pannello, si ferma a destra dell'analizzatore, lavora (braccio che oscilla e scintille ambra sul bordo) e se ne va. Ogni camminata dura min(2 s, durata/3).
+**Operatore** (`operator`): operatore di laboratorio stilizzato (camice bianco lungo, guanti blu sottili, capelli scuri, senza attrezzi) che entra a piedi dal bordo destro del pannello, si ferma a destra dell'analizzatore, lavora (la mano si muove sullo strumento) e se ne va. Ogni camminata dura min(2 s, durata/3).
 
 **Righe del sequence diagram:** ogni `message` e ogni `note` occupa una riga, assegnata in ordine di tempo (a parità di tempo, nell'ordine del file).
 
@@ -253,7 +254,7 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 | action | Chiavi specifiche |
 |---|---|
 | `caption` | `title`, `text` |
-| `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed`, `runaway` (false: carrier che scappa, anello rosso pulsante e cartellino "… · RUN-AWAY" durante il movimento) |
+| `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed`, `runaway` (false: carrier che scappa, anello rosso pulsante e cartellino "… · RUN-AWAY" dal primo all'ultimo movimento di fuga, soste comprese) |
 | `message` | `type`, `carrier`, `needle`; oppure, senza `type`: `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `needle`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
 | `pipette` | `device` sampling o turnstile (aggiunge la nota "Pipetting") |
@@ -350,6 +351,7 @@ Un solo carrier; 05 con il punto di campionamento semplice (geometria della scen
 - L'operatore arriva allo strumento (azione `operator`, 7 s, insieme alla nota "Operator recovery") ed esegue la recovery: mentre lavora l'ago risale.
 - Lo strumento torna verde e manda **Status `State=Ready`**; l'Interfaccia risponde **OK** e solo ora rilascia il carrier (nella 06 prima la ruota lo porta all'uscita).
 - Sulla Main-Lane l'Interfaccia manda **Release**.
+- Lo strumento resta verde 3 s dopo lo Status Ready, poi torna grigio.
 - I messaggi Status e i relativi OK non hanno SampleId (è lo stato dello strumento).
 - Durate: 05 ≈ 45 s, 06 ≈ 51 s.
 
@@ -359,7 +361,7 @@ Tre carrier deviati (Prepare/OK, Query/Tests to perform per ciascuno); 07 con il
 
 - **07:** Sample Acquisition per C1; **prima che l'ago scenda** C1 scappa (`runaway = true`) ed esce fino alla Main-Lane. C2 scivola sotto l'ago, C3 avanza in coda. L'analizzatore aspira C2 credendo che sia C1.
 - **08:** C2 aspetta al gate (Prepare viola all'antenna), C3 dietro di lui. Dopo la Sample Acquisition per C1 la ruota **gira da sola**: C1 va all'uscita e scappa verso la Main-Lane. L'ago scende nella tasca vuota e non aspira nulla.
-- In entrambe l'analizzatore manda **Sample Complete** con il SampleId di C1; l'Interfaccia manda **Cancel** (SampleId di C1) → **OK**, poi manda via tutti i carrier senza campionarli (nella 08 C2 e C3 passano dalla ruota: entrano, rotazioni, escono; C3 si ferma all'antenna ma non riceve Prepare). Quando l'ultimo è sulla Main-Lane: **Clear All** (senza parametri) → **OK**. Nessun Release.
+- In entrambe l'analizzatore manda **Sample Complete** con il SampleId di C1; l'Interfaccia manda **Cancel** (SampleId di C1) → **OK**, poi manda via tutti i carrier senza campionarli (nella 08 C2 e C3 passano dalla ruota: entrano, rotazioni, escono; C3 si ferma all'antenna ma non riceve Prepare). Subito dopo l'OK al Cancel parte **Clear All** (senza parametri) → **OK**, mentre i carrier stanno uscendo. Nessun Release.
 - L'**interfaccia** (zona "Interface module") diventa **rossa** al momento della fuga (07: quando C1 lascia il punto di campionamento; 08: quando la ruota gira da sola) e torna **grigia** quando l'ultimo carrier è uscito completamente dal riquadro.
 - Nella 08 l'ultima rotazione parte solo quando C2 è uscito completamente dal cerchio della ruota.
 - Durate: 07 ≈ 48 s, 08 ≈ 60 s.
@@ -381,7 +383,7 @@ Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyz
 - **Quali aghi** dipende dai test del campione: uno solo o entrambi.
 - Le deviazioni standard sono etichettate "Divert 1" e "Divert 2". Un carrier può entrare in una pit-lane mentre l'ago sta campionando il carrier precedente. Soste ai divert brevi: 0,6 s con il Prepare viola, 0,4 s se il carrier è solo letto (il carrier non aspetta l'arrivo della freccia).
 - **13** happy path (≈ 51 s): C1 usa entrambi gli aghi, C2 solo l'ago 2; C1 entra nella seconda pit-lane mentre C2 è in campionamento.
-- **14** Clear (≈ 51 s): il fantasma di C2 si ferma a `div1`, C3 ci si ferma sopra; alla lettura di C3 Clear di C2 → OK → Prepare viola di C3.
+- **14** Clear (≈ 51 s): il fantasma di C2 si ferma a `div1`, C3 ci si ferma sopra; alla lettura di C3 parte il Clear di C2 → OK → Prepare viola di C3, mentre C3 è già stato deviato: la sosta al divert non aspetta la risposta.
 - **15** errore (≈ 50 s): errore **dell'ago 1** (`status` sul device `sampling`: diventa rossa solo la sua fascia dell'analizzatore), l'ago 2 continua durante la recovery.
 - **16** run-away (≈ 55 s): C1 scappa dall'ago 1 e si ferma comunque a `div2`; il carrier dopo finisce sotto l'ago. Via solo i carrier della pit-lane dell'ago 1, che è rossa dalla fuga finché non si è svuotata. L'ago 2 continua.
 
@@ -399,7 +401,7 @@ Un solo strumento con due aghi: un solo attore Analyzer e un solo device `analyz
 | A6 | SampleId `SID-000123` e durata della pipettatura 4,5 s | Segnaposto |
 | A7 | Messaggi di stato dell'analizzatore omessi | Da aggiungere |
 | A8 | Il secondo Prepare (all'antenna) non ha risposta OK; l'informazione in più che porterà è ancora da definire | Da confermare |
-| A10 | L'Analizzatore manda una Query a DMX alla volta: la successiva solo dopo aver ricevuto la risposta alla precedente (regola dell'utente, verificata da un test su tutte le scene). La Sample Acquisition di un campione parte dopo che i suoi test sono noti | Confermata la prima parte |
+| A10 | L'Analizzatore manda una Query a DMX alla volta: la successiva solo dopo aver ricevuto la risposta alla precedente (regola dell'utente, verificata da un test su tutte le scene). La Sample Acquisition può arrivare allo strumento anche prima dei test da DMX | Confermata dall'utente |
 | A9 | La risposta dell'Analizzatore al Clear si chiama "OK" (scene 03/04) | Scelta dell'utente |
 
 ---

@@ -58,8 +58,7 @@ fn cut_captions(tl: &Timeline) -> Vec<String> {
         .collect()
 }
 
-/// The analyzer sends one Query at a time, and a sample gets Sample Acquisition
-/// only after its tests are known.
+/// The analyzer sends one Query at a time.
 fn queries(tl: &Timeline) -> Vec<String> {
     let mut msgs: Vec<(f64, f64, &str, &str)> = tl
         .events
@@ -83,12 +82,6 @@ fn queries(tl: &Timeline) -> Vec<String> {
             "Tests to perform" => {
                 waiting = false;
                 free_at = t1;
-            }
-            "Sample Acquisition" => {
-                let id = params.split_whitespace().next();
-                if !msgs.iter().any(|m| m.2 == "Tests to perform" && m.3.split_whitespace().next() == id && m.1 <= t0) {
-                    out.push(format!("Sample Acquisition at {t0:.2}s ({params}) before its tests are known"));
-                }
             }
             _ => {}
         }
@@ -135,16 +128,16 @@ mod tests {
 
     #[test]
     fn queries_are_sent_one_at_a_time() {
-        let (q, t, s) = ("Query", "Tests to perform", "Sample Acquisition");
-        let good = [msg(q, 0.0, "SampleId=1"), msg(t, 2.0, "SampleId=1"), msg(q, 3.5, "SampleId=2"), msg(t, 5.0, "SampleId=2"), msg(s, 7.0, "SampleId=1 Needle=1")];
+        let (q, t) = ("Query", "Tests to perform");
+        let good = [msg(q, 0.0, "SampleId=1"), msg(t, 2.0, "SampleId=1"), msg(q, 3.5, "SampleId=2"), msg(t, 5.0, "SampleId=2")];
         assert!(warned(&good.concat()).is_empty());
         // Before the first reply has been sent, and before it has arrived.
         let w = warned(&[msg(q, 0.0, "SampleId=1"), msg(q, 1.0, "SampleId=2")].concat());
         assert!(w[0].contains("Query at 1.00s"), "{w:?}");
         let w = warned(&[msg(q, 0.0, "SampleId=1"), msg(t, 1.0, "SampleId=1"), msg(q, 2.0, "SampleId=2")].concat());
         assert!(w[0].contains("Query at 2.00s"), "{w:?}");
-        // Sample Acquisition before the tests have arrived.
-        let w = warned(&[msg(q, 0.0, "SampleId=1"), msg(t, 1.0, "SampleId=1"), msg(s, 2.0, "SampleId=1")].concat());
-        assert!(w[0].contains("before its tests are known"), "{w:?}");
+        // Sample Acquisition may come before the tests are known.
+        let s = "Sample Acquisition";
+        assert!(warned(&[msg(q, 0.0, "SampleId=1"), msg(s, 0.5, "SampleId=1"), msg(t, 2.0, "SampleId=1")].concat()).is_empty());
     }
 }

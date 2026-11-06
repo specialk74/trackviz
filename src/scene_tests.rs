@@ -406,6 +406,16 @@ fn all_scenes_in_the_repository_are_valid() {
 }
 
 #[test]
+fn a_runaway_stays_flagged_during_a_stop() {
+    let steps = "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"b\"\nease = \"linear\"\nrunaway = true\n\
+                 [[step]]\naction = \"move\"\nat = 5\ncarrier = \"C1\"\nto = \"c\"\nease = \"linear\"\nrunaway = true\n";
+    let (_, tl) = ok(SAMPLING, steps);
+    let c = &tl.carriers[0];
+    assert!(c.running_away(2.0) && c.running_away(4.0) && c.running_away(6.0));
+    assert!(!c.running_away(0.5) && !c.running_away(100.0));
+}
+
+#[test]
 fn runaway_moves_are_flagged_only_while_moving() {
     let (_, tl) = ok(SAMPLING, "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"c\"\nease = \"linear\"\nrunaway = true\n");
     let c = &tl.carriers[0];

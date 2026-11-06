@@ -305,12 +305,12 @@ carrier = "C3"
 action = "caption"
 when = "prepare_again C3 sent"
 title = "5 · Prepare again for the third carrier"
-text = "Only after the reply to Clear the interface sends Prepare again for the third carrier, and diverts it into the pit-lane, behind the first one."
+text = "The carrier does not wait for the reply to Clear: it is diverted right away, behind the first one. Once the reply has arrived the interface sends Prepare again for it."
 
 [[step]]
 action = "move"
 when = "C3 at d1"
-delay = 4.0
+delay = 0.6
 carrier = "C3"
 to = "q1"
 ease = "inout"

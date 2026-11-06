@@ -786,9 +786,12 @@ impl CarrierPath {
     pub fn moving(&self, t: f64) -> bool {
         self.moves.iter().any(|m| t > m.t0 && t < m.t1)
     }
-    /// Running away (during a `move` with `runaway = true`).
+    /// Running away: from the first `move` with `runaway = true` to the end of
+    /// the last one, including a stop in between.
     pub fn running_away(&self, t: f64) -> bool {
-        self.moves.iter().any(|m| m.runaway && t >= m.t0 && t <= m.t1)
+        let first = self.moves.iter().find(|m| m.runaway);
+        let last = self.moves.iter().rev().find(|m| m.runaway);
+        first.zip(last).is_some_and(|(a, b)| t >= a.t0 && t <= b.t1)
     }
     /// 0 = hidden, 1 = fully visible (fading in between).
     pub fn opacity(&self, t: f64) -> f64 {

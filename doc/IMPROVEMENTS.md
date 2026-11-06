@@ -5,7 +5,8 @@ descritte in `README.md` e `PROJECT.md`; qui sono solo riassunte in fondo.
 
 ## 1. Miglioramenti proposti, non ancora fatti
 
-In ordine di utilità.
+Le voci 1.1–1.4 servono a scrivere le scene più in fretta, le 1.5–1.8 a controllarle e
+consegnarle. Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
 ### 1.1 Highlight agganciato all'evento
 
@@ -34,45 +35,31 @@ a catena, ma il conflitto va risolto a mano con un `delay`.
 - Scena 08: la ruota partirebbe prima che C2 sia fuori dal cerchio. Si potrebbe
   agganciare la rotazione al punto in cui il carrier è fuori dalla ruota.
 
+### 1.5 Foglio riassuntivo di una scena
+
+Un'immagine con un fotogramma per ogni didascalia, per controllare una scena in pochi
+secondi senza guardare il video.
+
+### 1.6 Esportare il sequence diagram
+
+Il diagramma da solo, come immagine o PDF, da allegare alla documentazione per i
+produttori di analizzatori. È utile soprattutto a chi deve implementare i messaggi.
+
+### 1.7 Indice dei video
+
+Una pagina HTML o un README con l'elenco degli scenari, per consegnarli come pacchetto
+unico.
+
+### 1.8 Didascalie in più lingue
+
+La stessa scena con didascalie in inglese e in italiano o altre lingue, se i destinatari
+lo richiedono. Oggi tutti i testi dei video sono in inglese.
+
 ## 2. Da confermare
 
-Scelte fatte senza un'indicazione esplicita.
-
-### Messaggi
-
-- **Sample Acquisition prima dei test:** `--check` avvisa se parte prima che i test del
-  campione siano noti. Non è una regola data dall'utente: se lo strumento può riceverla
-  prima, il controllo va tolto.
-- **Status Ready:** riporta `Needle=n`, come Status Error.
-- **Clear All (scene 16):** è senza parametri, ma va a un analizzatore con l'ago 2 ancora
-  al lavoro. Se riguarda solo l'ago 1, forse serve `Needle=1`.
-- **Clear e Cancel:** sono senza `Needle`.
-- **Errore dello strumento:** l'ordine è Status → Sample Complete → OK, quindi a colpo
-  d'occhio l'OK sembra la risposta a Sample Complete. In alternativa
-  Status → OK → Sample Complete.
-- **Assunzioni precedenti:** restano aperte A1–A8 in `PROJECT.md`, sezione 10.
-
-### Scenari
-
-- **Run-away, turnstile (08):** durante lo sgombero C3 si ferma all'antenna ma non riceve
-  il Prepare viola.
-- **Run-away (07, 08, 12, 16):** il Clear All parte quando l'ultimo carrier arriva sulla
-  Main-Lane, non quando esce dal pannello.
-- **Run-away, più aghi (16):** C1 in fuga si ferma comunque al Divert 2, e in quella sosta
-  la scritta RUN-AWAY sparisce per un attimo. Il carrier per l'ago 2 viaggia per secondo,
-  altrimenti si scontra con C1.
-- **Run-away, più aghi (16):** la pit-lane torna grigia quando i suoi carrier l'hanno
-  lasciata, non quando escono da tutta l'interfaccia.
-- **Clear, più aghi (14):** C3 resta circa 3,5 s al Divert 1 in attesa della risposta al
-  Clear.
-
-### Grafica
-
-- **Pit-lane nello spur a due aghi:** i riquadri tratteggiati restano visibili anche
-  quando non sono rossi.
-- **Operatore:** tiene in mano una chiave inglese; per una recovery di laboratorio
-  potrebbe lavorare a mani nude.
-- **Analizzatore dopo la recovery:** resta verde fino alla fine del video.
+Tutte le scelte sui messaggi, sugli scenari e sulla grafica sono state confermate. Restano
+aperte le assunzioni A1–A8 di `PROJECT.md`, sezione 10, tra cui i nomi reali dei messaggi
+verso DMX e l'ordine tra OK e Query.
 
 ## 3. Limiti noti
 

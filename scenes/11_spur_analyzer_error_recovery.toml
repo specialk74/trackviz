@@ -208,6 +208,13 @@ when = "status_ready sent"
 delay = 1.7
 
 [[step]]
+action = "status"
+when = "status_ready sent"
+delay = 3
+device = "analyzer"
+state = "normal"
+
+[[step]]
 action = "move"
 when = "status_ready arrived"
 delay = 1.9

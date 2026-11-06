@@ -213,6 +213,13 @@ delay = 1.7
 carrier = "C1"
 
 [[step]]
+action = "status"
+when = "status_ready sent"
+delay = 3
+device = "analyzer"
+state = "normal"
+
+[[step]]
 action = "caption"
 when = "interface_ok C1 arrived"
 delay = 0.2

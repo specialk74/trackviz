@@ -3,8 +3,8 @@
 # the first one, before the needle goes down, the first carrier runs away and
 # goes back to the Main-Lane; the second slides under the needle and the
 # analyzer aspirates it, believing it is the first. On Sample Complete (with the
-# first SampleId) the interface sends Cancel, sends every carrier away and,
-# once they are all back on the Main-Lane, sends Clear All.
+# first SampleId) the interface sends Cancel, right after the reply sends
+# Clear All, while the carriers are sent away.
 # Carrier flow: right to left, Pit-Lane above the Main-Lane.
 # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
 # Points left of x=30 or right of x=950 are outside the panel (hidden).
@@ -391,11 +391,23 @@ delay = 1.7
 carrier = "C1"
 
 [[step]]
+action = "message"
+type = "clear_all"
+when = "sample_ok C1 arrived"
+delay = 0.1
+
+[[step]]
+action = "message"
+type = "analyzer_ok"
+when = "clear_all sent"
+delay = 1.7
+
+[[step]]
 action = "caption"
 when = "sample_ok C1 arrived"
 delay = 0.2
 title = "6 · All carriers sent away — Clear All"
-text = "The interface sends every carrier away, without sampling. When they are all back on the Main-Lane it sends Clear All (OK). Once they have left the interface, it turns grey again."
+text = "Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away, without sampling. Once they have left the interface, it turns grey again."
 
 [[step]]
 action = "move"
@@ -428,20 +440,9 @@ to = "gone"
 ease = "out"
 
 [[step]]
-action = "message"
-type = "clear_all"
-when = "C3 at merge"
-delay = 0.001
-
-[[step]]
 action = "status"
 when = "clear_all arrived"
 delay = 0.17
 device = "interface"
 state = "normal"
 
-[[step]]
-action = "message"
-type = "analyzer_ok"
-when = "clear_all sent"
-delay = 1.7
