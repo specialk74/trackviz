@@ -12,12 +12,12 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit1,gone
     %% # The real C2: it is not diverted.
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,merge,iface_out,main_out,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 route=spawn,gone color=#0EA5E9
     %% # Where the interface believes C2 is.
-    %% carrier id=C2L sid=SID-000124 route=nsd,pit_in,w1c,w1b,spur_in,w1,d1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 route=nsd,d1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 route=spawn,pit1,gone color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers meant for needle 1 of the analyzer travel on the Main-Lane towards the spur.
     %% at 2.5

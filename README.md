@@ -183,6 +183,28 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
 - a Query sent before the OK to its Prepare or the reply to the previous Query has
   arrived
 
+### Routes
+
+A route lists where the carrier goes: points and lane ids, in order. A lane id stands
+for all its points; between two places the program fills in the way along the lanes
+(in their direction, through a turnstile from `ts.in` to `ts.out`). Two points that no
+lane joins are joined by a straight line.
+
+```
+%% carrier id=C1 sid=SID-000123 route=main_in,pit,main_out
+     -> main_in, nsd, pit_in, sampling, pit_out, merge, main_out
+%% carrier id=C2 sid=SID-000124 route=spawn,gone        (straight on the Main-Lane)
+```
+
+| Geometry | Lanes |
+|---|---|
+| `sampling`, `sampling_queue`, `sampling_queue2` | `main`, `pit` |
+| `turnstile`, `turnstile_queue` | `main`, `pit_entry`, `pit_exit` |
+| `spur` | `main`, `spur` |
+| `spur2` | `main`, `spur`, `pit1` (needle 1), `pit2` (needle 2) |
+
+The layout image shows every point: a route can also name them one by one.
+
 ### Carrier physics
 
 Carriers ride a belt that runs at 17.5 cm/s, 192.5 px/s on screen (a carrier, 4 cm
@@ -258,7 +280,7 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 | `@device` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `@actor` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (this actor gets the "Pipetting" note) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |
-| `@carrier` | `id`, `tube`, `sample_id`, `route` = list of point ids, `start`, `speed` (px/s), `cap_color`, `ghost` (see below), `visible` (default true), `tag` (tag text, default the SampleId) |
+| `@carrier` | `id`, `tube`, `sample_id`, `route` = list of points and lane ids (see Routes), `start`, `speed` (px/s), `cap_color`, `ghost` (see below), `visible` (default true), `tag` (tag text, default the SampleId) |
 | `@step` | `action`, one of `start` / `at` / `after_start` / `after_end` / `when`, `delay`, `duration` + action keys (below) |
 
 ### Steps

@@ -11,8 +11,8 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#0EA5E9
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit1,pit2,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,pit2,gone color=#0EA5E9
 
     %% caption 1 · One analyzer, two sampling points | The spur serves one analyzer with two needles, each on its own pit-lane. Which needles a sample needs depends on its tests: one of them, or both.
     %% at 2.5

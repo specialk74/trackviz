@@ -12,11 +12,11 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#0EA5E9
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#DB2777
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit1,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,pit1,gone color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 route=spawn,pit1,gone color=#DB2777
     %% # The carrier for needle 2 travels second.
-    %% carrier id=C4 sid=SID-000126 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#16A34A
+    %% carrier id=C4 sid=SID-000126 route=spawn,pit2,gone color=#16A34A
 
     %% caption 1 · Four carriers | Three carriers need needle 1, one needs needle 2. Each one gets Prepare when it enters the spur and Prepare again at the divert that sends it to its needle.
     %% at 1

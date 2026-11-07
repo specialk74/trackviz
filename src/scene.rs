@@ -28,6 +28,7 @@ pub enum LaneKind {
 }
 
 pub struct Lane {
+    pub id: String,
     pub label: String,
     pub points: Vec<String>,
     pub kind: LaneKind,
@@ -274,6 +275,110 @@ fn lane_dir(points: &HashMap<String, Point>, lanes: &[Lane], p: (f64, f64)) -> (
     (-1.0, 0.0)
 }
 
+/// The points of each lane in the direction of the carriers, with the points
+/// that lie on its segments (the vertices alone skip queue positions, sampling
+/// points, ...). Generated gate points are left out.
+fn lane_paths(points: &HashMap<String, Point>, lanes: &[Lane]) -> Vec<(String, Vec<String>)> {
+    lanes
+        .iter()
+        .map(|l| {
+            let mut out: Vec<String> = Vec::new();
+            for w in l.points.windows(2) {
+                let (a, b) = (sc_pt(points, &w[0]), sc_pt(points, &w[1]));
+                let len = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+                let mut on: Vec<(f64, &String)> = points
+                    .iter()
+                    .filter(|(id, _)| !id.ends_with(".gate") && **id != w[0] && **id != w[1])
+                    .filter_map(|(id, p)| {
+                        let (ux, uy) = ((b.0 - a.0) / len, (b.1 - a.1) / len);
+                        let along = (p.x - a.0) * ux + (p.y - a.1) * uy;
+                        let off = ((p.x - a.0) * uy - (p.y - a.1) * ux).abs();
+                        (off < 3.0 && along > 0.0 && along < len).then_some((along, id))
+                    })
+                    .collect();
+                on.sort_by(|x, y| x.0.total_cmp(&y.0));
+                if out.last() != Some(&w[0]) {
+                    out.push(w[0].clone());
+                }
+                out.extend(on.into_iter().map(|x| x.1.clone()));
+                out.push(w[1].clone());
+            }
+            (l.id.clone(), out)
+        })
+        .collect()
+}
+
+/// A route as written: points and lane ids, in order. Each lane id stands for its
+/// points; between two consecutive places the shortest way along the lanes (in
+/// their direction, and through a turnstile from "<id>.in" to "<id>.out") is
+/// filled in. "main_in,pit,main_out" is main_in, nsd, pit_in, ..., pit_out, merge,
+/// main_out. Two points that no lane joins are joined by a straight line.
+fn expand_route(written: &[String], points: &HashMap<String, Point>, lanes: &[Lane], devices: &[Device]) -> Result<Vec<String>, String> {
+    let paths = lane_paths(points, lanes);
+    let mut edges: HashMap<&str, Vec<(&str, f64)>> = HashMap::new();
+    let dist = |a: &str, b: &str| {
+        let (p, q) = (sc_pt(points, a), sc_pt(points, b));
+        ((p.0 - q.0).powi(2) + (p.1 - q.1).powi(2)).sqrt()
+    };
+    for (_, path) in &paths {
+        for w in path.windows(2) {
+            edges.entry(w[0].as_str()).or_default().push((w[1].as_str(), dist(&w[0], &w[1])));
+        }
+    }
+    let wheels: Vec<(String, String)> = devices.iter().filter(|d| d.kind == DeviceKind::Turnstile).map(|d| (format!("{}.in", d.id), format!("{}.out", d.id))).collect();
+    for (i, o) in &wheels {
+        edges.entry(i.as_str()).or_default().push((o.as_str(), 0.0));
+    }
+    // Shortest way from a to b along the lanes (Dijkstra; the graphs are small).
+    let way = |a: &str, b: &str| -> Option<Vec<String>> {
+        let mut best: HashMap<&str, (f64, Option<&str>)> = HashMap::from([(a, (0.0, None))]);
+        let mut open = vec![a];
+        while let Some(k) = (0..open.len()).min_by(|&x, &y| best[open[x]].0.total_cmp(&best[open[y]].0)) {
+            let n = open.swap_remove(k);
+            if n == b {
+                let mut out = vec![b.to_string()];
+                let mut cur = b;
+                while let Some(prev) = best[cur].1 {
+                    out.push(prev.to_string());
+                    cur = prev;
+                }
+                out.reverse();
+                return Some(out);
+            }
+            let d = best[n].0;
+            for &(m, w) in edges.get(n).map_or(&[][..], |v| v.as_slice()) {
+                if best.get(m).is_none_or(|x| d + w < x.0 - 1e-9) {
+                    best.insert(m, (d + w, Some(n)));
+                    open.push(m);
+                }
+            }
+        }
+        None
+    };
+    let mut route: Vec<String> = Vec::new();
+    for tok in written {
+        let places: Vec<String> = if points.contains_key(tok) {
+            vec![tok.clone()]
+        } else if let Some((_, p)) = paths.iter().find(|(id, _)| id == tok) {
+            p.clone()
+        } else {
+            return Err(format!("route: '{tok}' is neither a point nor a lane"));
+        };
+        for p in places {
+            match route.last() {
+                None => route.push(p),
+                Some(last) if *last == p => {}
+                // No lane between them: straight from one to the other.
+                Some(last) => match way(last, &p) {
+                    Some(w) => route.extend(w.into_iter().skip(1)),
+                    None => route.push(p),
+                },
+            }
+        }
+    }
+    Ok(route)
+}
+
 fn arr<'a>(doc: &'a Doc, name: &str) -> &'a [Table] {
     doc.arrays.get(name).map(|v| v.as_slice()).unwrap_or(&[])
 }
@@ -439,7 +544,7 @@ impl Scene {
                 (Some(x), Some(y)) => Some((x, y)),
                 _ => None,
             };
-            lanes.push(Lane { label: t.str_opt("label")?.unwrap_or_default(), points: pts, kind, label_pos });
+            lanes.push(Lane { id: t.str_opt("id")?.unwrap_or_default(), label: t.str_opt("label")?.unwrap_or_default(), points: pts, kind, label_pos });
         }
 
         let mut actors = Vec::new();
@@ -457,10 +562,7 @@ impl Scene {
         let mut carriers = Vec::new();
         for t in arr(doc, "carrier") {
             t.check_keys(&["id", "tube", "sample_id", "route", "start", "speed", "cap_color", "ghost", "visible", "tag"])?;
-            let route = t.str_list("route")?;
-            for p in &route {
-                need_point(p, t)?;
-            }
+            let route = expand_route(&t.str_list("route")?, &points, &lanes, &devices).map_err(|e| format!("{}: {e}", t.location()))?;
             let start = t.str_opt("start")?.unwrap_or_else(|| route[0].clone());
             if !route.contains(&start) {
                 return Err(format!("{}: start point '{start}' is not on the route", t.location()));

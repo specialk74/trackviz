@@ -16,12 +16,12 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,merge,main_out,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 route=spawn,gone color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the Pit-Lane, up to the antenna.
-    %% carrier id=C2L sid=SID-000124 route=nsd,pit_in,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 route=nsd,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 route=spawn,pit_entry,pit_exit,gone color=#DB2777
 
     %% caption 1 · Turnstile with gate and antenna | Three carriers holding sample tubes travel towards the interface. Every carrier diverted into the Pit-Lane stops at the antenna in front of the gate and the turnstile.
     %% at 2.6

@@ -16,9 +16,9 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,pit_q,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,pit_in,pit_q,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#0EA5E9
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,pit_q,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#DB2777
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,pit_entry,pit_exit,gone color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 route=spawn,pit_entry,pit_exit,gone color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the Pit-Lane, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
     %% at 2.26

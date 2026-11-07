@@ -13,9 +13,9 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone color=#0EA5E9
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone color=#DB2777
+    %% carrier id=C1 sid=SID-000123 route=main_in,spur,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,spur,gone color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 route=spawn,spur,gone color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the spur, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
     %% at 2.2

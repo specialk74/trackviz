@@ -13,12 +13,12 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,spur,gone
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,merge,iface_out,main_out,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 route=spawn,gone color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the spur.
-    %% carrier id=C2L sid=SID-000124 route=nsd,pit_in,spur_in,queue2,queue,sampling color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 route=nsd,sampling color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 route=spawn,spur,gone color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes travel on the Main-Lane towards the spur of the analyzer interface.
     %% at 2.2

@@ -156,6 +156,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **`pass <device>`:** il carrier fermo sul punto del device in quel momento (fantasmi e carrier nella ruota esclusi) riparte e il nastro lo porta alla prossima fermata della sua route (antenna con gate, ingresso di un tornello) o alla fine; nessun carrier fermo lì è un errore. È un `move` calcolato (`Scene::pass_move`), quindi vale la fisica. Le scene lo usano ogni volta che un carrier riparte da un gate; i `move` restano per le partenze, i run-away, i fantasmi e l'uscita dalla ruota. Nello spur2 i due move "fino all'NSD" e "dall'NSD al divert" sono diventati uno solo (l'NSD non ferma i carrier).
 
+**Route:** una route elenca tappe, punti o id di corsie. Un id di corsia vale tutti i suoi punti, compresi quelli che cadono sui suoi segmenti (code, punti di campionamento: `lane_paths`); tra due tappe il programma completa il percorso più breve lungo le corsie, nel loro verso, attraversando un tornello da `<id>.in` a `<id>.out` (`expand_route`). Due punti che nessuna corsia collega sono uniti in linea retta (come prima). Le scene usano la forma corta: `main_in,pit,main_out`, `spawn,pit_entry,pit_exit,gone`, `spawn,pit1,gone`, `spawn,gone`.
+
 **Nastro:** 17,5 cm/s; un carrier largo 4 cm è disegnato largo 44 px (11 px/cm), quindi 192,5 px/s (`BELT_SPEED`). Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
@@ -276,7 +278,7 @@ Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse ta
 | `@device` | `id`, `kind` = nsd\|sampling\|divert\|antenna (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta o, per un'antenna, il lettore; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `@actor` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |
-| `@carrier` | `id`, `tube` (true), `sample_id`, `route` = lista di id, `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
+| `@carrier` | `id`, `tube` (true), `sample_id`, `route` = punti e id di corsie (vedi sotto), `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
 | `@step` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `when` = `<carrier> at <punto>` e le altre cause, `delay`, `duration` + le chiavi specifiche dell'azione |
 
 | action | Chiavi specifiche |

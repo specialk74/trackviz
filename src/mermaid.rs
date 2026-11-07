@@ -897,6 +897,21 @@ mod tests {
     }
 
     #[test]
+    fn a_route_names_lanes_and_the_way_between_is_filled_in() {
+        let route = |r: &str| {
+            let d = doc(&format!("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 route={r}\n%% caption a | b\n")).unwrap();
+            build(&d).0.carriers[0].route.join(",")
+        };
+        assert_eq!(route("main_in,pit,main_out"), "main_in,nsd,pit_in,sampling,pit_out,merge,main_out");
+        // Points on a segment of a lane are part of the way.
+        assert_eq!(route("main_in,sampling"), "main_in,nsd,pit_in,sampling");
+        assert_eq!(route("main_in,main_out"), "main_in,nsd,merge,main_out");
+        let d = doc("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 route=main_in,pitt,main_out\n%% caption a | b\n").unwrap();
+        let e = Scene::from_doc(&d).err().unwrap();
+        assert!(e.contains("'pitt' is neither a point nor a lane"), "{e}");
+    }
+
+    #[test]
     fn every_default_route_exists() {
         for (g, needle) in [("sampling", "1"), ("turnstile", "1"), ("spur", "1"), ("spur2", "1"), ("spur2", "2"), ("spur2", "both")] {
             let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle={needle}\n%% carrier id=C2 sid=SID-2 needle={needle}\n%% move C1 to merge\n");
