@@ -160,6 +160,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Capienza della pit-lane:** `capacity=N` sulla corsia, nella geometria (nessun valore = nessun limite). Un carrier conta da quando lascia la Main-Lane a quando ci rientra; i fantasmi non contano. Dopo aver calcolato la timeline, `Scene::overflow` cerca il primo carrier che troverebbe la corsia piena; `Scene::with_straight` rifà la scena con quel carrier dritto sulla Main-Lane fino alla fine della sua route e senza i suoi step dopo la deviazione (move oltre quel punto, messaggi, pipette del suo `sid`, step legati al suo arrivo alla deviazione o a punti dove non passa più, e a cascata quelli che partivano da questi; un `pass` che non trova nessuno è saltato). Si ripete finché nessuna corsia supera la sua capienza; `--check` scrive in testa "C3 goes straight on: its pit-lane is full". Attenzione: anche step generali (per esempio l'interfaccia che torna grigia quando l'ultimo carrier esce) possono essere saltati se erano legati a quel carrier.
 
+**Accensione automatica:** quando un'antenna visibile legge un carrier (fermo o in transito; non fantasmi né nascosti), il device su cui sta (NSD, divert, oppure l'antenna stessa se è da sola, come davanti al tornello) resta acceso finché il carrier è sull'antenna, almeno 1 s (`READ_LIGHT`): all'NSD, dove il carrier passa senza fermarsi, dura il minimo; davanti al tornello dura tutta l'attesa al gate. I punti di campionamento non si accendono. Le scene non hanno più gli `highlight` di NSD, divert e antenna 2 (66 righe tolte); `highlight` resta per i casi particolari (il tornello nella 08). `--check` li elenca come "highlight nsd (C1 read by antenna1)".
+
 **Nastro:** 17,5 cm/s; un carrier largo 4 cm è disegnato largo 44 px (11 px/cm), quindi 192,5 px/s (`BELT_SPEED`). Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
@@ -290,7 +292,7 @@ Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse ta
 | `message` | `type`, `carrier`, `needle`; oppure, senza `type`: `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `needle`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
 | `pipette` | `device` sampling o turnstile, `sample_id`, `note` (aggiunge la nota "Pipetting Analyzer - SampleId=…") |
-| `highlight` | `device` |
+| `highlight` | `device` (l'NSD, i divert e le antenne da sole si accendono da sole quando l'antenna legge un carrier) |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |
 | `status` | `device` (analyzer, zone o sampling = un solo ago), `state` = error\|ready\|normal (vale fino al `status` successivo) |

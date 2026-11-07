@@ -85,6 +85,9 @@ pub struct Device {
 /// drawn 44 px wide (11 px/cm).
 pub const BELT_SPEED: f64 = 17.5 * 2.0 * CARRIER_R / 4.0;
 
+/// Shortest time (s) a device stays lit when its antenna reads a carrier.
+pub const READ_LIGHT: f64 = 1.0;
+
 /// A gate opens (or closes) in this time (s): it lets one carrier through.
 pub const GATE_TIME: f64 = 0.22;
 
@@ -1690,6 +1693,34 @@ impl Timeline {
                         if m.t0 > a - 1e-9 && m.t0 < b - 1e-9 && ((at.0 - p.0).powi(2) + (at.1 - p.1).powi(2)).sqrt() < 3.0 {
                             return Err(format!("carrier '{}' leaves '{}' at {:.2}s while the needle is down ({a:.2}s - {b:.2}s)", sc.carriers[ci].id, d.id, m.t0));
                         }
+                    }
+                }
+            }
+        }
+
+        // A device lights up while its antenna reads a carrier: from when the
+        // carrier gets on the antenna until it leaves it, at least READ_LIGHT
+        // seconds (a carrier passing the NSD is read in a moment). The NSD and the
+        // diverts carrying the antenna light up, or an antenna on its own. Ghosts
+        // and hidden carriers are not read; sampling points don't light up.
+        for (ai, d) in sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Antenna && d.visible) {
+            let target = match &d.part_of {
+                Some(p) => match sc.devices.iter().position(|x| x.id == *p) {
+                    Some(pi) if matches!(sc.devices[pi].kind, DeviceKind::Nsd | DeviceKind::Divert) => pi,
+                    _ => continue,
+                },
+                None => ai,
+            };
+            let at = d.at.as_deref().unwrap_or_default();
+            for (ci, c) in sc.carriers.iter().enumerate().filter(|(_, c)| !c.ghost) {
+                let path = &carriers[ci];
+                let start = c.route.iter().position(|p| *p == c.start).unwrap_or(0);
+                for (k, _) in c.route.iter().enumerate().filter(|(k, p)| p.as_str() == at && *k != start) {
+                    if let Some(t0) = path.reaches(path.cum[k]).filter(|&t0| path.opacity(t0) > 0.0) {
+                        let off = path.reaches(path.cum[k] + 1.0).unwrap_or(max_end);
+                        let t1 = off.max(t0 + READ_LIGHT);
+                        log.push(format!("{t0:7.2}s - {t1:7.2}s  highlight {}  ({} read by {})", sc.devices[target].id, c.id, d.id));
+                        events.push(Timed { t0, t1, ev: Ev::Highlight { device: target } });
                     }
                 }
             }

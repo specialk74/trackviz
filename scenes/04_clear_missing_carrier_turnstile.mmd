@@ -28,14 +28,10 @@ sequenceDiagram
     %% move C1 to pit_wait
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The first carrier is diverted without stopping (Prepare) and read at the antenna (Prepare again). Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
-    %% on antenna1 C1
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% after 0.5 antenna2 C1
-    %% highlight antenna2 duration=1.5
     %% after 0.5 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
@@ -63,8 +59,6 @@ sequenceDiagram
     %% on antenna1 C2
     %% caption 4 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
     %% on antenna1 C2
-    %% highlight nsd duration=2
-    %% on antenna1 C2
     %% show C2L duration=0.4
     %% on antenna1 C2
     %% move C2L to pit_wait
@@ -79,14 +73,10 @@ sequenceDiagram
     %% move C3 to pit_wait
     %% on antenna1 C3
     %% caption 5 · Third carrier — Clear | The third carrier is diverted (Prepare) and stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
-    %% on antenna1 C3
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
     %% after 0.1 OK C2
     AN->>DMX: Query SampleId=SID-000124
-    %% on antenna2 C3
-    %% highlight antenna2 duration=1.5
     %% after 0.1 Prepare C3
     AN-->>IF: OK SampleId=SID-000125
     %% after 0.2 antenna2 C3

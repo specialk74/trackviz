@@ -23,15 +23,8 @@ Deciso con l'utente, a tappe:
 
 ## 1. Miglioramenti proposti, non ancora fatti
 
-Le voci 1.1–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
-consegnarle. Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
-
-### 1.1 Highlight agganciato all'evento
-
-59 `highlight` su 66 erano a ridosso di un messaggio (circa 350 righe).
-
-- Una chiave sullo step, `highlight = "nsd"`, al posto di uno step separato.
-- In alternativa il riquadro dell'NSD si accende da solo al passaggio del carrier.
+Le voci 1.2–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
+consegnarle (la 1.1, highlight automatico, è fatta). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
 ### 1.2 Scheletro di una nuova scena
 
@@ -105,7 +98,11 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 ## 5. Già realizzati
 
-Parti comuni con `include`, messaggi con nome e `{Needle}`, nota "Pipetting" automatica,
-tempi legati agli eventi con `when`, scene come catena di cause, righe del diagramma in
-ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly,
-anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), scene scritte in Mermaid con parti comuni.
+Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi con nome e
+`{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
+carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass`,
+route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
+accensione automatica dei device letti dalle antenne, immagine di layout (`--layout`),
+avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
+ordine, Query), più scene in parallelo con i caratteri jolly, anteprima veloce
+(`--preview`, `--from`, `--to`, `--watch`).

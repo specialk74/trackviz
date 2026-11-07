@@ -24,16 +24,10 @@ sequenceDiagram
     %% move C1 to d1
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare | The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer.
-    %% on antenna1 C1
-    %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% after 0 Prepare C1
-    %% highlight nsd duration=1.6
     %% at 4.6
     %% move C2 to gone
-    %% on antenna2 C1
-    %% highlight div1 duration=0.6
     %% after 0.1 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
@@ -60,8 +54,6 @@ sequenceDiagram
     IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
     %% at 7.6
     %% move C3 to d1
-    %% on antenna1 C3
-    %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
     %% after 0.2 Query C1
@@ -77,8 +69,6 @@ sequenceDiagram
     %% pipette sp1 duration=6.6 sid=SID-000123
     %% on antenna2 C3
     %% caption 4 · Read at the divert — Clear | The third carrier stops at the divert on top of the second one, which is not there. It reads the third sample instead of the second: the interface sends Clear for the second.
-    %% on antenna2 C3
-    %% highlight div1 duration=0.6
     %% after 0.195 antenna2 C3
     IF->>AN: Clear SampleId=SID-000124
     %% after 0.6 antenna2 C3
@@ -112,8 +102,6 @@ sequenceDiagram
     %% move C3 to s1
     %% after 0.2 antenna3 C3
     IF->>AN: Sample Acquisition SampleId=SID-000125 Needle=1
-    %% on antenna4 C1
-    %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C1
     %% pass div2
     %% after 0.1 Sample Acquisition C3
@@ -134,8 +122,6 @@ sequenceDiagram
     %% for C3
     IF-->>AN: OK
     %% pass sp1
-    %% on antenna4 C3
-    %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C3
     %% pass div2
     %% on antenna6

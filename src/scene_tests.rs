@@ -366,6 +366,22 @@ fn a_carrier_that_finds_its_pit_lane_full_goes_straight_on() {
     assert_eq!(tl.events.iter().filter(|e| matches!(&e.ev, Ev::Message { .. })).count(), 2);
 }
 
+#[test]
+fn a_device_lights_up_when_its_antenna_reads_a_carrier() {
+    let base = SAMPLING.replace("%% @device id=nsd kind=nsd at=b\n", "%% @device id=nsd kind=nsd at=b antenna=ant1\n");
+    let (sc, tl) = ok(&base, "\n%% @step action=move ease=linear carrier=C1 to=c \n%% @step action=move ease=linear carrier=G to=c ");
+    let nsd = sc.devices.iter().position(|d| d.id == "nsd").unwrap();
+    let lit: Vec<(f64, f64)> = tl.events.iter().filter(|e| matches!(e.ev, Ev::Highlight { device } if device == nsd)).map(|e| (e.t0, e.t1)).collect();
+    // C1 passes b (150 px at 75 px/s) without stopping: lit for the shortest time.
+    // The ghost G is not read.
+    assert_eq!(lit.len(), 1, "{lit:?}");
+    assert!((lit[0].0 - 2.0).abs() < 1e-6 && (lit[0].1 - 2.0 - READ_LIGHT).abs() < 1e-6, "{lit:?}");
+    // A carrier that stops on the antenna keeps it lit until it leaves.
+    let (_, tl) = ok(&base, "\n%% @step action=move ease=linear carrier=C1 to=b \n%% @step action=move at=6 ease=linear carrier=C1 to=c ");
+    let e = tl.events.iter().find(|e| matches!(e.ev, Ev::Highlight { device } if device == nsd)).unwrap();
+    assert!((e.t0 - 2.0).abs() < 1e-6 && (e.t1 - 6.0).abs() < 0.02, "{} {}", e.t0, e.t1);
+}
+
 // ------------------------------------------------------------ turnstile
 
 const C1_IN: &str = "\n%% @step action=move carrier=C1 to=ts.in ";

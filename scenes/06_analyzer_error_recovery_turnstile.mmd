@@ -19,14 +19,10 @@ sequenceDiagram
     %% move C1 to pit_wait
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The carrier is diverted without stopping (Prepare) and read at the antenna (Prepare again). Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
-    %% on antenna1 C1
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% after 0.5 antenna2 C1
-    %% highlight antenna2 duration=1.5
     %% after 0.5 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123

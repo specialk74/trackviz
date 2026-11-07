@@ -25,8 +25,6 @@ sequenceDiagram
     %% move C1 to sampling
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The first carrier is diverted into the spur without stopping (Prepare) and stopped by the gate on the sampling point: Sample Acquisition, then the analyzer aspirates.
-    %% on antenna1 C1
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
@@ -41,8 +39,6 @@ sequenceDiagram
     %% # C2 reaches the NSD: logically diverted (ghost appears), physically straight on.
     %% on antenna1 C2
     %% caption 3 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
-    %% on antenna1 C2
-    %% highlight nsd duration=2
     %% on antenna1 C2
     %% show C2L duration=0.4
     %% on antenna1 C2
@@ -63,8 +59,6 @@ sequenceDiagram
     %% pipette sp duration=5 sid=SID-000123
     %% on antenna1 C3
     %% caption 4 · Third carrier — one position, two carriers | The third carrier is diverted (Prepare) and stops in the queue on the same position as the second one: the second is not physically there, it went straight on along the Main-Lane.
-    %% on antenna1 C3
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
     %% after 0.1 OK C2

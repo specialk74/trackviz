@@ -26,14 +26,10 @@ sequenceDiagram
 
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The first carrier is diverted into the Pit-Lane without stopping: Prepare. The gate stops it on the antenna, which reads it: the interface sends Prepare again. Nothing is being sampled, so the gate will open.
-    %% on antenna1 C1
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% after 0.5 antenna2 C1
-    %% highlight antenna2 duration=1.5
     %% after 0.5 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
@@ -52,14 +48,10 @@ sequenceDiagram
     %% after 0.972 OK C1
     %% caption 3 · Rotation — Sample Acquisition | With the carrier in the entry position the wheel rotates it under the needle: Sample Acquisition and aspiration. Meanwhile the second carrier is diverted, read at the antenna and held by the gate.
     %% rotate ts
-    %% on antenna1 C2
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.1
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.5 antenna2 C2
-    %% highlight antenna2 duration=1.5
     %% after 0.5 antenna2 C2
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
@@ -84,8 +76,6 @@ sequenceDiagram
     AN->>IF: Sample Complete SampleId=SID-000123
     %% at 20.3
     %% move C3 to pit_wait
-    %% on antenna1 C3
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
     %% after 0.1 Sample Complete C1
@@ -95,8 +85,6 @@ sequenceDiagram
     AN-->>IF: OK SampleId=SID-000125
     %% after 0.1 OK C1
     %% pass antenna2
-    %% after 0.5 antenna2 C3
-    %% highlight antenna2 duration=1.5
     %% after 0.5 antenna2 C3
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000125

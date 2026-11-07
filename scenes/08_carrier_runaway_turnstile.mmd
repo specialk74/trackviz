@@ -23,12 +23,8 @@ sequenceDiagram
     %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the Pit-Lane, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
     %% at 2.26
     %% move C1 to pit_wait
-    %% on antenna1 C1
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna2 C1
-    %% highlight antenna2 duration=1.5
     %% after 0.097 Prepare C1
     AN-->>IF: OK SampleId=SID-000123
     %% after 0.2 antenna2 C1
@@ -43,16 +39,12 @@ sequenceDiagram
     AN->>DMX: Query SampleId=SID-000123
     %% at 6.97
     %% move C2 to pit_wait
-    %% on antenna1 C2
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
     %% after 3.927 antenna2 C1
     %% rotate ts
     %% after 1.03 Query C1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% on antenna2 C2
-    %% highlight antenna2 duration=1.5
     %% after 0.097 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
     %% after 0.2 antenna2 C2
@@ -62,8 +54,6 @@ sequenceDiagram
     %% move C3 to pit_q
     %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% on antenna1 C3
-    %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
     %% after 0.1 OK C2

@@ -334,7 +334,7 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `message` | `type` (a named message), `carrier`, `needle`; or, without `type`: `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `needle`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
 | `pipette` | `device` (a `sampling` or `turnstile` device), `sample_id`, `note`. Also adds a note on the `analyzer` actor, with the same timing: "Pipetting Analyzer - SampleId=SID-000123" ("· Needle n" when there are several sampling points). The SampleId is the one written on the directive, `%% pipette sp duration=4.5 sid=SID-000123`; without it the note has none. A `Note over AN: ...` written right after the `pipette` in the diagram replaces this text | 3 s |
-| `highlight` | `device` | 1.5 s |
+| `highlight` | `device`. Not needed when an antenna reads a carrier: the NSD, a divert or an antenna on its own light up by themselves while the carrier is on the antenna, at least 1 s; ghosts and hidden carriers are not read, sampling points don't light up | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
 | `status` | `device` (an `analyzer`, a `zone`, or a `sampling` device for one needle), `state` = `error` (red; ERROR badge on an analyzer) \| `ready` (green) \| `normal` (grey); lasts until the next `status` | 0 s |
