@@ -3,6 +3,7 @@
 //! Usage:
 //!   trackviz <scene.mmd>... [-o out.mp4] [-j jobs]   (default: out/<scene name>.mp4)
 //!   trackviz <scene.mmd> --still <seconds> [-o frame.png]
+//!   trackviz <scene.mmd>... --layout      (only out/<scene name>_layout.png: points and devices)
 //!   trackviz <scene.mmd>... --check         (validate + print the timeline)
 //!   trackviz <scene.mmd> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
 //!   trackviz <scene.mmd> --preview --watch  (regenerate when the scene or a file it uses changes)
@@ -39,13 +40,15 @@ fn usage() -> String {
         "trackviz {VERSION}\n\
          {REPOSITORY}\n\
          usage: trackviz <scene.mmd>... [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
-         \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch]\n\
+         \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch] [--layout]\n\
          \x20 a scene is a Mermaid diagram with %% directives; its common/ folder is next to it or in scenes/\n\
          \x20 scene files may use the wildcards * and ? (e.g. \"scenes/*.mmd\"): they are rendered in parallel\n\
          \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)\n\
          \x20 --from/--to render only that part, --preview at half size and 15 fps: both write\n\
          \x20 out/<scene name>_preview.mp4, so the full video is kept\n\
-         \x20 --watch repeats the command when the scene or a file it uses changes (one scene)"
+         \x20 --watch repeats the command when the scene or a file it uses changes (one scene)\n\
+         \x20 a full video also writes out/<scene name>_layout.png: the names of the points and devices\n\
+         \x20 --layout writes only that image, without the video"
     )
 }
 
@@ -205,6 +208,10 @@ fn plan(video: &scene::Video, duration: f64, opts: VideoOpts) -> Result<Plan, St
 
 /// Renders one scene to a video with `jobs` threads.
 fn render_video(sc: &scene::Scene, tl: &scene::Timeline, out: &str, opts: VideoOpts, jobs: usize, opt: &usvg::Options, progress: bool) -> Result<(), String> {
+    // A full video comes with its layout image: where the points and devices are.
+    if !opts.partial() {
+        write_layout(sc, tl, &layout_path(out))?;
+    }
     let Plan { w, h, fps, start, frames: n } = plan(&sc.video, tl.duration, opts)?;
     let mut ff = Command::new("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba"])
@@ -328,6 +335,7 @@ fn run() -> Result<(), String> {
     let mut out = None;
     let mut still: Option<f64> = None;
     let mut svg_out = false;
+    let mut layout = false;
     let mut check = false;
     let mut watch = false;
     let mut opts = VideoOpts::default();
@@ -359,6 +367,7 @@ fn run() -> Result<(), String> {
             "--watch" => watch = true,
             "--svg" => svg_out = true,
             "--check" => check = true,
+            "--layout" => layout = true,
             "-h" | "--help" => {
                 println!("{}", usage());
                 return Ok(());
@@ -379,13 +388,16 @@ fn run() -> Result<(), String> {
             }
         }
     }
+    if layout && (check || still.is_some() || opts.partial()) {
+        return Err("--layout writes only the layout image: not with --check, --still, --from, --to or --preview".into());
+    }
     if files.len() > 1 && (out.is_some() || still.is_some() || watch) {
         return Err(format!("-o, --still and --watch take a single scene, but {} were given", files.len()));
     }
     if opts.partial() && (check || still.is_some()) {
         return Err("--from, --to and --preview are for videos: not with --check or --still".into());
     }
-    let job = Job { out, still, svg_out, check, jobs: jobs.max(1), opts };
+    let job = Job { out, still, layout, svg_out, check, jobs: jobs.max(1), opts };
     if watch {
         watch_scene(&files[0], &job);
     }
@@ -396,6 +408,8 @@ fn run() -> Result<(), String> {
 struct Job {
     out: Option<String>,
     still: Option<f64>,
+    /// Only the layout image (`--layout`).
+    layout: bool,
     svg_out: bool,
     check: bool,
     jobs: usize,
@@ -412,6 +426,27 @@ impl Job {
                 }
                 match load(f) {
                     Ok((sc, tl)) => eprint!("{}", timeline_text(&sc, &tl)),
+                    Err(e) if files.len() == 1 => return Err(e),
+                    Err(e) => failures.push(e),
+                }
+            }
+            return report_failures(failures, files.len());
+        }
+        if self.layout {
+            let mut failures = Vec::new();
+            for f in files {
+                let res = load(f).and_then(|(sc, tl)| {
+                    let path = match &self.out {
+                        Some(o) => o.clone(),
+                        None => {
+                            std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
+                            layout_path(&default_out(f, VideoOpts::default()))
+                        }
+                    };
+                    write_layout(&sc, &tl, &path)
+                });
+                match res {
+                    Ok(()) => {}
                     Err(e) if files.len() == 1 => return Err(e),
                     Err(e) => failures.push(e),
                 }
@@ -449,6 +484,21 @@ impl Job {
         eprintln!("wrote {out}");
         Ok(())
     }
+}
+
+/// The layout image next to a video: out/a.mp4 -> out/a_layout.png.
+fn layout_path(video: &str) -> String {
+    let stem = video.strip_suffix(".mp4").unwrap_or(video);
+    format!("{stem}_layout.png")
+}
+
+/// Writes the overview of the points and devices of a scene as a PNG.
+fn write_layout(sc: &scene::Scene, tl: &scene::Timeline, path: &str) -> Result<(), String> {
+    let svg = render::layout(sc, tl);
+    let png = rasterize(&raster_options(), &svg, sc.video.width, sc.video.height)?.encode_png().map_err(|e| e.to_string())?;
+    std::fs::write(path, png).map_err(|e| format!("{path}: {e}"))?;
+    eprintln!("wrote {path}");
+    Ok(())
 }
 
 /// Modification times of the scene and of everything it includes.

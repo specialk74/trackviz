@@ -39,12 +39,11 @@
 
 %% @device id=analyzer kind=analyzer label=Analyzer x=730 y=330 w=200 h=220
 
-%% @device id=nsd kind=nsd at=nsd
+%% @device id=nsd kind=nsd at=nsd antenna=antenna1
 
-%% @device id=sp kind=sampling at=sampling label="Sampling point" label_x=560 label_y=396
+%% @device id=sp kind=sampling at=sampling antenna=antenna2 gate=true label="Sampling point" label_x=560 label_y=396
 %% # Antennas on the lanes: a step can start when a carrier is over one (%% on antennaN).
-%% # gate=true: a gate holds the carrier on the antenna (the belt never stops);
-%% # visible=false: a trigger only (the last one, where the carrier has left the module).
-%% @device id=antenna1 kind=antenna at=nsd
-%% @device id=antenna2 kind=antenna at=sampling gate=true
-%% @device id=antenna3 kind=antenna at=iface_out visible=false
+%% # antenna= on a device puts one on its point; gate=true: a gate holds the carrier
+%% # on the antenna (the belt never stops);
+%% # visible=false: a trigger only (the last one, at the end of the pit-lane: Release).
+%% @device id=antenna3 kind=antenna at=pit_out visible=false

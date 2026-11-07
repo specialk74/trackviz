@@ -43,18 +43,16 @@ sequenceDiagram
     %% for C1
     IF-->>AN: OK
     %% after 0.1
-    %% caption 5 · Carrier released | The interface opens the gate: the carrier leaves the Pit-Lane and heads back to the Main-Lane.
+    %% caption 5 · Carrier released — Release | The interface opens the gate and the carrier leaves the sampling point. Before it reaches the Main-Lane the interface sends Release: the sample has left the analyzer interface.
     %% after 0.1 OK C1
     %% move C1 to main_out
-    %% on antenna3 C1
-    %% caption 6 · Release | As soon as the carrier with the tube has left the interface module, the interface sends Release: the sample has left the analyzer interface.
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1
     AN-->>IF: OK
     %% after 0.5
-    %% caption 7 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% caption 6 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
     %% after 0.3
     %% duration 1.5
     Note over AN: Analysis

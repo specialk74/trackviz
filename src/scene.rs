@@ -67,11 +67,17 @@ pub struct Device {
     pub label_pos: Option<(f64, f64)>,
     /// Drawn (an antenna can be a trigger only).
     pub visible: bool,
+    /// For an antenna or a gate declared on another device (`antenna=`, `gate=`):
+    /// that device. In the layout they are named together, e.g. sp.antenna2.gate.
+    pub part_of: Option<String>,
 }
 
 /// Speed of the belt under the carriers: 17.5 cm/s, with a carrier 4 cm wide
 /// drawn 44 px wide (11 px/cm).
 pub const BELT_SPEED: f64 = 17.5 * 2.0 * CARRIER_R / 4.0;
+
+/// A gate opens (or closes) in this time (s): it lets one carrier through.
+pub const GATE_TIME: f64 = 0.22;
 
 /// Turnstile: distance from the pocket centers to the rim of the wheel.
 pub const TS_RIM: f64 = 32.0;
@@ -151,7 +157,8 @@ pub enum Action {
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
     Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
-    Pipette { device: String },
+    /// `note`: the text of the note on the analyzer, if the diagram gives it.
+    Pipette { device: String, note: Option<String> },
     Highlight { device: String },
     Rotate { device: String },
     /// Fades a carrier in (`show`) or out (`hide`).
@@ -276,7 +283,7 @@ impl Scene {
         }
         for k in doc.arrays.keys() {
             if !["point", "lane", "device", "actor", "carrier", "message", "step"].contains(&k.as_str()) {
-                return Err(format!("unknown section [[{k}]]"));
+                return Err(format!("unknown section @{k}"));
             }
         }
         // Included files make it easy to define the same thing twice.
@@ -342,8 +349,14 @@ impl Scene {
                         if t.bool_opt("gate")?.unwrap_or(false) {
                             gated.push(devices.len());
                         }
-                    } else {
+                    } else if kind == DeviceKind::Gate {
                         t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y"])?;
+                    } else {
+                        // nsd, sampling, divert: an antenna on the same point, and its gate.
+                        t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y", "antenna", "gate"])?;
+                        if t.bool_opt("gate")?.is_some() && t.str_opt("antenna")?.is_none() {
+                            return Err(format!("{}: gate= needs antenna=: the gate holds the carrier on the antenna", t.location()));
+                        }
                     }
                     let a = t.str_req("at")?;
                     if !points.contains_key(&a) {
@@ -382,7 +395,16 @@ impl Scene {
                 _ => return Err(format!("{}: give both label_x and label_y", t.location())),
             };
             let visible = t.bool_opt("visible")?.unwrap_or(true);
-            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos, visible });
+            let antenna = if matches!(kind, DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Divert) { t.str_opt("antenna")? } else { None };
+            let gate = t.bool_opt("gate")?.unwrap_or(false);
+            let point = at.clone();
+            devices.push(Device { id: id.clone(), kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos, visible, part_of: None });
+            if let Some(aid) = antenna {
+                if gate {
+                    gated.push(devices.len());
+                }
+                devices.push(Device { id: aid, kind: DeviceKind::Antenna, at: point, rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true, part_of: Some(id) });
+            }
         }
 
         let need_point = |id: &str, t: &Table| -> Result<(), String> {
@@ -473,7 +495,7 @@ impl Scene {
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
-                "pipette" => &["device"],
+                "pipette" => &["device", "note"],
                 "highlight" => &["device"],
                 "rotate" => &["device"],
                 "show" | "hide" => &["carrier"],
@@ -520,7 +542,7 @@ impl Scene {
                     }
                 }
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
-                "pipette" => Action::Pipette { device: t.str_req("device")? },
+                "pipette" => Action::Pipette { device: t.str_req("device")?, note: t.str_opt("note")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
                 "rotate" => Action::Rotate { device: t.str_req("device")? },
                 "show" | "hide" => Action::Visibility { carrier: t.str_req("carrier")?, show: action_name == "show" },
@@ -595,7 +617,7 @@ impl Scene {
             });
         }
         if steps.is_empty() {
-            return Err("the scene has no [[step]] entries".into());
+            return Err("the scene has no steps".into());
         }
         // The gate of an antenna: across the lane, just in front of a carrier
         // standing on the antenna ("<antenna>.gate", a point and a device).
@@ -605,7 +627,8 @@ impl Scene {
             let id = format!("{}.gate", devices[di].id);
             let ahead = CARRIER_R + 6.0;
             points.insert(id.clone(), Point { x: a.0 + dx * ahead, y: a.1 + dy * ahead });
-            devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true });
+            let part_of = Some(devices[di].part_of.clone().unwrap_or_else(|| devices[di].id.clone()));
+            devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true, part_of });
         }
         Ok(Scene { video, points, lanes, devices, actors, carriers, steps })
     }
@@ -645,13 +668,35 @@ impl Scene {
     }
     /// Note shown while pipetting at device `di`, on the analyzer's actor. With
     /// several sampling points it names the needle (needle 1 = first in the file).
-    fn pipetting_note(&self, di: usize) -> Option<(usize, String)> {
+    /// The note of a `pipette` on the analyzer lifeline: the text written in the
+    /// diagram, or "Pipetting <analyzer>[ · Needle n] - SampleId=..." with the
+    /// SampleId of the latest message to the analyzer for that needle.
+    fn pipetting_note(&self, di: usize, written: Option<&str>, before: &[Timed], t0: f64) -> Option<(usize, String)> {
         let ai = self.actors.iter().position(|a| a.analyzer)?;
+        if let Some(w) = written {
+            return Some((ai, w.to_string()));
+        }
         let needles: Vec<usize> = (0..self.devices.len()).filter(|&i| self.devices[i].kind == DeviceKind::Sampling).collect();
-        let text = match needles.iter().position(|&i| i == di) {
-            Some(n) if needles.len() > 1 => format!("Pipetting · Needle {}", n + 1),
-            _ => "Pipetting".to_string(),
-        };
+        let needle = needles.iter().position(|&i| i == di).filter(|_| needles.len() > 1).map(|n| n + 1);
+        let sample = before
+            .iter()
+            .rev()
+            .filter(|e| e.t0 <= t0 + 1e-9)
+            .find_map(|e| match &e.ev {
+                Ev::Message { to, params, .. } if *to == ai => {
+                    let value = |k: &str| params.split_whitespace().find_map(|p| p.strip_prefix(k)?.strip_prefix('=').map(String::from));
+                    let same_needle = needle.is_none_or(|n| value("Needle").as_deref() == Some(n.to_string().as_str()));
+                    value("SampleId").filter(|_| same_needle)
+                }
+                _ => None,
+            });
+        let mut text = format!("Pipetting {}", self.actors[ai].label);
+        if let Some(n) = needle {
+            text.push_str(&format!(" · Needle {n}"));
+        }
+        if let Some(s) = sample {
+            text.push_str(&format!(" - SampleId={s}"));
+        }
         Some((ai, text))
     }
     /// The analyzer of the scene (one instrument, possibly with several needles).
@@ -1157,7 +1202,7 @@ impl Timeline {
                     let ev = Ev::Note { actor: ai, text: text.clone(), row: 0 };
                     (st.duration.unwrap_or(1.5), ev, format!("note      {actor}: {text}"))
                 }
-                Action::Pipette { device } => {
+                Action::Pipette { device, .. } => {
                     let di = sc.need_probe(device, &st.loc, "pipette")?;
                     (st.duration.unwrap_or(3.0), Ev::Pipette { device: di }, format!("pipette   at {device}"))
                 }
@@ -1213,15 +1258,15 @@ impl Timeline {
                         history.push((format!("{k} {c}"), t0, t1));
                     }
                 }
-                Action::Pipette { device } => history.push((format!("pipette {device}"), t0, t1)),
+                Action::Pipette { device, .. } => history.push((format!("pipette {device}"), t0, t1)),
                 Action::Rotate { device } => history.push((format!("rotate {device}"), t0, t1)),
                 Action::Needle { device, .. } => history.push((format!("needle {device}"), t0, t1)),
                 _ => {}
             }
             log.push(format!("{t0:7.2}s - {t1:7.2}s  {desc}"));
             // The analyzer shows what it is doing on its lifeline.
-            let note = match ev {
-                Ev::Pipette { device } => sc.pipetting_note(device),
+            let note = match (&ev, &st.action) {
+                (Ev::Pipette { device }, Action::Pipette { note, .. }) => sc.pipetting_note(*device, note.as_deref(), &events, t0),
                 _ => None,
             };
             events.push(Timed { t0, t1, ev });
@@ -1337,8 +1382,8 @@ impl Timeline {
                         while first > 0 && (c.moves[first - 1].t1 - c.moves[first].t0).abs() < 1e-9 && c.moves[first - 1].s1 > c.moves[first - 1].s0 + 1e-9 {
                             first -= 1;
                         }
-                        let open = c.reaches(sg - 60.0).unwrap_or(c.moves[k].t0).max(c.moves[first].t0);
-                        iv.push((open, c.reaches(sg + 45.0).unwrap_or(c.moves[k].t1)));
+                        let open = c.reaches(sg - CARRIER_R).unwrap_or(c.moves[k].t0).max(c.moves[first].t0);
+                        iv.push((open, c.reaches(sg + CARRIER_R).unwrap_or(c.moves[k].t1)));
                     }
                 }
             }

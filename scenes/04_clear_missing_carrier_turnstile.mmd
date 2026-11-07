@@ -123,17 +123,17 @@ sequenceDiagram
     %% move C1 to gone
     %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000125
-    %% after 0.1
-    %% for C3
-    AN-->>IF: OK
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1 OK C3
-    %% pipette ts duration=4.5
+    %% after 0.1 Sample Acquisition C3
+    %% for C3
+    AN-->>IF: OK
     %% after 0.1 Release C1
     %% for C1
     AN-->>IF: OK
-    %% after 0.2 pipette ts
+    %% after 0.1 OK C3
+    %% pipette ts duration=4.5
+    %% after 0.2
     %% caption 8 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
     %% after 0.2 pipette ts
     AN->>IF: Sample Complete SampleId=SID-000125

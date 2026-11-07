@@ -119,15 +119,13 @@ sequenceDiagram
     %% caption 5 · All carriers sent away — Clear All | Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away through the wheel, without sampling. Once they have left the interface, it turns grey again.
     %% after 0.2 OK C1
     %% move C2 to ts.in
-    %% after 0 Clear All
-    %% status interface normal
+    %% after 0.2 OK C1
+    %% move C3 to pit_wait
     %% after 0.2 Clear All
     AN-->>IF: OK
     %% after 2.35 OK C1
     %% rotate ts
-    %% after 2.4 OK C1
-    %% move C3 to pit_wait
-    %% after 0.15 rotate ts
+    %% after 0.15
     %% move C3 to ts.in
     %% after 0.15
     %% rotate ts
@@ -137,3 +135,5 @@ sequenceDiagram
     %% rotate ts
     %% after 0.2
     %% move C3 to gone
+    %% on antenna3 C3
+    %% status interface normal

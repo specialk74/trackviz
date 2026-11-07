@@ -114,18 +114,18 @@ sequenceDiagram
     DMX-->>AN: Tests to perform SampleId=SID-000125
     %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000124
-    %% after 0.1
-    %% for C2
-    AN-->>IF: OK
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1 OK C2
-    %% pipette ts duration=4.5
+    %% after 0.1 Sample Acquisition C2
+    %% for C2
+    AN-->>IF: OK
     %% after 0.1 Release C1
     %% for C1
     AN-->>IF: OK
+    %% after 0.1 OK C2
+    %% pipette ts duration=4.5
 
-    %% after 0.3 pipette ts
+    %% after 0.3
     %% caption 6 · Sample Complete — enter — rotate | Sample Complete for the second sample. The third carrier enters the wheel, then the wheel rotates: the third sample under the needle, the second one to the exit.
     %% after 0.3 pipette ts
     AN->>IF: Sample Complete SampleId=SID-000124
@@ -140,18 +140,18 @@ sequenceDiagram
     %% move C2 to gone
     %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000125
-    %% after 0.1
-    %% for C3
-    AN-->>IF: OK
     %% on antenna3
     IF->>AN: Release SampleId=SID-000124
-    %% after 0.1 OK C3
-    %% pipette ts duration=4.5
+    %% after 0.1 Sample Acquisition C3
+    %% for C3
+    AN-->>IF: OK
     %% after 0.1 Release C2
     %% for C2
     AN-->>IF: OK
+    %% after 0.1 OK C3
+    %% pipette ts duration=4.5
 
-    %% after 0.3 pipette ts
+    %% after 0.3
     %% caption 7 · Last carrier | Sample Complete for the third sample. No carrier is waiting at the gate: the wheel rotates the third carrier to the exit and it leaves the module (Release).
     %% after 0.3 pipette ts
     AN->>IF: Sample Complete SampleId=SID-000125

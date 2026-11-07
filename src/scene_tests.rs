@@ -278,6 +278,40 @@ fn ghosts_do_not_open_gates() {
     assert_eq!(tl.gates[0].1.len(), 1);
 }
 
+#[test]
+fn a_gate_opens_only_when_its_carrier_sets_off_and_closes_once_it_is_through() {
+    let steps = "\n%% @step action=move carrier=C1 to=w \n%% @step action=move at=5 carrier=C1 to=ts.in ";
+    let (_, tl) = ok(TURNSTILE, steps);
+    let (open, close) = tl.gates[0].1[0];
+    // The carrier waits at w, 44 px before the gate: the gate starts opening when it
+    // sets off (GATE_TIME before being open) and is open when its front gets there.
+    assert!((open - GATE_TIME - 5.0).abs() < 0.01, "{open}");
+    // Through once its back has passed the gate: 44 + 22 px at 100 px/s.
+    assert!((close - 5.0 - 0.66).abs() < 0.01, "{close}");
+}
+
+#[test]
+fn an_antenna_with_a_gate_gets_one_in_front_of_the_carrier() {
+    let base = format!("{SAMPLING}%% @device id=ant kind=antenna at=s gate=true\n%% @device id=trigger kind=antenna at=c visible=false\n");
+    let (sc, _) = ok(&base, "\n%% @step action=caption title=t text=x ");
+    let g = sc.devices.iter().find(|d| d.id == "ant.gate").expect("generated gate");
+    assert!(g.kind == DeviceKind::Gate);
+    // The lane goes right to left: the gate is on the left of the antenna.
+    assert_eq!(sc.pt("ant.gate"), (600.0 - CARRIER_R - 6.0, 700.0));
+    assert!(!sc.devices.iter().find(|d| d.id == "trigger").unwrap().visible);
+}
+
+#[test]
+fn a_device_can_carry_its_antenna_and_gate() {
+    let base = SAMPLING.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp kind=sampling at=s antenna=ant gate=true\n");
+    let (sc, _) = ok(&base, "\n%% @step action=caption title=t text=x ");
+    let ant = sc.devices.iter().find(|d| d.id == "ant").expect("antenna");
+    assert!(ant.kind == DeviceKind::Antenna && ant.at.as_deref() == Some("s") && ant.part_of.as_deref() == Some("sp"));
+    assert_eq!(sc.devices.iter().find(|d| d.id == "ant.gate").unwrap().part_of.as_deref(), Some("sp"));
+    let bad = SAMPLING.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp kind=sampling at=s gate=true\n");
+    err(&bad, "\n%% @step action=caption title=t text=x ", "gate= needs antenna=");
+}
+
 // ------------------------------------------------------------ turnstile
 
 const C1_IN: &str = "\n%% @step action=move carrier=C1 to=ts.in ";
@@ -474,12 +508,20 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
     let with_actor = SAMPLING.replace("%% @actor id=AN label=Analyzer\n", "%% @actor id=AN label=Analyzer analyzer=true\n");
     assert_ne!(with_actor, SAMPLING);
     let (_, tl) = ok(&with_actor, steps);
-    assert_eq!(notes(&tl), vec![("Pipetting".to_string(), 1.0, 5.0)]);
+    assert_eq!(notes(&tl), vec![("Pipetting Analyzer".to_string(), 1.0, 5.0)]);
     assert_eq!(tl.rows, 1);
-    // Several sampling points: it names the needle.
+    // The SampleId of the latest message to the analyzer.
+    let sa = "\n%% @step action=message at=0 from=IF to=AN text=\"Sample Acquisition\" params=\"SampleId=SID-7\" ";
+    let (_, tl) = ok(&with_actor, &format!("{sa}{steps}"));
+    assert_eq!(notes(&tl)[0].0, "Pipetting Analyzer - SampleId=SID-7");
+    // Several sampling points: it names the needle, and takes the SampleId sent for it.
     let two = with_actor.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp1 kind=sampling at=c\n%% @device id=sp kind=sampling at=s\n");
-    let (_, tl) = ok(&two, steps);
-    assert_eq!(notes(&tl)[0].0, "Pipetting · Needle 2");
+    let sa2 = "\n%% @step action=message at=0 from=IF to=AN text=\"Sample Acquisition\" params=\"SampleId=SID-8 Needle=2\" ";
+    let (_, tl) = ok(&two, &format!("{sa2}{sa}{steps}"));
+    assert_eq!(notes(&tl)[0].0, "Pipetting Analyzer · Needle 2 - SampleId=SID-8");
+    // The text written in the diagram wins.
+    let (_, tl) = ok(&with_actor, "\n%% @step action=pipette at=1 device=sp note=\"Aspirating SID-7\" ");
+    assert_eq!(notes(&tl)[0].0, "Aspirating SID-7");
     // No analyzer actor: no note.
     let (_, tl) = ok(SAMPLING, steps);
     assert!(notes(&tl).is_empty());

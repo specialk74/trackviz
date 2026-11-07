@@ -449,10 +449,18 @@ impl Importer {
     /// `%% on <antenna> [<carrier>]`: the next step starts when the carrier is over
     /// the antenna; without a carrier, the one of the step (its SampleId, or the
     /// carrier it moves or shows).
-    /// The antennas of the scene: (id, point).
+    /// The antennas of the scene, also those declared on a device: (id, point).
     fn antennas(&self) -> Vec<(String, String)> {
         let field = |t: &Table, k: &str| t.str_opt(k).ok().flatten().unwrap_or_default();
-        self.list("device").iter().filter(|t| field(t, "kind") == "antenna").map(|t| (field(t, "id"), field(t, "at"))).collect()
+        self.list("device")
+            .iter()
+            .filter_map(|t| match (field(t, "kind").as_str(), field(t, "antenna")) {
+                ("antenna", _) => Some((field(t, "id"), field(t, "at"))),
+                // An antenna declared on another device: antenna=antenna2.
+                (_, a) if !a.is_empty() => Some((a, field(t, "at"))),
+                _ => None,
+            })
+            .collect()
     }
 
     /// The point an antenna reads.
@@ -641,8 +649,11 @@ impl Importer {
         let (place, body) = line.split_once(':').ok_or("a note needs ': text'")?;
         let who = place.split_whitespace().last().unwrap_or_default().split(',').next().unwrap_or_default().to_string();
         self.participant(&who, &who);
-        // A pipette already adds this note.
-        if self.last_pipette && body.trim().starts_with("Pipetting") {
+        // A note right after a pipette is the text of its note on the analyzer.
+        if self.last_pipette {
+            self.last_pipette = false;
+            let step = self.doc.arrays.get_mut("step").and_then(|v| v.last_mut()).ok_or("a note after a pipette needs the pipette")?;
+            step.entries.insert("note".to_string(), text(body.trim()));
             return Ok(());
         }
         let actor = self.actor(&who);
@@ -860,9 +871,10 @@ mod tests {
     }
 
     #[test]
-    fn a_note_after_a_pipette_is_not_repeated() {
-        let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Pipetting\nNote over AN: Other\n")).unwrap();
+    fn a_note_after_a_pipette_is_its_text() {
+        let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
         assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
+        assert!(has(&d, "step", &[("action", "pipette"), ("note", "Aspirating SID-1")]));
     }
 
     #[test]

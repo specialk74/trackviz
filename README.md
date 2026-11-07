@@ -41,9 +41,15 @@ also with wildcards, and the video is `out/<name>.mp4`.
 ```sh
 $B flow.mmd                  # the video
 $B flow.mmd --preview --watch
+$B flow.mmd --layout         # only out/flow_layout.png: where the points and devices are
 $B flow.mmd --check
 $B "scenes/*.mmd"            # all the diagrams, in parallel
 ```
+
+A full video also writes `out/<scene name>_layout.png`: the track without carriers,
+with the name of every point and device (hidden antennas as a dashed circle) and the
+list of the devices, to see where they are when writing a scene. `--layout` writes
+only this image.
 
 Mermaid only describes the messages, so the physical side goes in `%%` comments, which
 don't appear in the diagram (see `scenes/17_mermaid_spur_happy_path.mmd`):
@@ -82,15 +88,16 @@ Every geometry has its antennas, numbered in the direction of the carriers:
 
 | Geometry | Antennas |
 |---|---|
-| `sampling`, `spur` | 1 NSD, 2 sampling point, 3 exit from the interface module |
-| `turnstile` | 1 NSD, 2 in front of the gate, 3 exit from the interface module |
-| `spur2` | 1 NSD, 2 Divert 1, 3 sampling point 1, 4 Divert 2, 5 sampling point 2, 6 exit from the interface module |
+| `sampling`, `spur` | 1 NSD, 2 sampling point, 3 end of the pit-lane (Release) |
+| `turnstile` | 1 NSD, 2 in front of the gate, 3 end of the pit-lane (Release) |
+| `spur2` | 1 NSD, 2 Divert 1, 3 sampling point 1, 4 Divert 2, 5 sampling point 2, 6 end of the spur (Release) |
 
 The antennas lie on the lanes, under the carriers, without labels. The belt under the
 carriers never stops, so wherever a carrier must stop on an antenna a gate holds it
 there (sampling points, the divert points of `spur2`; in front of the turnstile the
 gate was already there). At the NSD the carrier is read and diverted on the fly. The
-exit antenna is not drawn: it only triggers the Release once the carrier has left.
+last antenna is not drawn: it is at the end of the pit-lane, before the carrier is back
+on the Main-Lane, and only triggers the Release.
 
 The message keeps the text written in the diagram exactly as it is:
 
@@ -294,7 +301,7 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed`, `runaway` (bool: the carrier escapes by itself; red pulsing ring and tag "… · RUN-AWAY" while it moves) | computed from length and speed |
 | `message` | `type` (a named message), `carrier`, `needle`; or, without `type`: `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `needle`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
-| `pipette` | `device` (a `sampling` or `turnstile` device). Also adds the note "Pipetting" on the `analyzer` actor, with the same timing ("Pipetting · Needle n" when there are several sampling points) | 3 s |
+| `pipette` | `device` (a `sampling` or `turnstile` device), `note`. Also adds a note on the `analyzer` actor, with the same timing: "Pipetting Analyzer - SampleId=SID-000123" ("· Needle n" when there are several sampling points), with the SampleId of the latest message sent to the analyzer for that needle (the Sample Acquisition). A `Note over AN: ...` written right after the `pipette` in the diagram replaces this text | 3 s |
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |
@@ -409,15 +416,19 @@ cleared. See scenes 03 and 04.
 `gate` and `antenna` are placed on a point (`at`) of a horizontal lane; both
 work by themselves, without steps:
 
-- **gate**: a barrier across the lane that opens while a carrier drives through
-  its point and closes after it. The gate point doesn't need to be in the routes,
+- **gate**: a barrier across the lane that lets one carrier through: it opens in
+  0.22 s when the carrier held by it sets off (or just before one that does not stop
+  reaches it) and closes in 0.22 s as soon as the carrier is through. The gate point doesn't need to be in the routes,
   only on their path.
 - **antenna**: a flat reader on the lane, under the carriers; waves spread around a
   carrier while it is over the point, and `%% on <antenna>` starts a step at that
   moment (put the point in the routes). `gate=true` adds a gate right in front of a
   carrier standing on it (`<antenna>.gate`, across the lane in any direction): the
   belt never stops, the gate holds the carrier. `visible=false` makes it a trigger
-  only.
+  only. An nsd, sampling or divert device can carry its antenna and gate on the same
+  line: `%% @device id=sp kind=sampling at=sampling antenna=antenna2 gate=true`. The
+  scenes still write `%% on antenna2`; the layout image names them together,
+  `sp.antenna2.gate`.
 
 `--check` also refuses a carrier that drives into a turnstile while the analyzer
 is pipetting there: it has to wait at the gate until the sampling is over.

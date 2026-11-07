@@ -101,17 +101,17 @@ sequenceDiagram
     %% caption 7 · Sample Acquisition — Release | Only after the reply to Clear the interface sends Sample Acquisition for the third sample. Meanwhile the first carrier leaves the module: Release.
     %% after 0.2 OK C2
     IF->>AN: Sample Acquisition SampleId=SID-000125
-    %% after 0.1
-    %% for C3
-    AN-->>IF: OK
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1 OK C3
-    %% pipette sp duration=4.5
+    %% after 0.1 Sample Acquisition C3
+    %% for C3
+    AN-->>IF: OK
     %% after 0.1 Release C1
     %% for C1
     AN-->>IF: OK
-    %% after 0.2 pipette sp
+    %% after 0.1 OK C3
+    %% pipette sp duration=4.5
+    %% after 0.2
     %% caption 8 · Back to normal | Sample Complete for the third sample: the carrier goes round the spur and, once it has left the module, the interface sends Release.
     %% after 0.2 pipette sp
     AN->>IF: Sample Complete SampleId=SID-000125
