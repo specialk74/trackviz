@@ -43,7 +43,9 @@ pub enum DeviceKind {
     Turnstile,
     /// Barrier across a lane; opens by itself while a carrier drives through it.
     Gate,
-    /// Reader next to a lane; shows a reading animation while a carrier stands on its point.
+    /// Reader on the lane, under the carriers; it reads a carrier over its point.
+    /// With `gate=true` a gate right after it holds carriers on it (the belt under
+    /// the carriers never stops); `visible=false` makes it a trigger only.
     Antenna,
     /// Standard diversion: every carrier stops here, is read, then is diverted or goes straight.
     Divert,
@@ -63,7 +65,13 @@ pub struct Device {
     pub entry_right: bool,
     /// Label position (center of the text) for nsd/sampling, if not the default.
     pub label_pos: Option<(f64, f64)>,
+    /// Drawn (an antenna can be a trigger only).
+    pub visible: bool,
 }
+
+/// Speed of the belt under the carriers: 17.5 cm/s, with a carrier 4 cm wide
+/// drawn 44 px wide (11 px/cm).
+pub const BELT_SPEED: f64 = 17.5 * 2.0 * CARRIER_R / 4.0;
 
 /// Turnstile: distance from the pocket centers to the rim of the wheel.
 pub const TS_RIM: f64 = 32.0;
@@ -227,6 +235,34 @@ pub struct Scene {
     pub steps: Vec<Step>,
 }
 
+fn sc_pt(points: &HashMap<String, Point>, id: &str) -> (f64, f64) {
+    let p = &points[id];
+    (p.x, p.y)
+}
+
+/// Direction of travel of the lane through point p (lanes list their points in
+/// the direction of the carriers); right to left if p is on no lane.
+fn lane_dir(points: &HashMap<String, Point>, lanes: &[Lane], p: (f64, f64)) -> (f64, f64) {
+    for l in lanes {
+        let pts: Vec<(f64, f64)> = l.points.iter().map(|id| sc_pt(points, id)).collect();
+        for w in pts.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let len = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+            if len < 1e-9 {
+                continue;
+            }
+            let (ux, uy) = ((b.0 - a.0) / len, (b.1 - a.1) / len);
+            let along = (p.0 - a.0) * ux + (p.1 - a.1) * uy;
+            let off = ((p.0 - a.0) * uy - (p.1 - a.1) * ux).abs();
+            // On the segment, not at its end (at a corner the next segment counts).
+            if off < 3.0 && along >= -1e-9 && along < len - 1e-9 {
+                return (ux, uy);
+            }
+        }
+    }
+    (-1.0, 0.0)
+}
+
 fn arr<'a>(doc: &'a Doc, name: &str) -> &'a [Table] {
     doc.arrays.get(name).map(|v| v.as_slice()).unwrap_or(&[])
 }
@@ -282,6 +318,7 @@ impl Scene {
             }
         }
         let mut devices = Vec::new();
+        let mut gated = Vec::new();
         for t in arr(doc, "device") {
             let kind = match t.str_req("kind")?.as_str() {
                 "nsd" => DeviceKind::Nsd,
@@ -300,7 +337,14 @@ impl Scene {
             let mut entry_right = true;
             match kind {
                 DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Gate | DeviceKind::Antenna | DeviceKind::Divert => {
-                    t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y"])?;
+                    if kind == DeviceKind::Antenna {
+                        t.check_keys(&["id", "kind", "at", "label", "gate", "visible"])?;
+                        if t.bool_opt("gate")?.unwrap_or(false) {
+                            gated.push(devices.len());
+                        }
+                    } else {
+                        t.check_keys(&["id", "kind", "at", "label", "label_x", "label_y"])?;
+                    }
                     let a = t.str_req("at")?;
                     if !points.contains_key(&a) {
                         return Err(format!("{}: unknown point '{a}'", t.location()));
@@ -337,7 +381,8 @@ impl Scene {
                 (None, None) => None,
                 _ => return Err(format!("{}: give both label_x and label_y", t.location())),
             };
-            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos });
+            let visible = t.bool_opt("visible")?.unwrap_or(true);
+            devices.push(Device { id, kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos, visible });
         }
 
         let need_point = |id: &str, t: &Table| -> Result<(), String> {
@@ -400,7 +445,7 @@ impl Scene {
                 sample_id: t.str_opt("sample_id")?.unwrap_or_default(),
                 route,
                 start,
-                speed: t.num_opt("speed")?.unwrap_or(100.0),
+                speed: t.num_opt("speed")?.unwrap_or(BELT_SPEED),
                 cap_color: t.str_opt("cap_color")?.unwrap_or_else(|| "#7C3AED".into()),
                 ghost: t.bool_opt("ghost")?.unwrap_or(false),
                 visible: t.bool_opt("visible")?.unwrap_or(true),
@@ -445,7 +490,7 @@ impl Scene {
                 "move" => Action::Move {
                     carrier: t.str_req("carrier")?,
                     to: t.str_req("to")?,
-                    ease: match t.str_opt("ease")?.as_deref().unwrap_or("inout") {
+                    ease: match t.str_opt("ease")?.as_deref().unwrap_or("linear") {
                         "linear" => Ease::Linear,
                         "in" => Ease::In,
                         "out" => Ease::Out,
@@ -552,6 +597,16 @@ impl Scene {
         if steps.is_empty() {
             return Err("the scene has no [[step]] entries".into());
         }
+        // The gate of an antenna: across the lane, just in front of a carrier
+        // standing on the antenna ("<antenna>.gate", a point and a device).
+        for di in gated {
+            let a = sc_pt(&points, devices[di].at.as_deref().unwrap());
+            let (dx, dy) = lane_dir(&points, &lanes, a);
+            let id = format!("{}.gate", devices[di].id);
+            let ahead = CARRIER_R + 6.0;
+            points.insert(id.clone(), Point { x: a.0 + dx * ahead, y: a.1 + dy * ahead });
+            devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true });
+        }
         Ok(Scene { video, points, lanes, devices, actors, carriers, steps })
     }
 
@@ -604,8 +659,11 @@ impl Scene {
         self.devices.iter().position(|d| d.kind == DeviceKind::Analyzer)
     }
     pub fn pt(&self, id: &str) -> (f64, f64) {
-        let p = &self.points[id];
-        (p.x, p.y)
+        sc_pt(&self.points, id)
+    }
+    /// Direction of travel of the lane through point p.
+    pub fn lane_dir(&self, p: (f64, f64)) -> (f64, f64) {
+        lane_dir(&self.points, &self.lanes, p)
     }
 }
 
@@ -837,7 +895,7 @@ impl CarrierPath {
     }
     /// When the carrier reaches distance s along its route, among the moves
     /// laid out so far.
-    fn reaches(&self, s: f64) -> Option<f64> {
+    pub fn reaches(&self, s: f64) -> Option<f64> {
         let m = self.moves.iter().find(|m| m.s1 >= s - 1e-9)?;
         if s <= m.s0 {
             return Some(m.t0);
@@ -1272,8 +1330,15 @@ impl Timeline {
             let mut iv = Vec::new();
             for c in carriers.iter().filter(|c| !c.ghost) {
                 if let Some(sg) = c.project(g) {
-                    for m in c.moves.iter().filter(|m| m.s0 < sg && m.s1 > sg) {
-                        iv.push((c.reaches(sg - 60.0).unwrap_or(m.t0), c.reaches(sg + 45.0).unwrap_or(m.t1)));
+                    if let Some(k) = c.moves.iter().position(|m| m.s0 < sg && m.s1 > sg) {
+                        // The start of the run that goes through the gate: a carrier
+                        // held by it sets off only when it opens.
+                        let mut first = k;
+                        while first > 0 && (c.moves[first - 1].t1 - c.moves[first].t0).abs() < 1e-9 && c.moves[first - 1].s1 > c.moves[first - 1].s0 + 1e-9 {
+                            first -= 1;
+                        }
+                        let open = c.reaches(sg - 60.0).unwrap_or(c.moves[k].t0).max(c.moves[first].t0);
+                        iv.push((open, c.reaches(sg + 45.0).unwrap_or(c.moves[k].t1)));
                     }
                 }
             }

@@ -12,27 +12,29 @@ sequenceDiagram
     participant DMX as DMX
 
     %% on antenna1 C1
-    %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping: Prepare.
+    %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping (Prepare) and stopped by the gate at the sampling point: Sample Acquisition.
     %% on antenna1 C1
     %% highlight nsd duration=2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     AN-->>IF: OK SampleId=SID-000123
-    AN->>DMX: Query SampleId=SID-000123
-    DMX-->>AN: Tests to perform SampleId=SID-000123
 
-    %% on antenna2 C1
-    %% caption 3 · Sample Acquisition | The carrier stops at the sampling point.
     %% on antenna2
     IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% after 0 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0 Sample Acquisition C1
     AN-->>IF: OK
+    %% after 0 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% after 0 OK
     %% pipette sp duration=4
     AN->>IF: Sample Complete SampleId=SID-000123
     IF-->>AN: OK
 
-    %% move C1 to iface_out ease=in
+    %% move C1 to iface_out
     %% on antenna3 C1
-    %% caption 4 · Release | The carrier leaves the module: Release.
+    %% caption 3 · Release | The carrier leaves the module: Release.
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
     AN-->>IF: OK

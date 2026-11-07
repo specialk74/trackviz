@@ -51,7 +51,7 @@ don't appear in the diagram (see `scenes/17_mermaid_spur_happy_path.mmd`):
 ```
 %% include common/spur_one_carrier.mmd
 sequenceDiagram
-    %% when C1 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     AN-->>IF: OK SampleId=SID-000123
     %% pipette sp duration=4
@@ -74,6 +74,8 @@ one before it ends, unless a directive right before it says otherwise:
 | `on <antenna> <carrier>` | when that carrier is over the antenna (for captions, highlights, pipettes, notes, ...) |
 | `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives) |
 | `after <seconds> <message> [<carrier>]` | that many seconds after the latest message with that text (for that carrier) has arrived |
+| `after <seconds> <antenna> <carrier>` | that many seconds after the carrier is over the antenna |
+| `after <seconds> pipette\|rotate\|needle <device>` | that many seconds after that action on the device ends |
 | `at <seconds>` | at that second of the video |
 
 Every geometry has its antennas, numbered in the direction of the carriers:
@@ -83,6 +85,12 @@ Every geometry has its antennas, numbered in the direction of the carriers:
 | `sampling`, `spur` | 1 NSD, 2 sampling point, 3 exit from the interface module |
 | `turnstile` | 1 NSD, 2 in front of the gate, 3 exit from the interface module |
 | `spur2` | 1 NSD, 2 Divert 1, 3 sampling point 1, 4 Divert 2, 5 sampling point 2, 6 exit from the interface module |
+
+The antennas lie on the lanes, under the carriers, without labels. The belt under the
+carriers never stops, so wherever a carrier must stop on an antenna a gate holds it
+there (sampling points, the divert points of `spur2`; in front of the turnstile the
+gate was already there). At the NSD the carrier is read and diverted on the fly. The
+exit antenna is not drawn: it only triggers the Release once the carrier has left.
 
 The message keeps the text written in the diagram exactly as it is:
 
@@ -96,10 +104,11 @@ AN-->>IF: OK SampleId=SID-000123
 IF->>AN: Add Tube SampleId=SID-000123
 ```
 
-`color #RRGGBB` colors the next message (the purple Prepare is `#9333EA`). The older
-directives `when`, `with`, `after_start`, `after_end` and `delay` still work (scenes
-01–16 use them); `when` takes several causes joined by `and`, the step starts at the
-last one.
+`color #RRGGBB` colors the next message (the purple Prepare is `#9333EA`). Only one of
+`on`, `after`, `at` per step. `after <seconds> <message>` refers to the latest message
+with that text written before it, so keep the diagram in time order. With the carrier
+physics (below) a step tied to an antenna or to a message moves with it when a carrier
+has to wait. `when`, `with`, `delay`, `after_start` and `after_end` no longer exist.
 
 | Directive | Meaning |
 |---|---|
@@ -114,7 +123,6 @@ last one.
 | `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
 | `caption <title> \| <text>` | a caption |
 | `on`, `after`, `at`, `color` | see above |
-| `when ...`, `with`, `after_start`, `after_end`, `delay` | older timing of the **next** step |
 | `include <file>` | the directives of another file |
 | `@<section> key=value ...` | a table of data (see Scene format) |
 | `# text` | a plain comment |
@@ -160,10 +168,18 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
 - two physical carriers overlapping on the track (with the physics this happens only
   when they start on the same spot inside the panel)
 - captions too long for the band, which get cut
+- captions shown less than 2.5 s before the next one, or written in a different order
+  from the one in which they appear
+- messages written in a different order from the one in which they are sent (the
+  video follows time, the Mermaid diagram follows the file)
 - a Query sent before the OK to its Prepare or the reply to the previous Query has
   arrived
 
 ### Carrier physics
+
+Carriers ride a belt that runs at 17.5 cm/s, 192.5 px/s on screen (a carrier, 4 cm
+wide, is drawn 44 px wide): every move is at that constant speed, starting and stopping
+at once. `speed=` and `ease=` are still accepted, but the scenes don't use them.
 
 Two carriers never take the same space, and they only go forward. `move C2 to
 sampling` means "C2 sets off towards the sampling point": if the way is taken, C2
@@ -237,9 +253,10 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 
 ### Steps
 
-Each step's `start` decides when it begins, in file order (the directives `on`, `after`, `at`,
-`when`, `with`, `delay`, ... set these keys). Rows of the sequence
-diagram always follow time, whatever the order in the file.
+These are the keys of a `@step` table, what the directives produce: `on antenna1` gives
+`when="C1 at nsd"`, `after 0.2 pipette sp` gives `when="pipette sp done" delay=0.2`,
+`after 1` gives `after_end=1`. Written by hand in `@step` lines they still work. Rows of
+the sequence diagram always follow time, whatever the order in the file.
 
 
 - `after` (default): when the previous step ends
@@ -395,10 +412,12 @@ work by themselves, without steps:
 - **gate**: a barrier across the lane that opens while a carrier drives through
   its point and closes after it. The gate point doesn't need to be in the routes,
   only on their path.
-- **antenna**: a reader above the lane (`label_x`, `label_y` move it elsewhere, with
-  a dashed line to its point). It shows a reading animation while a carrier is over
-  its point, and `%% on <antenna>` starts a step at that moment (put the point in
-  the routes). In front of a gate it is where carriers stop to be read.
+- **antenna**: a flat reader on the lane, under the carriers; waves spread around a
+  carrier while it is over the point, and `%% on <antenna>` starts a step at that
+  moment (put the point in the routes). `gate=true` adds a gate right in front of a
+  carrier standing on it (`<antenna>.gate`, across the lane in any direction): the
+  belt never stops, the gate holds the carrier. `visible=false` makes it a trigger
+  only.
 
 `--check` also refuses a carrier that drives into a turnstile while the analyzer
 is pipetting there: it has to wait at the gate until the sampling is over.

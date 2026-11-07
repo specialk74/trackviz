@@ -14,8 +14,12 @@ Deciso con l'utente, a tappe:
    Chi raggiunge un carrier fermo si avvicina fino a toccarlo e si ferma; riparte quando
    l'altro si muove. I carrier vanno solo avanti. `move C2 to <punto>` vuol dire "parte
    verso il punto": soste in coda e ripartenze le calcola il programma.
-3. **Da fare — conversione delle scene 01–16** a `on`/`after`/`at`, togliendo `when`,
-   `with`, `delay`, `after_start`, `after_end` dai file.
+3. **Fatto — conversione delle scene 01–16** a `on`/`after`/`at`; `when`, `with`,
+   `delay`, `after_start`, `after_end` non esistono più come direttive. `after` accetta
+   anche un'antenna (`after 0.15 antenna2 C1`) o la fine di un'azione (`after 0.2
+   pipette sp`). Dettagli e durate in `PROJECT.md`.
+
+4. **Fatto — nastro a 17,5 cm/s, antenne sulla corsia e gate:** vedi `PROJECT.md`.
 
 ## 1. Miglioramenti proposti, non ancora fatti
 
@@ -42,10 +46,10 @@ editor compatibile, come VS Code.
 
 ### 1.4 Risolvere i conflitti che la catena segnala
 
-Rallentando i carrier del 25% due scene danno un conflitto fisico: i tempi si spostano
-a catena, ma il conflitto va risolto a mano con un `delay`.
+Rallentando i carrier del 25% la scena 08 dava un conflitto fisico (quello della 07,
+carrier che si toccano in coda, ora lo risolve la fisica). Da riverificare dopo la
+conversione.
 
-- Scena 07: C2 e C3 si toccano in coda.
 - Scena 08: la ruota partirebbe prima che C2 sia fuori dal cerchio. Si potrebbe
   agganciare la rotazione al punto in cui il carrier è fuori dalla ruota.
 
@@ -68,8 +72,8 @@ lo richiedono. Oggi tutti i testi dei video sono in inglese.
 
 - **Results e Clear:** nessun Results per il campione del Clear (C2 nelle scene 03, 04, 10,
   14). È una deduzione: il campione non è mai arrivato al punto di campionamento.
-- **Durata dei video:** con i nuovi OK e i Results alcune scene superano il minuto
-  (02: 78 s; 03: 61 s; 04: 63 s; 13: 60 s). Il limite iniziale era 1 minuto.
+- **Durata dei video:** con il nastro a 17,5 cm/s solo la scena 02 supera il minuto
+  (69 s, tre carrier nel tornello). Il limite iniziale era 1 minuto.
 
 Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
@@ -79,8 +83,14 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
   (GitHub, VS Code): sono verificati solo dal tool.
 - Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.mmd` resta testo
   libero, senza avvisi: rinominare un tipo non aggiorna i diagrammi.
-- `when` si riferisce all'ultimo step corrispondente già scritto nel file: gli step vanno
-  tenuti in ordine di tempo.
+- `after <secondi> <messaggio>` si riferisce all'ultimo messaggio con quel testo già
+  scritto nel file: i messaggi vanno tenuti in ordine di tempo.
+- La fisica non conosce gate e ruota: un carrier che deve aspettare al gate va mandato
+  fino al punto dell'antenna, e l'ingresso nella ruota resta un `move` esplicito.
+- Alcuni ritardi hanno ancora decimali poco "umani" (`after 0.972 OK C1`): il riordino
+  per tempo esprime una causa lontana sommando le durate degli step in mezzo.
+- Un tool per riordinare una scena per tempo (`trackviz sort`) sarebbe utile: oggi è
+  uno script esterno usato durante la riscrittura.
 - Una geometria diversa richiede un proprio file in `scenes/common/`.
 - Con più scene il resto della divisione di `-j` resta inutilizzato (4 scene con `-j 6`:
   2 thread fermi).

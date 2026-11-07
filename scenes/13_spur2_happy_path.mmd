@@ -11,189 +11,134 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone speed=120
-    %% carrier C2 SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone speed=120 color=#0EA5E9
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
+    %% carrier C2 SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#0EA5E9
 
-    %% at 0
     %% caption 1 · One analyzer, two sampling points | The spur serves one analyzer with two needles, each on its own pit-lane. Which needles a sample needs depends on its tests: one of them, or both.
-    %% at 1
-    %% move C1 to nsd ease=in
-    %% at 1.6
-    %% move C2 to nsd ease=linear
-    %% when C1 at nsd
-    %% caption 2 · Diverted — Prepare | Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer.
-    %% when C1 at nsd
+    %% at 2.5
+    %% move C1 to nsd
+    %% at 2.89
+    %% move C2 to nsd
+    %% on antenna1 C1
     %% highlight nsd duration=1.6
-    %% when C1 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% when C1 at nsd
-    %% move C1 to d1 ease=out
-    %% when C2 at nsd
-    %% move C2 to w1 ease=out
-    %% when C2 at nsd
+    %% on antenna1
+    %% move C1 to d1
+    %% on antenna1
+    %% move C2 to d1
+    %% on antenna1 C2
     %% highlight nsd duration=1.6
-    %% when C2 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
-    %% when prepare C1 sent
-    %% delay 1.7
+    %% after 0.2 Prepare C1
     AN-->>IF: OK SampleId=SID-000123
-    %% when prepare C2 sent
-    %% delay 1.7
-    AN-->>IF: OK SampleId=SID-000124
-    %% when sample_ok C1 arrived
-    %% delay 0.2
-    AN->>DMX: Query SampleId=SID-000123
-    %% when query C1 sent
-    %% delay 1.7
-    DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% when C1 at d1
+    %% on antenna2 C1
     %% highlight div1 duration=0.6
-    %% when C1 at d1
-    %% caption 3 · Standard divert — Prepare again | Unlike at the entrance of the spur, here the carrier stops and is read. This sample needs needle 1: Prepare again, then it is diverted while the next carrier stops behind.
-    %% when C1 at d1
-    %% delay 0.1
+    %% on antenna2 C1
+    %% caption 2 · Standard divert — Prepare again | Each carrier is diverted into the spur without stopping (Prepare), then stops at the divert and is read. The first needs needle 1: Prepare again and diverted. The second only needs needle 2: straight on.
+    %% after 0.1 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare_again C1 arrived
-    %% delay 0.1
-    %% for C1
-    AN-->>IF: OK
-    %% when C1 at d1
-    %% delay 0.6
-    %% move C1 to s1 ease=inout
-    %% when tests C1 arrived
-    %% delay 0.1
-    AN->>DMX: Query SampleId=SID-000124
-    %% when C2 at w1
-    %% delay 1.575
-    %% move C2 to d1 ease=inout
-    %% when query C2 sent
-    %% delay 1.7
-    DMX-->>AN: Tests to perform SampleId=SID-000124
-    %% when C2 at d1
+    %% after 0.2 Prepare C2
+    AN-->>IF: OK SampleId=SID-000124
+    %% after 0.6 antenna2 C1
+    %% move C1 to s1
+    %% on antenna2 C2
     %% highlight div1 duration=0.6
-    %% when C2 at d1
-    %% caption 4 · The next carrier goes straight on | The second carrier also stops and is read, but it only needs needle 2: it goes straight on to the second divert, where it gets Prepare again.
-    %% when C2 at d1
-    %% delay 0.401
-    %% move C2 to d2 ease=inout
-    %% when C1 at s1
-    %% delay 0.3
-    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
-    %% when sample_acquisition_needle C1 arrived
-    %% delay 0.1
+    %% after 0.2 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0.401 antenna2 C2
+    %% move C2 to d2
+    %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
-    %% pipette sp1 duration=4
-    %% when C2 at d2
+    %% after 0.3 antenna3 C1
+    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
+    %% on antenna4 C2
     %% highlight div2 duration=0.6
-    %% when C2 at d2
-    %% delay 0.1
+    %% after 0.1 antenna4 C2
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
-    %% when prepare_again C2 arrived
-    %% delay 0.1
+    %% after 0.2 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% after 0.6 antenna4 C2
+    %% move C2 to s2
+    %% after 0.1 Sample Acquisition C1
+    %% for C1
+    AN-->>IF: OK
+    %% after 0.1 Prepare C2
     %% for C2
     AN-->>IF: OK
-    %% when C2 at d2
-    %% delay 0.6
-    %% move C2 to s2 ease=inout
-    %% when pipette sp1 done
-    %% delay 0.2
+    %% after 0.1 Tests to perform C1
+    AN->>DMX: Query SampleId=SID-000124
+    %% after 0.2 antenna5 C2
+    IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
+    %% after 0.1 OK C1
+    %% pipette sp1 duration=4
+    %% after 0.2 Query C2
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% after 0 Sample Acquisition C2
+    %% caption 3 · Sample Acquisition with the needle id | There is one Sample Acquisition for each sampling point: the Needle parameter tells the analyzer which needle must come out. Sample Complete carries the same id.
+    %% after 0.1 Sample Acquisition C2
+    %% for C2
+    AN-->>IF: OK
+    %% after 0.1
+    %% pipette sp2 duration=4
+    %% after 0.2 pipette sp1
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
-    %% when sample_complete_needle C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% when C2 at s2
-    %% delay 0.2
-    IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
-    %% when sample_acquisition_needle C2 arrived
-    %% delay 0.1
+    %% after 0.2 pipette sp2
+    AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
+    %% after 0 OK C1
+    %% move C1 to d2
+    %% after 0.1 Sample Complete C2
     %% for C2
-    AN-->>IF: OK
-    %% when sample_acquisition_needle C2 sent
-    %% delay 0.001
-    %% caption 5 · Sample Acquisition with the needle id | There is one Sample Acquisition for each sampling point: the Needle parameter tells the analyzer which needle must come out. Sample Complete carries the same id.
-    %% when interface_ok C1 sent
-    %% move C1 to d2 ease=inout
-    %% when analyzer_ok C2 arrived
-    %% delay 0.1
-    %% pipette sp2 duration=4
-    %% when C1 at d2
-    %% caption 6 · The first sample also needs needle 2 | Leaving needle 1 the carrier stops at the second divert: Prepare again. It also needs needle 2, so it enters the second pit-lane right away, even if the carrier ahead is still there.
-    %% when C1 at d2
+    IF-->>AN: OK
+    %% on antenna4 C1
+    %% caption 4 · The first sample also needs needle 2 | Leaving needle 1 the carrier stops at the second divert: Prepare again. It also needs needle 2, so it enters the second pit-lane right away, even if the carrier ahead is still there.
+    %% on antenna4 C1
     %% highlight div2 duration=0.6
-    %% when C1 at d2
-    %% delay 0.1
+    %% after 0.1 antenna4 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare_again C1 arrived
-    %% delay 0.1
+    %% after 0 OK C2
+    %% move C1 to s2
+    %% after 0 OK C2
+    %% move C2 to gone
+    %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
-    %% when pipette sp2 done
-    %% delay 0.2
-    AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
-    %% when sample_complete_needle C2 arrived
-    %% delay 0.1
-    %% for C2
-    IF-->>AN: OK
-    %% when interface_ok C2 sent
-    %% move C1 to s2 ease=inout
-    %% when interface_ok C2 sent
-    %% move C2 to pt2u ease=in
-    %% when C2 at pt2u
-    %% move C2 to merge ease=linear
-    %% when C1 at s2
-    %% delay 0.2
+    %% after 0.2 antenna5 C1
     IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=2
-    %% when sample_acquisition_needle C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% pipette sp2 duration=4
-    %% when pipette sp2 done
-    %% delay 0.2
-    AN->>IF: Sample Complete SampleId=SID-000123 Needle=2
-    %% when sample_complete_needle C1 arrived
-    %% delay 0.1
-    %% for C1
-    IF-->>AN: OK
-    %% when interface_ok C1 sent
-    %% move C1 to pt2u ease=in
-    %% when C2 at merge
-    %% delay 0.001
-    %% move C2 to gone ease=out
-    %% when C2 at iface_out
-    %% caption 7 · Release | Leaving the interface module each carrier gets one Release, however many needles sampled it.
-    %% when C2 at iface_out
+    %% on antenna6 C2
+    %% caption 5 · Release | Leaving the interface module each carrier gets one Release, however many needles sampled it.
+    %% on antenna6
     IF->>AN: Release SampleId=SID-000124
-    %% when release C2 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C2
     AN-->>IF: OK
-    %% when C1 at pt2u
-    %% move C1 to merge ease=linear
-    %% when C1 at merge
-    %% delay 0.001
-    %% move C1 to gone ease=out
-    %% when C1 at iface_out
+    %% after 0.2 pipette sp2
+    AN->>IF: Sample Complete SampleId=SID-000123 Needle=2
+    %% after 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% move C1 to gone
+    %% on antenna6
     IF->>AN: Release SampleId=SID-000123
-    %% when release C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.5
-    %% caption 8 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% when analyzer_ok C1 arrived
-    %% delay 0.5
+    %% after 0.5
+    %% caption 6 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% after 0.5 OK C1
     AN->>DMX: Results SampleId=SID-000123
-    %% when results C1 arrived
-    %% delay 0.2
+    %% after 0.2
     AN->>DMX: Results SampleId=SID-000124

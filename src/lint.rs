@@ -9,6 +9,8 @@ use crate::physics::TRACK_X;
 pub fn warnings(sc: &Scene, tl: &Timeline) -> Vec<String> {
     let mut w = overlapping_carriers(sc, tl);
     w.extend(cut_captions(tl));
+    w.extend(short_captions(tl));
+    w.extend(messages_out_of_order(sc, tl));
     w.extend(queries(tl));
     w
 }
@@ -56,6 +58,58 @@ fn cut_captions(tl: &Timeline) -> Vec<String> {
             _ => None,
         })
         .collect()
+}
+
+/// Messages and notes written in a different order from the one in which they
+/// are sent: the video follows time, but the Mermaid diagram follows the file.
+fn messages_out_of_order(sc: &Scene, tl: &Timeline) -> Vec<String> {
+    let name = |e: &Timed| match &e.ev {
+        Ev::Message { from, to, text, .. } => format!("{} -> {} {text}", sc.actors[*from].id, sc.actors[*to].id),
+        Ev::Note { actor, text, .. } => format!("note {}: {text}", sc.actors[*actor].id),
+        _ => String::new(),
+    };
+    let msgs: Vec<&Timed> = tl.events.iter().filter(|e| matches!(e.ev, Ev::Message { .. } | Ev::Note { .. })).collect();
+    let mut out = Vec::new();
+    for w in msgs.windows(2) {
+        if w[1].t0 < w[0].t0 - 1e-6 {
+            out.push(format!("'{}' at {:.2}s is written after '{}' at {:.2}s: the Mermaid diagram shows them in the wrong order", name(w[1]), w[1].t0, name(w[0]), w[0].t0));
+        }
+    }
+    out
+}
+
+/// Shortest time (s) a caption should stay on screen to be read.
+const CAPTION_MIN: f64 = 2.5;
+
+/// Captions replaced by the next one before they can be read, or out of order
+/// (a caption shows until the next one in time).
+fn short_captions(tl: &Timeline) -> Vec<String> {
+    let caps: Vec<(f64, &str, usize)> = tl
+        .events
+        .iter()
+        .filter_map(|e| match &e.ev {
+            Ev::Caption { title, .. } => Some((e.t0, title.as_str())),
+            _ => None,
+        })
+        .enumerate()
+        .map(|(i, (t, title))| (t, title, i))
+        .collect();
+    let mut out = Vec::new();
+    for w in caps.windows(2) {
+        let ((t0, a, _), (t1, b, _)) = (w[0], w[1]);
+        if t1 < t0 {
+            out.push(format!("caption '{b}' at {t1:.2}s comes before '{a}' at {t0:.2}s, which is written before it"));
+        }
+    }
+    let mut sorted = caps.clone();
+    sorted.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.2.cmp(&y.2)));
+    for w in sorted.windows(2) {
+        let ((t0, a, _), (t1, b, _)) = (w[0], w[1]);
+        if t1 - t0 < CAPTION_MIN {
+            out.push(format!("caption '{a}' at {t0:.2}s is shown only {:.1}s before '{b}'", t1 - t0));
+        }
+    }
+    out
 }
 
 /// The analyzer sends one Query at a time, after the OK to the Prepare of that sample.
@@ -127,6 +181,22 @@ mod tests {
         let long = "word ".repeat(60);
         let w = warned(&format!("\n%% @step action=caption title=Long text=\"{long}\" "));
         assert!(w[0].contains("caption 'Long'") && w[0].contains("is cut"), "{w:?}");
+    }
+
+    #[test]
+    fn messages_written_out_of_time_order_are_reported() {
+        let w = warned(&[msg("A", 2.0, ""), msg("B", 1.0, "")].concat());
+        assert!(w.iter().any(|x| x.contains("'IF -> AN B' at 1.00s is written after 'IF -> AN A' at 2.00s")), "{w:?}");
+    }
+
+    #[test]
+    fn short_and_out_of_order_captions_are_reported() {
+        let cap = |title: &str, at: f64| format!("\n%% @step action=caption at={at} title={title} text=x ");
+        assert!(warned(&[cap("A", 0.0), cap("B", 3.0)].concat()).is_empty());
+        let w = warned(&[cap("A", 0.0), cap("B", 1.0)].concat());
+        assert!(w[0].contains("'A' at 0.00s is shown only 1.0s"), "{w:?}");
+        let w = warned(&[cap("A", 5.0), cap("B", 1.0)].concat());
+        assert!(w[0].contains("'B' at 1.00s comes before 'A'"), "{w:?}");
     }
 
     #[test]

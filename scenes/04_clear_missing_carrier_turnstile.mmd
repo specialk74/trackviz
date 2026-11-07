@@ -16,195 +16,141 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone speed=75
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier C2 SID-000124 route=spawn,main_in,nsd,merge,main_out,gone speed=75 color=#0EA5E9
+    %% carrier C2 SID-000124 route=spawn,main_in,nsd,merge,main_out,gone color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the Pit-Lane, up to the antenna.
-    %% carrier C2L SID-000124 route=nsd,pit_in,pit_wait speed=75 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone speed=75 color=#DB2777
+    %% carrier C2L SID-000124 route=nsd,pit_in,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#DB2777
 
-    %% at 0
     %% caption 1 · Turnstile with gate and antenna | Three carriers holding sample tubes travel towards the interface. Every carrier diverted into the Pit-Lane stops at the antenna in front of the gate and the turnstile.
-    %% at 2.26
-    %% move C1 to nsd ease=in
-    %% when C1 at nsd
-    %% move C1 to pit_wait ease=out
-    %% when C1 at nsd
-    %% caption 2 · Diverted — Prepare | The first carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer.
-    %% when C1 at nsd
+    %% at 2.6
+    %% move C1 to pit_wait
+    %% on antenna1 C1
+    %% caption 2 · Diverted — Prepare — antenna | The first carrier is diverted without stopping (Prepare) and read at the antenna (Prepare again). Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
+    %% on antenna1 C1
     %% highlight nsd duration=2
-    %% when C1 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare C1 sent
-    %% delay 1.997
+    %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% when sample_ok C1 arrived
-    %% delay 0.3
-    AN->>DMX: Query SampleId=SID-000123
-    %% at 9.07
-    %% move C2 to gone ease=linear
-    %% when C1 at pit_wait
-    %% caption 3 · Antenna — Prepare again | The first carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
-    %% when C1 at pit_wait
+    %% after 0.5 antenna2 C1
     %% highlight antenna2 duration=1.5
-    %% when C1 at pit_wait
-    %% delay 0.2
+    %% after 0.5 antenna2 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare_again C1 arrived
-    %% delay 0.1
+    %% after 0.1 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
-    %% when query C1 sent
-    %% delay 2.53
+    %% after 0.1 Query C1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% at 11.57
-    %% move C3 to nsd ease=linear
-    %% at 12
-    %% move C2L to pit_wait ease=out
-    %% when tests C1 sent
-    %% delay 0.9
-    %% caption 4 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
-    %% when tests C1 sent
-    %% delay 0.9
-    %% highlight nsd duration=2
-    %% when tests C1 sent
-    %% delay 0.9
-    %% show C2L duration=0.4
-    %% when C2 at nsd
-    IF->>AN: Prepare SampleId=SID-000124
-    %% when C1 at pit_wait
-    %% delay 1.777
-    %% move C1 to ts.in ease=inout duration=2
-    %% when prepare C2 sent
-    %% delay 1.6
-    AN-->>IF: OK SampleId=SID-000124
-    %% when C3 at nsd
-    %% move C3 to pit_wait ease=out
-    %% when C3 at nsd
-    %% caption 5 · Third carrier — Prepare | The third carrier is diverted into the Pit-Lane: Prepare. For each Prepare the analyzer asks DMX which tests to perform.
-    %% when C3 at nsd
-    %% highlight nsd duration=2
-    %% when C3 at nsd
-    IF->>AN: Prepare SampleId=SID-000125
-    %% when C1 at ts.in
-    %% delay 0.15
+    %% after 0.1 OK C1
+    %% move C1 to ts.in
+    %% after 0.15
     %% rotate ts
-    %% when sample_ok C2 arrived
-    %% delay 0.1
-    AN->>DMX: Query SampleId=SID-000124
-    %% when prepare C3 sent
-    %% delay 1.597
-    AN-->>IF: OK SampleId=SID-000125
-    %% when rotate ts done
-    %% delay 0.25
+    %% after 0.25
+    %% caption 3 · Sample Acquisition | The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates.
+    %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% when sample_acquisition C1 arrived
-    %% delay 0.1
+
+    %% at 12.9
+    %% move C2 to gone
+    %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
-    %% when query C2 arrived
-    %% delay 0.1
-    %% caption 6 · Sample Acquisition | The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates. The second (expected) carrier reaches the antenna: nothing is read, it is not physically there.
-    %% when query C2 sent
-    %% delay 2.2
-    DMX-->>AN: Tests to perform SampleId=SID-000124
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
-    %% pipette ts duration=6.6
-    %% when tests C2 arrived
-    %% delay 0.1
-    AN->>DMX: Query SampleId=SID-000125
-    %% when C3 at pit_wait
-    %% caption 7 · Antenna reads the third carrier — Clear | The third carrier stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
-    %% when C3 at pit_wait
-    %% highlight antenna2 duration=1.5
-    %% when C3 at pit_wait
-    %% delay 0.197
-    IF->>AN: Clear SampleId=SID-000124
-    %% when query C3 sent
-    %% delay 1.7
-    DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% when clear C2 sent
-    %% delay 1.55
+    %% on antenna1 C2
+    %% caption 4 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
+    %% on antenna1 C2
+    %% highlight nsd duration=2
+    %% on antenna1 C2
+    %% show C2L duration=0.4
+    %% on antenna1 C2
+    %% move C2L to pit_wait
+    %% on antenna1
+    IF->>AN: Prepare SampleId=SID-000124
+    %% after 0.1 OK C1
+    %% pipette ts duration=10
+    %% after 0.1 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
-    %% when sample_ok C2 arrived
+
+    %% at 15.9
+    %% move C3 to pit_wait
+    %% on antenna1 C3
+    %% caption 5 · Third carrier — Clear | The third carrier is diverted (Prepare) and stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
+    %% on antenna1 C3
+    %% highlight nsd duration=2
+    %% on antenna1
+    IF->>AN: Prepare SampleId=SID-000125
+    %% after 0.1 OK C2
+    AN->>DMX: Query SampleId=SID-000124
+    %% on antenna2 C3
+    %% highlight antenna2 duration=1.5
+    %% after 0.1 Prepare C3
+    AN-->>IF: OK SampleId=SID-000125
+    %% after 0.2 antenna2 C3
+    IF->>AN: Clear SampleId=SID-000124
+    %% after 0.1 Query C2
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% after 0.1 Clear C2
+    AN-->>IF: OK SampleId=SID-000124
+    %% after 0.1 Tests to perform C2
+    AN->>DMX: Query SampleId=SID-000125
+    %% after 0 OK C2
     %% hide C2L duration=0.6
-    %% when sample_ok C2 arrived
-    %% caption 8 · Prepare again for the third carrier | Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete.
-    %% when sample_ok C2 arrived
-    %% delay 0.2
+    %% after 0 OK C2
+    %% caption 6 · Prepare again for the third carrier | Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete.
+    %% after 0.2 OK C2
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000125
-    %% when prepare_again C3 arrived
-    %% delay 0.1
+    %% after 0.1 Query C3
+    DMX-->>AN: Tests to perform SampleId=SID-000125
+    %% after 0.1 Prepare C3
     %% for C3
     AN-->>IF: OK
-    %% when pipette ts done
-    %% delay 0.2
-    %% caption 9 · Sample Complete — enter — rotate | Sample Complete for the first sample. The gate opens, the third carrier enters the wheel, then the wheel rotates: the third sample goes under the needle, the first one to the exit.
-    %% when pipette ts done
-    %% delay 0.2
+    %% after 0.2 pipette ts
+    %% caption 7 · Sample Complete — enter — rotate | Sample Complete for the first sample. The gate opens, the third carrier enters the wheel, then the wheel rotates: the third sample goes under the needle, the first one to the exit.
+    %% after 0.2 pipette ts
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% when sample_complete C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% when interface_ok C1 sent
-    %% move C3 to ts.in ease=inout duration=2
-    %% when C3 at ts.in
-    %% delay 0.15
+    %% move C3 to ts.in
+    %% after 0.15
     %% rotate ts
-    %% when rotate ts done
-    %% delay 0.15
-    %% move C1 to merge ease=in
-    %% when rotate ts done
-    %% delay 0.25
+    %% after 0.15
+    %% move C1 to gone
+    %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000125
-    %% when sample_acquisition C3 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C3
     AN-->>IF: OK
-    %% when analyzer_ok C3 arrived
-    %% delay 0.1
-    %% pipette ts duration=4.5
-    %% when pipette ts done
-    %% delay 0.2
-    %% caption 10 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
-    %% when pipette ts done
-    %% delay 0.2
-    AN->>IF: Sample Complete SampleId=SID-000125
-    %% when sample_complete C3 arrived
-    %% delay 0.1
-    %% for C3
-    IF-->>AN: OK
-    %% when C1 at merge
-    %% move C1 to gone ease=out
-    %% when C1 at main_out
+    %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% when release C1 arrived
-    %% delay 0.1
+    %% after 0.1 OK C3
+    %% pipette ts duration=4.5
+    %% after 0.1 Release C1
     %% for C1
     AN-->>IF: OK
-    %% when interface_ok C3 sent
+    %% after 0.2 pipette ts
+    %% caption 8 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
+    %% after 0.2 pipette ts
+    AN->>IF: Sample Complete SampleId=SID-000125
+    %% after 0.1
+    %% for C3
+    IF-->>AN: OK
     %% rotate ts
-    %% when rotate ts done
-    %% delay 0.2
-    %% move C3 to merge ease=in
-    %% when C3 at merge
-    %% move C3 to gone ease=out
-    %% when C3 at main_out
+    %% after 0.2
+    %% move C3 to gone
+    %% on antenna3
     IF->>AN: Release SampleId=SID-000125
-    %% when release C3 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C3
     AN-->>IF: OK
-    %% when analyzer_ok C3 arrived
-    %% delay 0.5
-    %% caption 11 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% when analyzer_ok C3 arrived
-    %% delay 0.5
+    %% after 0.5
+    %% caption 9 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% after 0.5 OK C3
     AN->>DMX: Results SampleId=SID-000123
-    %% when results C1 arrived
-    %% delay 0.2
+    %% after 0.2
     AN->>DMX: Results SampleId=SID-000125

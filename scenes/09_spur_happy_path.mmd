@@ -10,72 +10,48 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone speed=110
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone
 
-    %% at 0
     %% caption 1 · Spur | The spur is a U-shaped branch perpendicular to the Main-Lane: the carrier goes up one branch, past the sampling point (analyzer on its right), and comes back down the other.
-    %% at 1.5
-    %% move C1 to nsd ease=in
-    %% when C1 at nsd
-    %% move C1 to sampling ease=out
-    %% when C1 at nsd
-    %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping into a short piece of pit-lane that turns 90° into the spur. The interface sends Prepare to the analyzer.
-    %% when C1 at nsd
+    %% at 2.2
+    %% move C1 to sampling
+    %% on antenna1 C1
+    %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping into a short piece of pit-lane that turns into the spur: Prepare. The gate stops it on the sampling point of the up branch: Sample Acquisition.
+    %% on antenna1 C1
     %% highlight nsd duration=2
-    %% when C1 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare C1 sent
-    %% delay 1.829
+    %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% when sample_ok C1 sent
-    %% delay 1.4
-    %% caption 3 · Test query | After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample.
-    %% when sample_ok C1 arrived
-    %% delay 0.1
-    AN->>DMX: Query SampleId=SID-000123
-    %% when query C1 sent
-    %% delay 1.5
-    DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% when C1 at sampling
-    %% delay 0.262
-    %% caption 4 · Sampling point — Sample Acquisition | The carrier stops at the sampling point on the up branch. The interface sends Sample Acquisition: the tube is in position and can be aspirated.
-    %% when C1 at sampling
-    %% delay 0.46
+    %% on antenna2
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% when sample_acquisition C1 arrived
-    %% delay 0.1
+    %% after 0.1 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
+    %% after 0.1 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% after 0.1 OK C1
+    %% caption 3 · Test query — Pipetting | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now it aspirates the tube, while the gate holds the carrier at the sampling point.
+    %% after 0.1 OK C1
     %% pipette sp duration=4.5
-    %% when pipette sp done
-    %% delay 0.2
-    %% caption 5 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
-    %% when pipette sp done
-    %% delay 0.3
+    %% after 0.2
+    %% caption 4 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
+    %% after 0.3 pipette sp
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% when sample_complete C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% when interface_ok C1 sent
-    %% move C1 to spur_top_in ease=in
-    %% when C1 at spur_top_in
-    %% move C1 to merge ease=linear
-    %% when C1 at merge
-    %% move C1 to gone ease=out
-    %% when C1 at iface_out
-    %% caption 6 · Release | As soon as the carrier has left the interface module, the interface sends Release: the sample has left the analyzer interface.
-    %% when C1 at iface_out
+    %% move C1 to gone
+    %% on antenna3 C1
+    %% caption 5 · Release | As soon as the carrier has left the interface module, the interface sends Release: the sample has left the analyzer interface.
+    %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% when release C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.5
-    %% caption 7 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% when analyzer_ok C1 arrived
-    %% delay 0.5
+    %% after 0.5
+    %% caption 6 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% after 0.5 OK C1
     AN->>DMX: Results SampleId=SID-000123

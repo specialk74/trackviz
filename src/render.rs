@@ -251,71 +251,64 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 let _ = write!(o, r##"<text x="{cx}" y="{}" font-size="17" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##, cy + disk + 26.0, esc(&d.label));
             }
             DeviceKind::Gate => {
-                // Drawn for a horizontal lane: post above the lane, arm across it.
-                // Seen from above, the lifting arm gets shorter as it opens.
+                // Post beside the lane, arm across it. Seen from above, the lifting
+                // arm gets shorter as it opens.
                 let (gx, gy) = sc.pt(d.at.as_deref().unwrap());
+                let (dx, dy) = sc.lane_dir((gx, gy));
+                // The post stands on the right of the direction of travel (above a
+                // lane that goes right to left).
+                let (nx, ny) = (-dy, dx);
                 let iv = tl.gates.iter().find(|g| g.0 == di).map(|g| g.1.as_slice()).unwrap_or(&[]);
                 let open = iv
                     .iter()
                     .map(|&(a, b)| Ease::InOut.apply(((t - (a - 0.4)) / 0.4).min((b + 0.4 - t) / 0.4)))
                     .fold(0.0, f64::max);
-                let (py, len) = (gy - 30.0, 60.0 * (1.0 - open));
+                let (px, py) = (gx + nx * 30.0, gy + ny * 30.0);
+                let len = 60.0 * (1.0 - open);
                 if let Some(a) = glow {
-                    let _ = write!(o, r#"<rect x="{}" y="{}" width="28" height="72" rx="8" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#, gx - 14.0, gy - 40.0);
+                    let _ = write!(o, r#"<circle cx="{gx}" cy="{gy}" r="38" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
                 }
                 if len > 0.5 {
+                    let (ex, ey) = (px - nx * len, py - ny * len);
                     let _ = write!(
                         o,
-                        r##"<line x1="{gx}" y1="{py}" x2="{gx}" y2="{:.1}" stroke="#DC2626" stroke-width="7" stroke-linecap="round"/><line x1="{gx}" y1="{py}" x2="{gx}" y2="{:.1}" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="6 6"/>"##,
-                        py + len, py + len
+                        r##"<line x1="{px:.1}" y1="{py:.1}" x2="{ex:.1}" y2="{ey:.1}" stroke="#DC2626" stroke-width="7" stroke-linecap="round"/><line x1="{px:.1}" y1="{py:.1}" x2="{ex:.1}" y2="{ey:.1}" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="6 6"/>"##
                     );
                 }
-                let col = if glow.is_some() { ACCENT } else { "#475569" };
-                let _ = write!(
-                    o,
-                    r##"<rect x="{}" y="{}" width="14" height="14" rx="3" fill="#334155"/><text x="{gx}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
-                    gx - 7.0, py - 12.0, gy + 44.0, esc(&d.label)
-                );
+                let _ = write!(o, r##"<rect x="{:.1}" y="{:.1}" width="14" height="14" rx="3" fill="#334155"/>"##, px + nx * 5.0 - 7.0, py + ny * 5.0 - 7.0);
+                if !d.label.is_empty() {
+                    let col = if glow.is_some() { ACCENT } else { "#475569" };
+                    let _ = write!(o, r##"<text x="{:.1}" y="{:.1}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##, gx - nx * 44.0, gy - ny * 44.0 + 5.0, esc(&d.label));
+                }
             }
-            DeviceKind::Antenna => {
-                // A reader above the lane (or where label_x/label_y put it), with a dashed
-                // line to the point it reads; waves while a carrier is over the point.
+            DeviceKind::Antenna if d.visible => {
+                // A flat reader on the lane, under the carriers. While it reads a
+                // carrier, waves spread around it.
                 let (ax, ay) = sc.pt(d.at.as_deref().unwrap());
-                let (rx, ry) = d.label_pos.unwrap_or((ax, ay - 36.0));
+                let (dx, dy) = sc.lane_dir((ax, ay));
+                let deg = dy.atan2(dx).to_degrees();
                 let reading = carrier_over(sc, tl, (ax, ay), t);
                 if let Some(a) = glow {
-                    let _ = write!(o, r#"<circle cx="{rx}" cy="{ry}" r="22" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
+                    let _ = write!(o, r#"<circle cx="{ax}" cy="{ay}" r="30" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
                 }
-                let wave = if reading { "#2563EB" } else { "#94A3B8" };
-                for k in 1..=2 {
-                    let r = 7.0 * k as f64;
-                    let op = if reading { 0.35 + 0.65 * ((t * 3.0 - k as f64 * 0.3).sin() * 0.5 + 0.5) } else { 1.0 };
-                    // Arcs on both sides of the reader, opening sideways.
-                    let _ = write!(
-                        o,
-                        r##"<path d="M{:.1},{:.1} A{r},{r} 0 0 0 {:.1},{:.1} M{:.1},{:.1} A{r},{r} 0 0 1 {:.1},{:.1}" fill="none" stroke="{wave}" stroke-width="2.5" stroke-linecap="round" opacity="{op:.2}"/>"##,
-                        rx - r * 0.7, ry - r * 0.7, rx - r * 0.7, ry + r * 0.7,
-                        rx + r * 0.7, ry - r * 0.7, rx + r * 0.7, ry + r * 0.7
-                    );
+                if reading {
+                    for k in 0..2 {
+                        let phase = (t * 1.5 + k as f64 * 0.5).rem_euclid(1.0);
+                        let _ = write!(
+                            o,
+                            r##"<circle cx="{ax}" cy="{ay}" r="{:.1}" fill="none" stroke="#2563EB" stroke-width="2.5" opacity="{:.2}"/>"##,
+                            CARRIER_R + 4.0 + 18.0 * phase,
+                            0.7 * (1.0 - phase)
+                        );
+                    }
                 }
-                // From the reader to the edge of a carrier on the point.
-                let len = ((ax - rx).powi(2) + (ay - ry).powi(2)).sqrt().max(1.0);
-                let (ux, uy) = ((ax - rx) / len, (ay - ry) / len);
-                if len > 30.0 {
-                    let (line, width, dash) = if reading { ("#2563EB", 2.0, "3 4") } else { ("#CBD5E1", 1.5, "2 4") };
-                    let _ = write!(
-                        o,
-                        r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{line}" stroke-width="{width}" stroke-dasharray="{dash}"/>"##,
-                        rx + ux * 6.0, ry + uy * 6.0, ax - ux * 22.0, ay - uy * 22.0
-                    );
-                }
-                let col = if glow.is_some() { ACCENT } else { "#475569" };
+                let coil = if reading { "#2563EB" } else { "#64748B" };
                 let _ = write!(
                     o,
-                    r##"<circle cx="{rx}" cy="{ry}" r="5" fill="#334155"/><text x="{rx}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
-                    ry - 28.0, esc(&d.label)
+                    r##"<g transform="translate({ax} {ay}) rotate({deg:.1})"><rect x="-9" y="-15" width="18" height="30" rx="4" fill="#CBD5E1" stroke="#334155" stroke-width="2"/><rect x="-5" y="-10" width="10" height="20" rx="2" fill="none" stroke="{coil}" stroke-width="1.8"/></g>"##
                 );
             }
+            DeviceKind::Antenna => {}
             DeviceKind::Zone => {}
         }
     }

@@ -13,111 +13,76 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,sampling,pit_out,merge,main_out speed=75
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,sampling,pit_out,merge,main_out
 
-    %% at 0
     %% caption 1 · Main-Lane | A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface.
-    %% at 1
-    %% move C1 to nsd ease=in
-    %% when C1 at nsd
-    %% move C1 to sampling ease=out
-    %% when C1 at nsd
-    %% caption 2 · Diverted — Prepare | The carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer.
-    %% when C1 at nsd
+    %% at 2.2
+    %% move C1 to sampling
+    %% on antenna1 C1
+    %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted into the Pit-Lane without stopping and the interface sends Prepare. The gate stops it on the sampling point: the interface sends Sample Acquisition.
+    %% on antenna1 C1
     %% highlight nsd duration=2
-    %% when C1 at nsd
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare C1 sent
-    %% delay 2
+    %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% when sample_ok C1 arrived
-    %% delay 0.33
-    %% caption 3 · Test query | After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample.
-    %% when sample_ok C1 arrived
-    %% delay 0.53
-    AN->>DMX: Query SampleId=SID-000123
-    %% when query C1 sent
-    %% delay 2
-    DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% when C1 at sampling
-    %% delay 0.08
-    %% caption 4 · Sampling point — Sample Acquisition | The carrier stops at the sampling point. The interface sends Sample Acquisition and the analyzer starts aspirating.
-    %% when C1 at sampling
-    %% delay 0.28
+    %% on antenna2
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% when sample_acquisition C1 arrived
-    %% delay 0.1
+    %% after 0.1 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
+    %% after 0.1 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% after 0.1 OK C1
+    %% caption 3 · Test query — Aspiration | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now its needle goes down into the tube and it starts aspirating.
+    %% after 0.1 OK C1
     %% needle sp down
-    %% when analyzer_ok C1 arrived
-    %% delay 0.1
+    %% after 0.1 OK C1
     %% duration 2.6
     Note over AN: Pipetting
-    %% when needle sp done
-    %% delay 1.7
-    %% caption 5 · Instrument error | During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status.
-    %% when needle sp done
-    %% delay 1.7
+    %% after 1.7 needle sp
+    %% caption 4 · Instrument error | During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status.
+    %% after 1.7 needle sp
     %% status analyzer error
-    %% when needle sp done
-    %% delay 1.7
+    %% after 1.7 needle sp
     %% for C1
     AN->>IF: Status State=Error
-    %% when status_error C1 sent
-    %% delay 0.5
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% when sample_complete C1 arrived
-    %% delay 0.1
+    %% after 0.3 Status C1
     %% for C1
     IF-->>AN: OK
-    %% when status_error C1 sent
-    %% delay 1.8
+    %% after 0.1 Sample Complete C1
     %% for C1
     IF-->>AN: OK
-    %% when interface_ok C1 arrived
-    %% delay 0.3
-    %% caption 6 · Operator recovery | Sample Complete is not enough: with the analyzer in error the interface does not move the carrier: the needle is still in the tube. An operator walks to the instrument and performs a recovery: the needle is brought back up.
-    %% when interface_ok C1 arrived
-    %% delay 0.3
+    %% after 2.1 Status C1
+    %% caption 5 · Operator recovery | Sample Complete is not enough: with the analyzer in error the interface does not move the carrier: the needle is still in the tube. An operator walks to the instrument and performs a recovery: the needle is brought back up.
+    %% after 2.1 Status C1
     %% duration 6
     Note over AN: Operator recovery
-    %% when interface_ok C1 arrived
-    %% delay 0.3
+    %% after 2.1 Status C1
     %% operator analyzer duration=7
-    %% when interface_ok C1 arrived
-    %% delay 2.8
+    %% after 4.6 Status C1
     %% needle sp up duration=1.2
-    %% when needle sp done
-    %% delay 2.6
-    %% caption 7 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
-    %% when needle sp done
-    %% delay 2.6
+    %% after 2.6
+    %% caption 6 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
+    %% after 2.6 needle sp
     %% status analyzer ready
-    %% when needle sp done
-    %% delay 2.6
+    %% after 2.6 needle sp
     %% for C1
     AN->>IF: Status State=Ready
-    %% when status_ready C1 sent
-    %% delay 1.7
+    %% after 0.2
     %% for C1
     IF-->>AN: OK
-    %% when status_ready sent
-    %% delay 3
+    %% after 1.5 Status C1
     %% status analyzer normal
-    %% when interface_ok C1 arrived
-    %% delay 0.2
-    %% caption 8 · Carrier released — Release | The interface releases the carrier. As soon as it has left the interface module, the interface sends Release.
-    %% when status_ready C1 arrived
-    %% delay 1.9
-    %% move C1 to merge ease=in
-    %% when C1 at merge
-    %% move C1 to main_out ease=out
-    %% when C1 at main_out
+    %% after 0.2 OK C1
+    %% caption 7 · Carrier released — Release | The interface releases the carrier. As soon as it has left the interface module, the interface sends Release.
+    %% after 1.9 Status C1
+    %% move C1 to main_out
+    %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% when release C1 arrived
-    %% delay 0.1
+    %% after 0.1
     %% for C1
     AN-->>IF: OK

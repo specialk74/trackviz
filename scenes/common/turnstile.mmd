@@ -35,7 +35,9 @@
 
 %% # Opens by itself while a carrier drives through it.
 %% @device id=gate kind=gate at=gate label=Gate
-%% # Antennas: a message or a step can start when a carrier is over one (%% on antennaN).
-%% @device id=antenna1 kind=antenna at=nsd label="Antenna 1"
-%% @device id=antenna2 kind=antenna at=pit_wait label="Antenna 2" label_x=720 label_y=480
-%% @device id=antenna3 kind=antenna at=main_out label="Antenna 3" label_x=110 label_y=704
+%% # Antennas on the lanes: a step can start when a carrier is over one (%% on antennaN).
+%% # gate=true: a gate holds the carrier on the antenna (the belt never stops);
+%% # visible=false: a trigger only (the last one, where the carrier has left the module).
+%% @device id=antenna1 kind=antenna at=nsd
+%% @device id=antenna2 kind=antenna at=pit_wait
+%% @device id=antenna3 kind=antenna at=main_out visible=false

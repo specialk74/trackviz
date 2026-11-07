@@ -81,9 +81,9 @@ impl MsgType {
 }
 
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 27] = [
-    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "color", "when", "at", "delay", "with", "after_end", "after_start", "for", "duration", "move", "pipette",
-    "rotate", "highlight", "operator", "needle", "status", "show", "hide", "wait", "caption",
+const DIRECTIVES: [&str; 22] = [
+    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
+    "show", "hide", "wait", "caption",
 ];
 
 fn distance(a: &str, b: &str) -> usize {
@@ -245,7 +245,7 @@ impl Importer {
     /// A step has one starting rule: only `delay` is added to another.
     fn no_start_yet(&self) -> Result<(), String> {
         if self.on.is_some() || self.timing.iter().any(|(k, _)| ["when", "at", "start", "after_start", "after_end"].contains(k)) {
-            return Err("only one of on, after, at, when, with, after_start, after_end for a step".into());
+            return Err("only one of on, after, at for a step".into());
         }
         Ok(())
     }
@@ -365,7 +365,7 @@ impl Importer {
                 self.on_antenna(plain[0], plain.get(1).copied())?;
             }
             "after" => {
-                need(1, "after <seconds> [<message> <carrier>]")?;
+                need(1, "after <seconds> [<message> [<carrier>] | <antenna> <carrier> | pipette|rotate|needle <device>]")?;
                 self.after(seconds("after", plain[0])?, &plain[1..])?;
             }
             "color" => {
@@ -376,17 +376,9 @@ impl Importer {
                 }
                 self.color = Some(c.to_string());
             }
-            "when" => self.timing_key("when", text(tail))?,
-            "with" => self.timing_key("start", text("with"))?,
-            "at" | "delay" | "after_end" | "after_start" => {
-                need(1, &format!("{cmd} <seconds>"))?;
-                let key = match cmd {
-                    "at" => "at",
-                    "delay" => "delay",
-                    "after_end" => "after_end",
-                    _ => "after_start",
-                };
-                self.timing_key(key, seconds(cmd, plain[0])?)?;
+            "at" => {
+                need(1, "at <seconds>")?;
+                self.timing_key("at", seconds(cmd, plain[0])?)?;
             }
             "for" => {
                 need(1, "for <carrier>")?;
@@ -443,6 +435,9 @@ impl Importer {
                 let (title, body) = tail.split_once('|').ok_or("'caption' is written: caption <title> | <text>")?;
                 self.step("caption", vec![("title", text(title.trim())), ("text", text(body.trim()))])?;
             }
+            "when" | "with" | "delay" | "after_start" | "after_end" => {
+                return Err(format!("'{cmd}' no longer exists: a step starts with on <antenna>, after <seconds> [<what>] or at <seconds>"));
+            }
             o => {
                 let hint = suggest(d).map_or(String::new(), |s| format!(": did you mean '{s}'?"));
                 return Err(format!("unknown directive '{o}'{hint} (for a plain comment write '%% # text')"));
@@ -454,29 +449,59 @@ impl Importer {
     /// `%% on <antenna> [<carrier>]`: the next step starts when the carrier is over
     /// the antenna; without a carrier, the one of the step (its SampleId, or the
     /// carrier it moves or shows).
-    fn on_antenna(&mut self, antenna: &str, carrier: Option<&str>) -> Result<(), String> {
+    /// The antennas of the scene: (id, point).
+    fn antennas(&self) -> Vec<(String, String)> {
         let field = |t: &Table, k: &str| t.str_opt(k).ok().flatten().unwrap_or_default();
-        let antennas: Vec<(String, String)> = self.list("device").iter().filter(|t| field(t, "kind") == "antenna").map(|t| (field(t, "id"), field(t, "at"))).collect();
-        let point = antennas.iter().find(|a| a.0 == antenna).map(|a| a.1.clone()).ok_or_else(|| {
+        self.list("device").iter().filter(|t| field(t, "kind") == "antenna").map(|t| (field(t, "id"), field(t, "at"))).collect()
+    }
+
+    /// The point an antenna reads.
+    fn antenna_point(&self, antenna: &str) -> Result<String, String> {
+        let antennas = self.antennas();
+        antennas.iter().find(|a| a.0 == antenna).map(|a| a.1.clone()).ok_or_else(|| {
             let names: Vec<&str> = antennas.iter().map(|a| a.0.as_str()).collect();
             format!("'{antenna}' is not an antenna of this scene (antennas: {})", if names.is_empty() { "none".to_string() } else { names.join(", ") })
-        })?;
+        })
+    }
+
+    fn known_carrier(&self, what: &str, c: &str) -> Result<(), String> {
+        if self.samples.iter().any(|s| s.0 == c) {
+            Ok(())
+        } else {
+            Err(format!("'{what}': no carrier '{c}'"))
+        }
+    }
+
+    fn on_antenna(&mut self, antenna: &str, carrier: Option<&str>) -> Result<(), String> {
+        let point = self.antenna_point(antenna)?;
         if let Some(c) = carrier {
-            if !self.samples.iter().any(|s| s.0 == c) {
-                return Err(format!("'on {antenna} {c}': no carrier '{c}'"));
-            }
+            self.known_carrier(&format!("on {antenna} {c}"), c)?;
         }
         self.no_start_yet()?;
         self.on = Some((point, antenna.to_string(), carrier.map(String::from)));
         Ok(())
     }
 
-    /// `%% after <seconds>`: after the end of the step before; `%% after <seconds>
-    /// <message> [<carrier>]`: after that message has arrived (the latest with
-    /// that text, for that carrier).
+    /// `%% after <seconds>`: after the end of the step before. With what it waits
+    /// for: `<message> [<carrier>]` when that message has arrived (the latest with
+    /// that text, for that carrier); `<antenna> <carrier>` when the carrier is over
+    /// the antenna; `pipette|rotate|needle <device>` when that action ends.
     fn after(&mut self, secs: Value, refer: &[&str]) -> Result<(), String> {
         if refer.is_empty() {
             return self.timing_key("after_end", secs);
+        }
+        if self.antennas().iter().any(|a| a.0 == refer[0]) {
+            let [antenna, c] = refer else {
+                return Err(format!("'after <seconds> {}' needs the carrier: after <seconds> {} <carrier>", refer[0], refer[0]));
+            };
+            let point = self.antenna_point(antenna)?;
+            self.known_carrier(&format!("after {antenna} {c}"), c)?;
+            self.timing_key("when", text(&format!("{c} at {point}")))?;
+            return self.timing_key("delay", secs);
+        }
+        if let [kind @ ("pipette" | "rotate" | "needle"), device] = refer {
+            self.timing_key("when", text(&format!("{kind} {device} done")))?;
+            return self.timing_key("delay", secs);
         }
         let mut name = refer.to_vec();
         let carrier = name.last().filter(|w| self.samples.iter().any(|s| s.0 == **w)).map(|w| w.to_string());
@@ -514,17 +539,16 @@ impl Importer {
                 r
             }
         };
-        let speed = match o.get("speed") {
-            Some(s) => seconds("speed", s)?,
-            None => Value::Num(if self.geometry.as_deref().is_some_and(|g| g.starts_with("spur")) { 110.0 } else { 75.0 }),
-        };
         let mut k: Keys = vec![
             ("id", text(id)),
             ("tube", Value::Bool(true)),
             ("sample_id", text(sample)),
             ("route", Value::Arr(route.iter().map(|p| text(p)).collect())),
-            ("speed", speed),
         ];
+        // Without speed= the carrier goes with the belt.
+        if let Some(s) = o.get("speed") {
+            k.push(("speed", seconds("speed", s)?));
+        }
         if let Some(col) = o.get("color") {
             k.push(("cap_color", text(col)));
         }
@@ -772,9 +796,10 @@ mod tests {
 
     #[test]
     fn timing_directives_apply_to_the_next_step() {
-        let d = doc(&format!("{HEAD}%% move C1 to nsd ease=in\n%% when C1 at nsd\n%% delay 0.5\nIF->>AN: Prepare SampleId=SID-1\n%% with\n%% highlight nsd duration=2\n")).unwrap();
-        assert!(has(&d, "step", &[("when", "C1 at nsd"), ("delay", "0.5"), ("type", "prepare")]));
-        assert!(has(&d, "step", &[("start", "with"), ("device", "nsd"), ("duration", "2")]));
+        let d = doc(&format!("{HEAD}%% move C1 to nsd ease=in\n%% on antenna1\nIF->>AN: Prepare SampleId=SID-1\n%% at 3\n%% highlight nsd duration=2\n%% after 0.5\n%% caption a | b\n")).unwrap();
+        assert!(has(&d, "step", &[("when", "C1 at nsd"), ("type", "prepare")]));
+        assert!(has(&d, "step", &[("at", "3"), ("device", "nsd"), ("duration", "2")]));
+        assert!(has(&d, "step", &[("after_end", "0.5"), ("action", "caption")]));
         assert!(has(&d, "step", &[("action", "move"), ("ease", "in")]) && !has(&d, "step", &[("action", "move"), ("when", "C1 at nsd")]));
     }
 
@@ -787,10 +812,11 @@ mod tests {
     }
 
     const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1 needle=both\n%% carrier C2 SID-2 needle=2\n\
-        %% move C1 to d1\n%% move C1 to s1\n%% with\n%% move C2 to w1\n\
+        %% move C1 to d1\n%% move C1 to s1\n%% at 0\n%% move C2 to w1\n\
         %% on antenna1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
         %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 Add Tube C1\nAN-->>IF: Late\n\
-        %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n";
+        %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
+        %% after 0.5 antenna2 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done SampleId=SID-1\n";
 
     #[test]
     fn on_after_and_color_set_the_moment_and_the_look() {
@@ -801,6 +827,8 @@ mod tests {
         assert!(has(&d, "step", &[("text", "Again"), ("when", "C1 at d1"), ("color", "#9333EA")]));
         assert!(has(&d, "step", &[("text", "Late"), ("when", "add_tube C1 arrived"), ("delay", "0.2")]));
         assert!(has(&d, "step", &[("text", "Go"), ("after_end", "1")]));
+        assert!(has(&d, "step", &[("action", "caption"), ("when", "C1 at d1"), ("delay", "0.5")]));
+        assert!(has(&d, "step", &[("text", "Done"), ("when", "pipette sp1 done"), ("delay", "0.2")]));
         let (_, tl) = build(&d);
         let at = |name: &str| tl.events.iter().find(|e| matches!(&e.ev, Ev::Message { text, .. } if text == name)).unwrap().t0;
         let same = |a: f64, b: f64| assert!((a - b).abs() < 0.011, "{a} != {b}");
@@ -819,7 +847,9 @@ mod tests {
         fails(&k("%% on antenna1 C9\n%% caption a | b\n"), "no carrier 'C9'");
         fails(&k("%% on antenna1\n%% caption a | b\n"), "write the carrier, on antenna1 <carrier>");
         fails(&k("%% on antenna1\n%% at 3\nIF->>AN: X SampleId=SID-1\n"), "only one of");
-        fails(&k("%% when C1 at d1\n%% on antenna1\nIF->>AN: X SampleId=SID-1\n"), "only one of");
+        fails(&k("%% after 1\n%% on antenna1\nIF->>AN: X SampleId=SID-1\n"), "only one of");
+        fails(&k("%% after 1 antenna1\nIF->>AN: X SampleId=SID-1\n"), "needs the carrier");
+        fails(&k("%% after 1 antenna1 C9\nIF->>AN: X SampleId=SID-1\n"), "no carrier 'C9'");
         fails(&k("%% on antenna1\n"), "its step is missing");
         fails(&k("%% after 1 Nothing C1\nIF->>AN: X\n"), "no message 'Nothing' for C1");
         fails(&k("%% color blue\nIF->>AN: X\n"), "like #9333EA");
@@ -854,8 +884,9 @@ mod tests {
         fails(&format!("{HEAD}alt ok\nIF->>AN: A\nend\n"), "'alt' is not supported");
         fails(&format!("{HEAD}IF->>AN: Prepare SampleId=SID-9\n"), "no carrier has sample id 'SID-9'");
         fails("sequenceDiagram\n%% carrier C1 SID-1\n", "geometry must be given before");
-        fails(&format!("{HEAD}%% when C1 at nsd\n%% at 3\nIF->>AN: A\n"), "only one of");
-        fails(&format!("{HEAD}%% delay soon\nIF->>AN: A\n"), "needs seconds");
+        fails(&format!("{HEAD}%% on antenna1\n%% at 3\nIF->>AN: A SampleId=SID-1\n"), "only one of");
+        fails(&format!("{HEAD}%% at soon\nIF->>AN: A\n"), "needs seconds");
+        fails(&format!("{HEAD}%% when C1 at nsd\nIF->>AN: A\n"), "'when' no longer exists");
         fails("%% geometry nowhere\n", "nowhere.mmd not found");
         fails("%% @point id=a id=b\n", "duplicate key 'id'");
     }
