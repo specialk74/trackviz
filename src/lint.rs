@@ -4,7 +4,7 @@
 use crate::render::caption_lines;
 use crate::scene::*;
 
-const TRACK_X: std::ops::Range<f64> = 30.0..950.0;
+use crate::physics::TRACK_X;
 
 pub fn warnings(sc: &Scene, tl: &Timeline) -> Vec<String> {
     let mut w = overlapping_carriers(sc, tl);
@@ -30,7 +30,7 @@ fn overlapping_carriers(sc: &Scene, tl: &Timeline) -> Vec<String> {
         for i in 0..n {
             for j in i + 1..n {
                 let hit = match (pos[i], pos[j]) {
-                    (Some(a), Some(b)) => ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() < 2.0 * CARRIER_R,
+                    (Some(a), Some(b)) => ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() < 2.0 * CARRIER_R - 0.5,
                     _ => false,
                 };
                 if hit && !touching[i * n + j] {

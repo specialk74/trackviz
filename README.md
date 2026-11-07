@@ -157,10 +157,32 @@ the exit code is 1. `-o` and `--still` take a single scene.
 log when tuning timings. It also prints warnings, as rendering does, for what is
 valid but looks wrong; they don't stop anything and the exit code stays 0:
 
-- two physical carriers overlapping on the track
+- two physical carriers overlapping on the track (with the physics this happens only
+  when they start on the same spot inside the panel)
 - captions too long for the band, which get cut
 - a Query sent before the OK to its Prepare or the reply to the previous Query has
   arrived
+
+### Carrier physics
+
+Two carriers never take the same space, and they only go forward. `move C2 to
+sampling` means "C2 sets off towards the sampling point": if the way is taken, C2
+stops in contact with the carrier in front and moves on as soon as that one makes
+room, so it arrives when it can. Everything that waits for that arrival (`on
+antennaN`, `when C2 at ...`) moves with it. `--check` shows the waits:
+
+```
+     0.00s -   20.35s  move      C2 -> sampling  (waits 12.0s behind C1)
+    30.35s -   43.83s  move      C2 -> iface_out  (stops behind C1 and never gets there)
+```
+
+- Where two lanes join, the carrier nearer to the junction goes first (on a tie, the
+  one declared first); the other one stays clear of its way and then follows it.
+- Carriers that start on the same spot (the spawn point) go in the order they are
+  declared.
+- A `move` asked while the carrier is still moving starts when it stops.
+- Ghosts, hidden carriers and carriers in a turnstile pocket don't take space;
+  outside the panel carriers don't stop.
 
 ## Scene format
 

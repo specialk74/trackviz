@@ -1,6 +1,7 @@
 //! Scene model (parsed from the scenario file) and timeline computation.
 
 use crate::doc::{Doc, Table};
+use crate::physics;
 use std::collections::HashMap;
 
 pub struct Video {
@@ -610,6 +611,7 @@ impl Scene {
 
 // ---------------------------------------------------------------- timeline
 
+#[derive(Clone)]
 pub struct MoveSeg {
     pub t0: f64,
     pub t1: f64,
@@ -786,7 +788,7 @@ impl CarrierPath {
         self.pos_at_s(self.s_at(t))
     }
     pub fn moving(&self, t: f64) -> bool {
-        self.moves.iter().any(|m| t > m.t0 && t < m.t1)
+        self.moves.iter().any(|m| t > m.t0 && t < m.t1 && m.s1 > m.s0 + 1e-9)
     }
     /// Running away: from the first `move` with `runaway = true` to the end of
     /// the last one, including a stop in between.
@@ -852,20 +854,6 @@ impl CarrierPath {
         }
         Some(hi)
     }
-    /// First time within move m at which the carrier reaches distance s.
-    fn time_at_s(&self, m: &MoveSeg, s: f64) -> f64 {
-        if s <= m.s0 {
-            return m.t0;
-        }
-        let n = 400;
-        for k in 0..=n {
-            let t = m.t0 + (m.t1 - m.t0) * k as f64 / n as f64;
-            if self.s_at(t) >= s {
-                return t;
-            }
-        }
-        m.t1
-    }
 }
 
 pub enum Ev {
@@ -930,17 +918,28 @@ impl Timeline {
     /// Lays out the steps in time. On error, the message also lists the
     /// timeline computed up to that point (useful to fix delays in a scene).
     pub fn build(sc: &Scene) -> Result<Timeline, String> {
-        let mut log = Vec::new();
-        Self::build_inner(sc, &mut log).map_err(|e| {
-            if log.is_empty() {
-                e
-            } else {
-                format!("{e}\nTimeline up to the error:\n  {}", log.join("\n  "))
+        // The moves depend on the steps (when they start) and the steps on the
+        // moves (when a carrier arrives): lay out, play the moves together, and
+        // again until nothing changes.
+        let mut actual: HashMap<usize, physics::Done> = HashMap::new();
+        for _ in 0..40 {
+            let mut log = Vec::new();
+            let (tl, plans) = Self::build_inner(sc, &mut log, &actual, false).map_err(|e| with_log(e, &log))?;
+            let next = physics::simulate(&tl.carriers, &plans);
+            let settled = next.len() == actual.len() && next.iter().all(|(k, d)| actual.get(k).is_some_and(|a| a.same(d)));
+            actual = next;
+            if settled {
+                let mut log = Vec::new();
+                return Self::build_inner(sc, &mut log, &actual, true).map(|r| r.0).map_err(|e| with_log(e, &log));
             }
-        })
+        }
+        Err("the carriers keep pushing each other: the timing never settles (check the moves that start when another carrier arrives)".into())
     }
 
-    fn build_inner(sc: &Scene, log: &mut Vec<String>) -> Result<Timeline, String> {
+    /// One layout of the steps. `actual`: the moves as they really happen (from
+    /// the physics), by step; a move not in it is laid out without obstacles.
+    /// `check`: the final layout, with the checks on wheels, needles and gates.
+    fn build_inner(sc: &Scene, log: &mut Vec<String>, actual: &HashMap<usize, physics::Done>, check: bool) -> Result<(Timeline, Vec<physics::Plan>), String> {
         let mut carriers = Vec::new();
         let mut cur_idx = Vec::new();
         for c in &sc.carriers {
@@ -993,8 +992,9 @@ impl Timeline {
         let mut first = true;
         // What a `when` can refer to: (key, start, end) of the steps so far.
         let mut history: Vec<(String, f64, f64)> = Vec::new();
+        let mut plans: Vec<physics::Plan> = Vec::new();
 
-        for st in &sc.steps {
+        for (si, st) in sc.steps.iter().enumerate() {
             let base = match &st.start {
                 StartMode::At(at) => *at,
                 StartMode::When(anchors) => {
@@ -1034,14 +1034,9 @@ impl Timeline {
                     let ci = sc.need_carrier(carrier, &st.loc)?;
                     let c = &sc.carriers[ci];
                     let mut from = cur_idx[ci];
-                    // Leaving a turnstile (from the exit position: checked by simulate_wheels).
-                    if let Some(ai) = attached[ci] {
-                        let wheel = carriers[ci].attach[ai].wheel;
-                        wheel_recs.push(WheelRec { t: t0, wheel, ev: WheelEv::Leave(ci, ai), loc: st.loc.clone() });
-                        carriers[ci].attach[ai].t1 = t0;
-                        attached[ci] = None;
+                    let leaving = attached[ci];
+                    if leaving.is_some() {
                         from += 1; // the route point after "<id>.in" is "<id>.out"
-                        cur_idx[ci] = from;
                     }
                     let ti = c.route.iter().enumerate().skip(from + 1).find(|(_, p)| *p == to).map(|(i, _)| i)
                         .ok_or_else(|| format!("{}: point '{to}' is not ahead of carrier '{carrier}' on its route", st.loc))?;
@@ -1050,25 +1045,42 @@ impl Timeline {
                     }
                     let path = &mut carriers[ci];
                     let (s0, s1) = (path.cum[from], path.cum[ti]);
-                    if let Some(last) = path.moves.last() {
-                        if t0 < last.t1 - 1e-9 {
-                            return Err(format!("{}: carrier '{carrier}' is still moving at t={t0:.2}s", st.loc));
-                        }
-                    }
                     let d = st.duration.unwrap_or((s1 - s0) / speed.unwrap_or(c.speed) * ease.factor());
-                    path.moves.push(MoveSeg { t0, t1: t0 + d, s0, s1, ease: *ease, runaway: *runaway });
+                    let into = wheel_pts.get(to).filter(|w| w.1 == 0).map(|w| w.0);
+                    plans.push(physics::Plan { step: si, carrier: ci, t_req: t0, s0, s1, dur: d, ease: *ease, runaway: *runaway, into_wheel: into.is_some() });
+                    // A move asked while the carrier is still moving starts when it stops.
+                    let free = path.moves.last().map_or(f64::NEG_INFINITY, |m| m.t1);
+                    let done = actual.get(&si).cloned().unwrap_or_else(|| {
+                        let start = t0.max(free);
+                        physics::Done { start, end: Some(start + d), last_motion: start + d, segs: vec![MoveSeg { t0: start, t1: start + d, s0, s1, ease: *ease, runaway: *runaway }], waits: Vec::new() }
+                    });
+                    // Leaving a turnstile (from the exit position: checked by simulate_wheels).
+                    if let Some(ai) = leaving {
+                        let wheel = path.attach[ai].wheel;
+                        wheel_recs.push(WheelRec { t: done.start, wheel, ev: WheelEv::Leave(ci, ai), loc: st.loc.clone() });
+                        path.attach[ai].t1 = done.start;
+                        attached[ci] = None;
+                    }
+                    path.moves.extend(done.segs.iter().cloned());
                     cur_idx[ci] = ti;
                     // Entering a turnstile: the carrier drops into the pocket at the entry.
                     // The pocket is assigned later, in time order (simulate_wheels).
-                    if let Some(&(wi, 0)) = wheel_pts.get(to) {
-                        let t_in = t0 + d;
-                        carriers[ci].attach.push(Attach { wheel: wi, pocket: 0, t_move: t0, t0: t_in, t1: f64::INFINITY });
-                        let ai = carriers[ci].attach.len() - 1;
+                    if let (Some(wi), Some(t_in)) = (into, done.end) {
+                        path.attach.push(Attach { wheel: wi, pocket: 0, t_move: done.start, t0: t_in, t1: f64::INFINITY });
+                        let ai = path.attach.len() - 1;
                         attached[ci] = Some(ai);
                         wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
                     }
-                    let tag = if *runaway { "  (run-away)" } else { "" };
-                    (d, Ev::Wait, format!("move      {carrier} -> {to}{tag}"))
+                    let mut tag = if *runaway { "  (run-away)".to_string() } else { String::new() };
+                    let waited: f64 = done.waits.iter().map(|w| w.1 - w.0).sum();
+                    if let Some(w) = done.waits.first() {
+                        let who = &sc.carriers[w.2].id;
+                        tag += &match done.end {
+                            Some(_) => format!("  (waits {waited:.1}s behind {who})"),
+                            None => format!("  (stops behind {who} and never gets there)"),
+                        };
+                    }
+                    (done.end.unwrap_or(done.last_motion) - t0, Ev::Wait, format!("move      {carrier} -> {to}{tag}"))
                 }
                 Action::Message { from, to, text, params, reply, carrier, color, needle, .. } => {
                     let (fi, ti) = (sc.need_actor(from, &st.loc)?, sc.need_actor(to, &st.loc)?);
@@ -1163,6 +1175,10 @@ impl Timeline {
             prev_end = t1;
             max_end = max_end.max(t1);
         }
+        if !check {
+            let tl = Timeline { events, carriers, wheels, gates: Vec::new(), rows: 0, duration: max_end, log: Vec::new() };
+            return Ok((tl, plans));
+        }
         simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
 
         // Rows of the sequence diagram in time order (same start: file order).
@@ -1239,7 +1255,7 @@ impl Timeline {
             } else {
                 let p = sc.pt(d.at.as_deref().unwrap());
                 for (ci, c) in carriers.iter().enumerate() {
-                    for m in &c.moves {
+                    for m in c.moves.iter().filter(|m| m.s1 > m.s0 + 1e-9) {
                         let at = c.pos_at_s(m.s0);
                         if m.t0 > a - 1e-9 && m.t0 < b - 1e-9 && ((at.0 - p.0).powi(2) + (at.1 - p.1).powi(2)).sqrt() < 3.0 {
                             return Err(format!("carrier '{}' leaves '{}' at {:.2}s while the needle is down ({a:.2}s - {b:.2}s)", sc.carriers[ci].id, d.id, m.t0));
@@ -1257,13 +1273,21 @@ impl Timeline {
             for c in carriers.iter().filter(|c| !c.ghost) {
                 if let Some(sg) = c.project(g) {
                     for m in c.moves.iter().filter(|m| m.s0 < sg && m.s1 > sg) {
-                        iv.push((c.time_at_s(m, sg - 60.0), c.time_at_s(m, sg + 45.0)));
+                        iv.push((c.reaches(sg - 60.0).unwrap_or(m.t0), c.reaches(sg + 45.0).unwrap_or(m.t1)));
                     }
                 }
             }
             gates.push((di, iv));
         }
-        Ok(Timeline { events, carriers, wheels, gates, rows, duration: max_end + sc.video.tail, log: std::mem::take(log) })
+        Ok((Timeline { events, carriers, wheels, gates, rows, duration: max_end + sc.video.tail, log: std::mem::take(log) }, plans))
+    }
+}
+
+fn with_log(e: String, log: &[String]) -> String {
+    if log.is_empty() {
+        e
+    } else {
+        format!("{e}\nTimeline up to the error:\n  {}", log.join("\n  "))
     }
 }
 

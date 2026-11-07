@@ -15,6 +15,7 @@
 //! (and only for video output).
 
 mod doc;
+mod physics;
 mod lint;
 mod mermaid;
 mod render;

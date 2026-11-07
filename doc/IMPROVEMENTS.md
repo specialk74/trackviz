@@ -10,7 +10,7 @@ Deciso con l'utente, a tappe:
 1. **Fatto:** antenne in tutte le geometrie; direttive `on <antenna> [carrier]`,
    `after <secondi> [<messaggio> <carrier>]`, `at`, `color`; tolte le parole chiave
    (`Prepare 1`, `OK`, ...) e il Prepare viola automatico.
-2. **Da fare — fisica dei carrier:** due carrier non occupano mai lo stesso spazio.
+2. **Fatto — fisica dei carrier:** due carrier non occupano mai lo stesso spazio.
    Chi raggiunge un carrier fermo si avvicina fino a toccarlo e si ferma; riparte quando
    l'altro si muove. I carrier vanno solo avanti. `move C2 to <punto>` vuol dire "parte
    verso il punto": soste in coda e ripartenze le calcola il programma.

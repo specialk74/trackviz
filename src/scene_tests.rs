@@ -174,11 +174,64 @@ fn move_durations_follow_speed_and_easing() {
 #[test]
 fn move_errors() {
     err(SAMPLING, "\n%% @step action=move carrier=C1 to=a ", "not ahead");
-    err(
-        SAMPLING,
-        "\n%% @step action=move carrier=C1 to=s \n%% @step action=move start=with carrier=C1 to=c ",
-        "still moving",
-    );
+}
+
+#[test]
+fn a_move_asked_while_moving_starts_when_the_carrier_stops() {
+    let (_, tl) = ok(SAMPLING, "\n%% @step action=move ease=linear carrier=C1 to=s \n%% @step action=move ease=linear start=with carrier=C1 to=c ");
+    // 300 px to s (4 s), then 150 px to c (2 s) right after.
+    assert!((tl.events[1].t1 - 6.0).abs() < 1e-6, "{}", tl.events[1].t1);
+    assert_eq!(tl.carrier_pos(0, 5.0), (525.0, 700.0));
+}
+
+/// A straight lane: C1 waits at the sampling point, C2 and the ghost G come
+/// from the right.
+const LANE: &str = r#"
+%% @video title=t tail=1
+%% @point id=a x=900 y=700
+%% @point id=s x=600 y=700
+%% @point id=c x=300 y=700
+%% @lane id=main points=a,s,c
+%% @device id=an kind=analyzer x=100 y=150 w=400 h=150
+%% @actor id=IF label=Interface
+%% @actor id=AN label=Analyzer
+%% @carrier id=C1 route=a,s,c start=s speed=100
+%% @carrier id=C2 route=a,s,c speed=100
+%% @carrier id=G ghost=true route=a,s,c speed=100
+"#;
+
+const QUEUE: &str = "\n%% @step action=move ease=linear carrier=C2 to=s \n%% @step action=move ease=linear at=5 carrier=C1 to=c \n%% @step action=caption when=\"C2 at s\" title=t text=x ";
+
+#[test]
+fn a_carrier_stops_in_contact_and_moves_on_when_the_way_is_free() {
+    let (_, tl) = ok(LANE, QUEUE);
+    // C2 stops touching C1 (two radii from its center) until C1 leaves at 5 s.
+    assert!((tl.carrier_pos(1, 4.0).0 - (600.0 + 2.0 * CARRIER_R)).abs() < 0.5, "{:?}", tl.carrier_pos(1, 4.0));
+    assert!(!tl.carriers[1].moving(4.0));
+    // Then it follows C1 and reaches s when C1 is two radii further on.
+    let arrived = tl.events[2].t0;
+    assert!((arrived - (5.0 + 2.0 * CARRIER_R / 100.0)).abs() < 0.02, "{arrived}");
+    assert!(tl.log[0].contains("waits") && tl.log[0].contains("behind C1"), "{}", tl.log[0]);
+    // They never overlap.
+    let mut t = 0.0;
+    while t < tl.duration {
+        let (a, b) = (tl.carrier_pos(0, t), tl.carrier_pos(1, t));
+        assert!(((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() > 2.0 * CARRIER_R - 0.5, "t={t}");
+        t += 0.01;
+    }
+}
+
+#[test]
+fn a_carrier_that_is_never_let_through_stays_in_the_queue() {
+    let (_, tl) = ok(LANE, "\n%% @step action=move ease=linear carrier=C2 to=s ");
+    assert!(tl.log[0].contains("never gets there"), "{}", tl.log[0]);
+    err(LANE, "\n%% @step action=move ease=linear carrier=C2 to=s \n%% @step action=caption when=\"C2 at s\" title=t text=x ", "C2");
+}
+
+#[test]
+fn ghosts_go_through_carriers() {
+    let (_, tl) = ok(LANE, "\n%% @step action=move ease=linear carrier=G to=s ");
+    assert!((tl.events[0].t1 - 3.0).abs() < 1e-9);
 }
 
 #[test]
@@ -503,4 +556,50 @@ fn a_slower_carrier_moves_the_whole_scene() {
     };
     let (a, b) = (times(false), times(true));
     assert!(b.0 > a.0 + 1.0 && b.1 > a.1 + 1.0 && b.2 > a.2 + 1.0 && b.3 > a.3 + 1.0, "{a:?} {b:?}");
+}
+
+/// Two lanes that join at m: C1 comes from the right, C2 from above.
+const MERGE: &str = r#"
+%% @video title=t tail=1
+%% @point id=a x=900 y=700
+%% @point id=u x=700 y=500
+%% @point id=m x=700 y=700
+%% @point id=c x=300 y=700
+%% @point id=z x=-100 y=700
+%% @lane id=main points=a,m,c,z
+%% @lane id=side points=u,m
+%% @device id=an kind=analyzer x=100 y=150 w=400 h=150
+%% @actor id=IF label=Interface
+%% @carrier id=C1 route=a,m,c,z speed=100
+%% @carrier id=C2 route=u,m,c,z speed=100
+"#;
+
+#[test]
+fn at_a_merge_the_carrier_declared_first_goes_and_the_other_waits() {
+    let (_, tl) = ok(MERGE, "\n%% @step action=move ease=linear carrier=C1 to=z \n%% @step action=move ease=linear start=with carrier=C2 to=c ");
+    // Both are 200 px from the merge: C1 passes without stopping, C2 waits and
+    // follows it (without the wait it would reach c at 6 s).
+    assert!((tl.events[0].t1 - 10.0).abs() < 1e-9, "{}", tl.events[0].t1);
+    assert!(tl.events[1].t1 > 6.0 + 2.0 * CARRIER_R / 100.0 - 0.02, "{}", tl.events[1].t1);
+    assert!(tl.log[1].contains("behind C1"), "{}", tl.log[1]);
+    let mut t = 0.0;
+    while t < tl.duration {
+        let (a, b) = (tl.carrier_pos(0, t), tl.carrier_pos(1, t));
+        assert!(((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() > 2.0 * CARRIER_R - 0.5, "t={t}");
+        t += 0.01;
+    }
+}
+
+#[test]
+fn a_carrier_declared_first_but_behind_still_follows() {
+    // C1 is declared first but starts behind C2: it must not drive through it.
+    let lane = LANE.replace("route=a,s,c start=s speed=100", "route=a,s,c speed=100").replace("%% @carrier id=C2 route=a,s,c speed=100", "%% @carrier id=C2 route=a,s,c start=s speed=50");
+    let (_, tl) = ok(&lane, "\n%% @step action=move ease=linear carrier=C2 to=c \n%% @step action=move ease=linear start=with carrier=C1 to=c ");
+    let mut t = 0.0;
+    while t < tl.duration {
+        let (a, b) = (tl.carrier_pos(0, t), tl.carrier_pos(1, t));
+        assert!(((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() > 2.0 * CARRIER_R - 0.5, "t={t}");
+        t += 0.01;
+    }
+    assert!(tl.log[1].contains("behind C2"), "{}", tl.log[1]);
 }

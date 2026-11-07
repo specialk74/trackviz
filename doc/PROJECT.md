@@ -119,6 +119,7 @@ trackviz/
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
+    ├── physics.rs        # fisica dei carrier: code a contatto, incroci, precedenze
     ├── mermaid.rs        # lettura delle scene Mermaid
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
@@ -172,7 +173,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Modello:** `Video`, `Point`, `Lane` (Main/Pit/Link), `Device` (Nsd/Sampling/Analyzer/Zone), `Actor`, `Carrier`, `Step` con `Action`.
 
-**Validazioni:** riferimenti a point/actor/device/carrier esistenti, punto `start` sulla route, target del `move` **più avanti** sulla route del carrier, carrier che non può ricevere un nuovo move mentre è ancora in movimento, `pipette` solo su device `sampling` o `turnstile` e solo se esiste un `analyzer`, route che attraversano un turnstile solo come `<id>.in`, `<id>.out` consecutivi, regole della ruota (vedi sotto), `wait` con `duration` obbligatoria, niente messaggi di un attore verso sé stesso.
+**Validazioni:** riferimenti a point/actor/device/carrier esistenti, punto `start` sulla route, target del `move` **più avanti** sulla route del carrier, `pipette` solo su device `sampling` o `turnstile` e solo se esiste un `analyzer`, route che attraversano un turnstile solo come `<id>.in`, `<id>.out` consecutivi, regole della ruota (vedi sotto), `wait` con `duration` obbligatoria, niente messaggi di un attore verso sé stesso.
 
 **Calcolo dei tempi degli step** (in ordine di file):
 - `start=after` (default): inizia alla fine dello step precedente.
@@ -195,7 +196,9 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
-- Ogni `move` genera un segmento `(t0, t1, s0, s1, ease)` sull'ascissa curvilinea *s*.
+- Ogni `move` genera un segmento `(t0, t1, s0, s1, ease)` sull'ascissa curvilinea *s*, se nessuno lo ostacola.
+- **Fisica (`physics.rs`):** i `move` chiesti dagli step sono giocati tutti insieme, a passi di 1/120 s. Un carrier che andrebbe a meno di due raggi da un altro carrier visibile, avvicinandosi, si ferma a contatto e riparte quando c'è spazio; un move chiesto mentre il carrier si muove ancora parte quando si ferma. Due carrier in movimento le cui strade (150 px avanti) si incrociano: passa quello già sulla strada dell'altro, altrimenti il più vicino all'incrocio, a parità il primo dichiarato; la decisione resta finché l'incrocio non è risolto e l'altro si tiene lontano dalla strada del primo. Carrier nello stesso punto (spawn): parte il primo dichiarato. Fantasmi, carrier nascosti o nella ruota non occupano spazio; fuori dal pannello (`TRACK_X`) nessuno si ferma. Un move ostacolato diventa una serie di segmenti lineari.
+- **Catena:** gli arrivi decidono gli step (`on`, `when`) e gli step decidono i move, quindi `Timeline::build` ripete la disposizione degli step con i move reali finché i tempi non cambiano più (al massimo 40 volte); le verifiche su ruota, ago e gate si fanno sull'ultima. `--check` scrive `(waits N s behind C1)` o `(stops behind C1 and never gets there)`.
 - Easing: `linear`, `in` = 1−cos(πx/2), `out` = sin(πx/2), `inout` = (1−cos πx)/2.
 - Durata del move = lunghezza / speed × fattore, con fattore 1 per linear e **π/2 per gli altri**. In questo modo la **velocità di picco è uguale a `speed`**, e un move `in` seguito da un move `out` ha velocità continua nel punto di giunzione. È così che si rappresenta il passaggio **senza fermata** dall'NSD.
 
