@@ -93,28 +93,28 @@ trackviz/
 ├── Cargo.toml            # edition 2021, dipendenze: resvg, dejavu (build: sha2)
 ├── README.md             # guida rapida e riferimento del formato
 ├── doc/IMPROVEMENTS.md   # miglioramenti proposti e punti da confermare
-├── examples/             # esempio di scena scritta in Mermaid
 ├── build.rs              # scarica Inter (SHA-256 verificato) in OUT_DIR
 ├── fonts/                # README e licenze dei font (i .ttf non sono in git)
 ├── PROJECT.md            # questo documento
 ├── scenes/
-│   ├── 01_prepare_sample_release.toml
-│   ├── 02_turnstile_three_carriers.toml
-│   ├── 03_clear_missing_carrier.toml
-│   ├── 04_clear_missing_carrier_turnstile.toml
-│   ├── 05_analyzer_error_recovery.toml
-│   ├── 06_analyzer_error_recovery_turnstile.toml
-│   ├── 07_carrier_runaway.toml
-│   ├── 08_carrier_runaway_turnstile.toml
-│   ├── 09_spur_happy_path.toml
-│   ├── 10_spur_clear_missing_carrier.toml
-│   ├── 11_spur_analyzer_error_recovery.toml
-│   ├── 12_spur_carrier_runaway.toml
-│   ├── 13_spur2_happy_path.toml
-│   ├── 14_spur2_clear_missing_carrier.toml
-│   ├── 15_spur2_analyzer_error_recovery.toml
-│   ├── 16_spur2_carrier_runaway.toml
-│   └── common/           # parti comuni incluse dalle scene: video, attori, geometrie
+│   ├── 01_prepare_sample_release.mmd
+│   ├── 02_turnstile_three_carriers.mmd
+│   ├── 03_clear_missing_carrier.mmd
+│   ├── 04_clear_missing_carrier_turnstile.mmd
+│   ├── 05_analyzer_error_recovery.mmd
+│   ├── 06_analyzer_error_recovery_turnstile.mmd
+│   ├── 07_carrier_runaway.mmd
+│   ├── 08_carrier_runaway_turnstile.mmd
+│   ├── 09_spur_happy_path.mmd
+│   ├── 10_spur_clear_missing_carrier.mmd
+│   ├── 11_spur_analyzer_error_recovery.mmd
+│   ├── 12_spur_carrier_runaway.mmd
+│   ├── 13_spur2_happy_path.mmd
+│   ├── 14_spur2_clear_missing_carrier.mmd
+│   ├── 15_spur2_analyzer_error_recovery.mmd
+│   ├── 16_spur2_carrier_runaway.mmd
+│   ├── 17_mermaid_spur_happy_path.mmd
+│   └── common/           # parti comuni: video, attori, messaggi, geometrie, direttive Mermaid
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
@@ -130,18 +130,23 @@ trackviz/
 
 ```
 trackviz <scene.toml>... [-o out.mp4] [-j jobs]   # video completo (senza -o: out/<nome del .toml>.mp4)
-trackviz "scenes/*.toml"                          # più scene in parallelo (* e ? nel nome del file)
+trackviz "scenes/*.mmd"                          # più scene in parallelo (* e ? nel nome del file)
 trackviz <scene.toml> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.toml> --still <sec> --svg -o f.svg
 trackviz <scene.toml>... --check                  # valida e stampa la timeline
 trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima veloce
+trackviz <flusso.mmd>                             # le scene possono essere diagrammi Mermaid
 ```
 
 **Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima dell'OK al suo Prepare o della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
-**Mermaid:** `trackviz export <scene>...` scrive il sequence diagram in `out/<nome>.mmd`, `trackviz import <flusso.mmd> [--geometry g] [-o file]` genera una scena. Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%` (`src/mermaid.rs`, esempio in `examples/`). Una direttiva sconosciuta è un errore, `%% # testo` è un commento. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso. Le route di default per geometria sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate (lo verifica un test).
+**Mermaid come file principale:** tutte le scene in `scenes/` sono diagrammi `.mmd`, i file `.toml` restano per le parti comuni (geometrie, attori, messaggi, video). Il formato TOML completo è ancora accettato. Un diagramma `.mmd` con le direttive `%%` è una scena a tutti gli effetti: ogni comando lo accetta come un `.toml` (`trackviz flusso.mmd`, `--preview`, `--watch`, `--check`, caratteri jolly). Il diagramma viene convertito in memoria nel testo di una scena e poi passa dalla stessa strada (`src/mermaid.rs`, `toml::parse_source`). Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%`. Una direttiva sconosciuta è un errore, `%% # testo` è un commento, gli errori indicano la riga del diagramma. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso.
+
+**Parti comuni dei diagrammi:** `common/` è cercata accanto al diagramma e poi in `scenes/`, con gli stessi file `.toml` delle altre scene. `%% include <file>` inserisce altre direttive (percorso relativo, annidabile, niente inclusioni circolari). Un file incluso può contenere solo righe `%%`: un messaggio incluso mancherebbe dal diagramma mostrato da Mermaid. `--watch` controlla anche i file inclusi e i `.toml` comuni.
+
+**Altri comandi:** `trackviz export <scene>...` scrive il sequence diagram semplice in `out/<nome>.mmd`, senza direttive. `trackviz import <flusso.mmd> [--geometry g] [-o file]` salva la scena come `.toml`; non sovrascrive una scena esistente senza `-o`. Le route di default per geometria sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate.
 
 **Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 
@@ -240,7 +245,7 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 ## 8. Formato delle scene (riferimento)
 
-Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.toml"` prende solo le scene. Le scene 03, 07 e 08 hanno geometrie uniche e le tengono nel proprio file.
+Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.mmd"` prende solo le scene. Le geometrie delle scene 03, 07 e 08 stanno in `sampling_queue.toml`, `sampling_queue2.toml` e `turnstile_queue.toml`.
 
 **Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.toml` (`[[message]]`) e gli step li richiamano con `type`, più `carrier` e, se il messaggio contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer = true`; la nota compare alla stessa riga di tempo del `pipette`.
 
@@ -272,7 +277,7 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 
 ---
 
-## 9. Scena 01 — `01_prepare_sample_release.toml`
+## 9. Scena 01 — `01_prepare_sample_release.mmd`
 
 **Geometria:** flusso dei carrier da destra verso sinistra, Pit-Lane in alto (sopra la Main-Lane).
 
@@ -330,7 +335,7 @@ Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi rel
 
 ---
 
-## 9b. Scena 02 — `02_turnstile_three_carriers.toml`
+## 9b. Scena 02 — `02_turnstile_three_carriers.mmd`
 
 Turnstile (`ts`, centro 440,505, r 70, ingresso a destra) al posto del punto di campionamento, con **antenna** (`pit_wait`, x 640) e **gate** (x 596) davanti. Tre carrier pieni (SID-000123/124/125, tappi viola, azzurro, rosa). C2 e C3 partono da un punto fuori dal pannello (`spawn`, x 1010) e tutti escono verso `gone` (x −40). Per ogni carrier: Prepare/OK all'NSD, Query/Tests to perform con DMX, **secondo Prepare (viola) all'antenna**, Sample Acquisition sotto l'ago, Sample Complete, Release sul rientro. C1 trova la ruota libera: sosta all'antenna, entra, la ruota gira. C2 e C3 aspettano al gate chiuso durante il pipettaggio del carrier precedente; dopo il Sample Complete entrano e solo allora la ruota gira. L'ultima rotazione avviene senza carrier in attesa. Messaggi, didascalie e rotazioni usano `at`. Durata ≈ 78 s, sequence diagram a scorrimento (scorre).
 

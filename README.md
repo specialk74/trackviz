@@ -25,64 +25,83 @@ cargo build --release
 cargo test --release      # unit tests (parser, timeline rules, rendering, all scenes)
 B=./target/release/trackviz
 
-$B scenes/01_prepare_sample_release.toml --check            # validate + print timeline
-$B scenes/01_prepare_sample_release.toml --still 17 -o f.png # one frame at t=17 s
-$B scenes/01_prepare_sample_release.toml                    # full video → out/01_prepare_sample_release.mp4
-$B scenes/01_prepare_sample_release.toml -o other.mp4        # full video, chosen file name
+$B scenes/01_prepare_sample_release.mmd --check            # validate + print timeline
+$B scenes/01_prepare_sample_release.mmd --still 17 -o f.png # one frame at t=17 s
+$B scenes/01_prepare_sample_release.mmd                    # full video → out/01_prepare_sample_release.mp4
+$B scenes/01_prepare_sample_release.mmd -o other.mp4        # full video, chosen file name
 ```
 
 Without `-o` the video goes to `out/<scene file name>.mp4` (`out/` is created if missing).
 
 ### Mermaid
 
-`trackviz export scenes/a.toml` writes the message sequence of a scene as a Mermaid
-diagram, `out/a.mmd` (`-o` for another file; wildcards work). Purple messages are
-framed in a colored `rect`.
+A Mermaid diagram with `%%` directives is a scene like a `.toml`: every command takes
+it directly, also with wildcards, and the video is `out/<name>.mp4`.
 
-`trackviz import flow.mmd` builds `scenes/flow.toml` from a Mermaid diagram, and it
-never replaces an existing scene unless `-o` names it. Mermaid only describes the
-messages, so the physical side goes in `%%` comments, which don't appear in the
-diagram (see `examples/spur_happy_path.mmd`):
+```sh
+$B flow.mmd                  # the video
+$B flow.mmd --preview --watch
+$B flow.mmd --check
+$B "scenes/*.mmd"            # all the diagrams, in parallel
+```
+
+Mermaid only describes the messages, so the physical side goes in `%%` comments, which
+don't appear in the diagram (see `scenes/17_mermaid_spur_happy_path.mmd`):
 
 ```
-%% geometry spur
+%% include common/spur_one_carrier.mmd
 sequenceDiagram
-    %% carrier C1 SID-000123
-    %% move C1 to nsd ease=in
-    %% with
-    %% highlight nsd
+    %% when C1 at nsd
     IF->>AN: Prepare SampleId=SID-000123
     AN-->>IF: OK SampleId=SID-000123
     %% pipette sp duration=4
 ```
 
+`common/` is looked for next to the diagram, then in `scenes/`: geometries, actors,
+messages and video settings are the same files the `.toml` scenes use.
+
+`%% include <file>` puts the directives of another file in that place (path relative
+to the including file, nested includes allowed, circular ones refused). An included
+file can only hold `%%` lines: a message there would be missing from the diagram that
+Mermaid shows, so messages stay in the main file.
+
+`trackviz export a.toml` writes the message sequence of any scene as a plain diagram,
+`out/a.mmd` (`-o` for another file; wildcards work), with purple messages framed in a
+colored `rect`. It has no directives, so it isn't a scene until they are added.
+
+`trackviz import flow.mmd` writes the scene as `scenes/flow.toml` instead, for who wants
+to go on from there. It never replaces a scene unless `-o` names it, and the target
+folder needs its `common/`.
+
 | Directive | Meaning |
 |---|---|
 | `geometry <name>` | `sampling`, `turnstile`, `spur`, `spur2`, or `--geometry` on the command line |
 | `title`, `subtitle` | the `[video]` texts |
+| `for <carrier>` | the carrier of the next message, when its text doesn't say it (e.g. `OK`) |
+| `duration <seconds>` | duration of the next message or note |
 | `carrier <id> <sample id>` | options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
 | `move <carrier> to <point>` | options: `ease=`, `speed=`, `duration=`, `runaway` |
 | `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=` |
 | `needle <device> down\|up`, `status <device> <state>` | as the steps |
-| `show`, `hide <carrier>`, `wait <seconds>` | as the steps |
+| `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
 | `caption <title> \| <text>` | a caption |
 | `when ...`, `at`, `with`, `after_start`, `after_end`, `delay` | timing of the **next** step; without them a step starts when the previous one ends |
+| `include <file>` | the directives of another file |
 | `# text` | a plain comment |
 
-An unknown directive is an error, so that typos don't get lost. Participants are
+An unknown directive is an error, so that typos don't get lost, and errors name the
+line of the diagram. Participants are
 matched with the shared actors by id or label. Messages become named messages when
 they match `common/messages.toml`, and the second Prepare of a sample is the purple
 one. `SampleId=` must name a declared carrier. `alt`, `loop`, `opt` and `par` are
-refused: a scene is one path, so write one diagram for each case. The result is
-validated at once. A diagram exported from a scene has no directives, so it needs
-them before it can be imported.
+refused: a scene is one path, so write one diagram for each case.
 
 To look at a scene quickly while writing it:
 
 ```sh
-$B scenes/a.toml --preview                # half size, 15 fps
-$B scenes/a.toml --from 15 --to 25        # only that part, full quality
-$B scenes/a.toml --preview --from 15 --to 25 --watch
+$B scenes/a.mmd --preview                # half size, 15 fps
+$B scenes/a.mmd --from 15 --to 25        # only that part, full quality
+$B scenes/a.mmd --preview --from 15 --to 25 --watch
 ```
 
 These write `out/<scene file name>_preview.mp4`, so the full video is kept. `--watch`
@@ -94,9 +113,9 @@ Several scenes can be given at once, also with the wildcards `*` and `?` in the 
 name; they are rendered in parallel:
 
 ```sh
-$B "scenes/*.toml"            # all the scenes
-$B "scenes/1?_spur*.toml"     # some of them
-$B a.toml b.toml --check      # validate several scenes
+$B "scenes/*.mmd"            # all the scenes
+$B "scenes/1?_spur*.mmd"     # some of them
+$B a.mmd b.mmd --check      # validate several scenes
 ```
 
 Use the quotes to let trackviz expand the wildcards (needed on Windows); without them
@@ -114,7 +133,13 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
 - a Query sent before the OK to its Prepare or the reply to the previous Query has
   arrived
 
-## Scene format (TOML subset)
+## Scene format
+
+The scenes in `scenes/` are **Mermaid diagrams with `%%` directives** (see Mermaid below).
+Geometries, actors, messages and video settings are shared TOML files in `scenes/common/`.
+A scene can also be a whole TOML file: the keys below are what the directives produce,
+and what the shared files use.
+
 
 Parts shared by several scenes live in `scenes/common/` and are pulled in with a
 top-level `include`, written before the first section:
@@ -133,8 +158,7 @@ Paths are relative to the including file, and included files can include others.
 Sections like `[[point]]` or `[[device]]` from included files come first, then the
 ones of the scene. Keys of `[video]` are merged and the scene wins, so it can
 override any of them. An id defined twice is an error, and so is a circular include.
-A lane can't be extended from a scene: a geometry that differs needs its own points
-and lanes (scenes 03, 07 and 08 keep theirs in the scene file).
+A geometry that differs needs its own common file.
 
 | Common file | Contents |
 |---|---|
@@ -143,6 +167,8 @@ and lanes (scenes 03, 07 and 08 keep theirs in the scene file).
 | `messages.toml` | the named messages (below) |
 | `sampling.toml` | Pit-Lane with a simple sampling point |
 | `turnstile.toml` | Pit-Lane with turnstile, gate and antenna |
+| `sampling_queue.toml`, `sampling_queue2.toml` | the same with one or two queue positions |
+| `turnstile_queue.toml` | turnstile with a queue position behind the antenna |
 | `spur.toml` | spur with one sampling point |
 | `spur2.toml` | spur with two sampling points |
 
@@ -267,7 +293,7 @@ from the exit position, a rotation can't start while a carrier is still in the
 exit position, nothing arrives or leaves while the wheel is turning, and the wheel
 doesn't turn until a carrier that has left (or is arriving) is completely outside
 the wheel's circle.
-See `scenes/02_turnstile_three_carriers.toml`.
+See `scenes/02_turnstile_three_carriers.mmd`.
 
 ### Analyzer error and needle
 
@@ -280,7 +306,7 @@ between a `needle down` and the end of the next `needle up`. See scenes 05 and 0
 ### Spur
 
 A spur is a U-shaped branch perpendicular to the Main-Lane, built from plain
-points and lanes (see `scenes/09_spur_happy_path.toml`): the NSD diverts the
+points and lanes (see `scenes/09_spur_happy_path.mmd`): the NSD diverts the
 carrier, without stopping, into a short piece of pit-lane that turns 90° into the
 up branch; the sampling point is on the up branch with the analyzer on its right;
 the carrier crosses at the top and comes back down the other branch to the

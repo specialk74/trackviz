@@ -1,20 +1,14 @@
-%% # A scene from a Mermaid diagram: trackviz import examples/spur_happy_path.mmd
-%% # The comments starting with %% describe the physical side and don't appear in
-%% # the diagram. A step starts when the previous one ends, unless a timing directive
-%% # (when, with, at, after_start, after_end, delay) comes before it.
-%% geometry spur
-%% title Analyzer interface · message exchange with the automation
+%% # Scene 17, written in Mermaid: trackviz scenes/17_mermaid_spur_happy_path.mmd
+%% # The %% comments describe the physical side and don't appear in the diagram.
+%% # A step starts when the previous one ends, unless a timing directive (when, with,
+%% # at, after_start, after_end, delay) comes before it.
+%% include common/spur_one_carrier.mmd
 %% subtitle Spur — happy path, written in Mermaid
 sequenceDiagram
     participant IF as Interface
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123
-    %% caption 1 · Spur | The carrier travels along the Main-Lane towards the spur.
-    %% move C1 to nsd ease=in
-    %% move C1 to sampling ease=out
-    %% # Back to the moment the carrier passes the NSD.
     %% when C1 at nsd
     %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping: Prepare.
     %% when C1 at nsd

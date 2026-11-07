@@ -44,6 +44,11 @@ pub fn parse_file(path: &Path) -> Result<Doc, String> {
     parse_included(path, "", &mut Vec::new())
 }
 
+/// Parses scene text that is not in a file; `dir` is where its includes start from.
+pub fn parse_source(src: &str, dir: &Path) -> Result<Doc, String> {
+    parse_with(src, dir, "", &mut Vec::new())
+}
+
 fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<Doc, String> {
     let name = path.display();
     let real = path.canonicalize().map_err(|e| format!("{name}: {e}"))?;
@@ -51,7 +56,16 @@ fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<
         return Err(format!("{name}: circular include"));
     }
     let src = std::fs::read_to_string(path).map_err(|e| format!("{name}: {e}"))?;
-    let mut own = parse(&src).map_err(|e| if shown.is_empty() { e } else { format!("{shown}: {e}") })?;
+    stack.push(real);
+    let doc = parse_with(&src, path.parent().unwrap_or(Path::new("")), shown, stack);
+    stack.pop();
+    let mut doc = doc?;
+    doc.files.insert(0, path.to_path_buf());
+    Ok(doc)
+}
+
+fn parse_with(src: &str, dir: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<Doc, String> {
+    let mut own = parse(src).map_err(|e| if shown.is_empty() { e } else { format!("{shown}: {e}") })?;
     for t in own.tables.values_mut().chain(own.arrays.values_mut().flatten()) {
         t.file = shown.to_string();
     }
@@ -62,14 +76,11 @@ fn parse_included(path: &Path, shown: &str, stack: &mut Vec<PathBuf>) -> Result<
     };
     root.entries.remove("include");
 
-    stack.push(real);
-    let mut doc = Doc { files: vec![path.to_path_buf()], ..Default::default() };
+    let mut doc = Doc::default();
     for inc in &includes {
-        let target = path.parent().unwrap_or(Path::new("")).join(inc);
-        let d = parse_included(&target, inc, stack)?;
+        let d = parse_included(&dir.join(inc), inc, stack)?;
         merge(&mut doc, d);
     }
-    stack.pop();
     merge(&mut doc, own);
     Ok(doc)
 }

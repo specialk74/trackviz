@@ -1,0 +1,81 @@
+%% # Scene 09 — spur, single carrier, happy path
+%% # Prepare -> Sample Acquisition -> Sample Complete -> Release, on a spur.
+%% # Carrier flow: right to left on the Main-Lane; the spur rises perpendicular to it.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry spur
+%% subtitle Spur — single carrier with sample tube, happy path
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone speed=110
+
+    %% at 0
+    %% caption 1 · Spur | The spur is a U-shaped branch perpendicular to the Main-Lane: the carrier goes up one branch, past the sampling point (analyzer on its right), and comes back down the other.
+    %% at 1.5
+    %% move C1 to nsd ease=in
+    %% when C1 at nsd
+    %% move C1 to sampling ease=out
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping into a short piece of pit-lane that turns 90° into the spur. The interface sends Prepare to the analyzer.
+    %% when C1 at nsd
+    %% highlight nsd duration=2
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare C1 sent
+    %% delay 1.829
+    AN-->>IF: OK SampleId=SID-000123
+    %% when sample_ok C1 sent
+    %% delay 1.4
+    %% caption 3 · Test query | After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample.
+    %% when sample_ok C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000123
+    %% when query C1 sent
+    %% delay 1.5
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C1 at sampling
+    %% delay 0.262
+    %% caption 4 · Sampling point — Sample Acquisition | The carrier stops at the sampling point on the up branch. The interface sends Sample Acquisition: the tube is in position and can be aspirated.
+    %% when C1 at sampling
+    %% delay 0.46
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% when sample_acquisition C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% pipette sp duration=4.5
+    %% when pipette sp done
+    %% delay 0.2
+    %% caption 5 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
+    %% when pipette sp done
+    %% delay 0.3
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% when sample_complete C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when interface_ok C1 sent
+    %% move C1 to spur_top_in ease=in
+    %% when C1 at spur_top_in
+    %% move C1 to merge ease=linear
+    %% when C1 at merge
+    %% move C1 to gone ease=out
+    %% when C1 at iface_out
+    %% caption 6 · Release | As soon as the carrier has left the interface module, the interface sends Release: the sample has left the analyzer interface.
+    %% when C1 at iface_out
+    IF->>AN: Release SampleId=SID-000123
+    %% when release C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.5
+    %% caption 7 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% when analyzer_ok C1 arrived
+    %% delay 0.5
+    AN->>DMX: Results SampleId=SID-000123

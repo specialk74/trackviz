@@ -1,0 +1,139 @@
+%% # Scene 06 — analyzer error during sampling, needle left down (turnstile)
+%% # Same situation as scene 05, with the turnstile, gate and antenna of scene 02.
+%% # The wheel can't rotate while the needle is down: after the recovery and
+%% # Status (Ready) it brings the carrier to the exit and releases it.
+%% # Carrier flow: right to left, Pit-Lane above the Main-Lane.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry turnstile
+%% subtitle Single carrier — analyzer error with the needle down, operator recovery (turnstile)
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone speed=75
+
+    %% at 0
+    %% caption 1 · Turnstile with gate and antenna | A carrier holding a sample tube travels towards the interface. The Pit-Lane ends in a turnstile, with an antenna and a gate in front of it.
+    %% at 2.26
+    %% move C1 to nsd ease=in
+    %% when C1 at nsd
+    %% move C1 to pit_wait ease=out
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | The carrier is diverted into the Pit-Lane without stopping, and the interface sends Prepare to the analyzer.
+    %% when C1 at nsd
+    %% highlight nsd duration=2
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare C1 sent
+    %% delay 1.997
+    AN-->>IF: OK SampleId=SID-000123
+    %% when sample_ok C1 arrived
+    %% delay 0.3
+    AN->>DMX: Query SampleId=SID-000123
+    %% when C1 at pit_wait
+    %% caption 3 · Antenna — Prepare again | The carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
+    %% when C1 at pit_wait
+    %% highlight antenna duration=1.5
+    %% when C1 at pit_wait
+    %% delay 0.2
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare_again C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when query C1 sent
+    %% delay 2.53
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C1 at pit_wait
+    %% delay 1.777
+    %% move C1 to ts.in ease=inout duration=2
+    %% when C1 at ts.in
+    %% delay 0.15
+    %% rotate ts
+    %% when rotate ts done
+    %% delay 0.05
+    %% caption 4 · Sample Acquisition | The carrier is under the needle: the interface sends Sample Acquisition and the analyzer starts aspirating.
+    %% when rotate ts done
+    %% delay 0.25
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% when sample_acquisition C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% needle ts down
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% duration 2.6
+    Note over AN: Pipetting
+    %% when needle ts done
+    %% delay 1.7
+    %% caption 5 · Instrument error | During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status.
+    %% when needle ts done
+    %% delay 1.7
+    %% status analyzer error
+    %% when needle ts done
+    %% delay 1.7
+    %% for C1
+    AN->>IF: Status State=Error
+    %% when status_error C1 sent
+    %% delay 0.5
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% when sample_complete C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when status_error C1 sent
+    %% delay 1.8
+    %% for C1
+    IF-->>AN: OK
+    %% when interface_ok C1 arrived
+    %% delay 0.3
+    %% caption 6 · Operator recovery | Sample Complete is not enough: with the analyzer in error the wheel does not rotate, the needle is still in the tube. An operator comes to the instrument for a recovery: the needle goes back up.
+    %% when interface_ok C1 arrived
+    %% delay 0.3
+    %% duration 6
+    Note over AN: Operator recovery
+    %% when interface_ok C1 arrived
+    %% delay 0.3
+    %% operator analyzer duration=7
+    %% when interface_ok C1 arrived
+    %% delay 2.8
+    %% needle ts up duration=1.2
+    %% when needle ts done
+    %% delay 2.6
+    %% caption 7 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
+    %% when needle ts done
+    %% delay 2.6
+    %% status analyzer ready
+    %% when needle ts done
+    %% delay 2.6
+    %% for C1
+    AN->>IF: Status State=Ready
+    %% when status_ready C1 sent
+    %% delay 1.7
+    %% for C1
+    IF-->>AN: OK
+    %% when status_ready sent
+    %% delay 3
+    %% status analyzer normal
+    %% when interface_ok C1 arrived
+    %% delay 0.2
+    %% caption 8 · Carrier released — Release | The wheel brings the carrier to the exit and the interface releases it. As soon as it has left the interface module, the interface sends Release.
+    %% when status_ready C1 arrived
+    %% delay 1.9
+    %% rotate ts
+    %% when rotate ts done
+    %% delay 0.2
+    %% move C1 to merge ease=in
+    %% when C1 at merge
+    %% move C1 to gone ease=out
+    %% when C1 at main_out
+    IF->>AN: Release SampleId=SID-000123
+    %% when release C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK

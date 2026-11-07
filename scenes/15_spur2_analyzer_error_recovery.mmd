@@ -1,0 +1,207 @@
+%% # Scene 15 — spur with two needles, error on needle 1, needle 2 goes on
+%% # Needle 1 goes into error left down in the tube; its carrier is released only after
+%% # Status (Ready). Needle 2 keeps working normally during the recovery.
+%% # Carrier flow: right to left on the Main-Lane, up the spur, down the back branch.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry spur2
+%% subtitle Spur with two sampling points — needle 1 in error, needle 2 goes on
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone speed=120
+    %% carrier C2 SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone speed=120 color=#0EA5E9
+
+    %% at 0
+    %% caption 1 · One analyzer, two sampling points | Two carriers travel towards the spur: the first one needs needle 1, the second one needle 2.
+    %% at 1
+    %% move C1 to nsd ease=in
+    %% at 1.6
+    %% move C2 to nsd ease=linear
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer.
+    %% when C1 at nsd
+    %% highlight nsd duration=1.6
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when C1 at nsd
+    %% move C1 to d1 ease=out
+    %% when C2 at nsd
+    %% move C2 to w1 ease=out
+    %% when C2 at nsd
+    %% highlight nsd duration=1.6
+    %% when C2 at nsd
+    IF->>AN: Prepare SampleId=SID-000124
+    %% when prepare C1 sent
+    %% delay 1.7
+    AN-->>IF: OK SampleId=SID-000123
+    %% when prepare C2 sent
+    %% delay 1.7
+    AN-->>IF: OK SampleId=SID-000124
+    %% when sample_ok C1 arrived
+    %% delay 0.2
+    AN->>DMX: Query SampleId=SID-000123
+    %% when query C1 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C1 at d1
+    %% highlight div1 duration=0.6
+    %% when C1 at d1
+    %% delay 0.1
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare_again C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when C1 at d1
+    %% delay 0.6
+    %% move C1 to s1 ease=inout
+    %% when tests C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000124
+    %% when C2 at w1
+    %% delay 1.575
+    %% move C2 to d1 ease=inout
+    %% when query C2 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% when C2 at d1
+    %% highlight div1 duration=0.6
+    %% when C2 at d1
+    %% delay 0.401
+    %% move C2 to d2 ease=inout
+    %% when tests C2 arrived
+    %% delay 0.06
+    %% caption 3 · Sample Acquisition | The first carrier is at sampling point 1: Sample Acquisition with Needle=1, and the needle starts aspirating.
+    %% when C1 at s1
+    %% delay 0.2
+    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
+    %% when sample_acquisition_needle C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% needle sp1 down
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% duration 2.6
+    Note over AN: Pipetting · Needle 1
+    %% when C2 at d2
+    %% highlight div2 duration=0.6
+    %% when C2 at d2
+    %% delay 0.1
+    IF->>AN: Prepare SampleId=SID-000124
+    %% when prepare_again C2 arrived
+    %% delay 0.1
+    %% for C2
+    AN-->>IF: OK
+    %% when needle sp1 done
+    %% delay 0.253
+    %% move C2 to s2 ease=inout
+    %% when prepare_again C2 arrived
+    %% delay 0.447
+    %% caption 4 · Error on needle 1 | Needle 1 goes into error, left down in the tube: the analyzer sends its status (Error, Needle=1) and Sample Complete, and the interface replies OK to the status. The carrier stays still.
+    %% when prepare_again C2 arrived
+    %% delay 0.447
+    %% status sp1 error
+    %% when prepare_again C2 arrived
+    %% delay 0.447
+    AN->>IF: Status State=Error Needle=1
+    %% when status_error_needle sent
+    %% delay 0.5
+    AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
+    %% when sample_complete_needle C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when status_error_needle sent
+    %% delay 1.8
+    IF-->>AN: OK
+    %% when C2 at s2
+    %% delay 0.57
+    IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
+    %% when sample_acquisition_needle C2 arrived
+    %% delay 0.1
+    %% for C2
+    AN-->>IF: OK
+    %% when analyzer_ok C2 arrived
+    %% delay 0.1
+    %% pipette sp2 duration=4
+    %% when sample_acquisition_needle C2 arrived
+    %% delay 0.301
+    %% caption 5 · Operator recovery — needle 2 goes on | An operator comes to the instrument for a recovery of needle 1, which goes back up. Meanwhile needle 2 keeps working normally on its own carrier.
+    %% when sample_acquisition_needle C2 arrived
+    %% delay 0.301
+    %% operator an duration=7
+    %% when analyzer_ok C2 arrived
+    %% delay 0.1
+    %% duration 6
+    Note over AN: Operator recovery · Needle 1
+    %% when analyzer_ok C2 arrived
+    %% delay 0.1
+    %% needle sp1 up duration=1.2
+    %% when pipette sp2 done
+    %% delay 0.2
+    AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
+    %% when sample_complete_needle C2 arrived
+    %% delay 0.1
+    %% for C2
+    IF-->>AN: OK
+    %% when interface_ok C2 sent
+    %% move C2 to pt2u ease=in
+    %% when sample_complete_needle C2 arrived
+    %% delay 0.8
+    %% caption 6 · Needle 1 ready | Needle 1 is green again: the analyzer sends its status (Ready, Needle=1), the interface replies OK, and only now releases the carrier. Sample Complete alone was not enough.
+    %% when sample_complete_needle C2 arrived
+    %% delay 0.8
+    %% status sp1 ready
+    %% when sample_complete_needle C2 arrived
+    %% delay 0.8
+    AN->>IF: Status State=Ready Needle=1
+    %% when C2 at pt2u
+    %% move C2 to merge ease=linear
+    %% when status_ready_needle sent
+    %% delay 1.7
+    IF-->>AN: OK
+    %% when status_ready_needle sent
+    %% delay 3
+    %% status sp1 normal
+    %% when status_ready_needle arrived
+    %% delay 1.8
+    %% move C1 to d2 ease=inout
+    %% when C1 at d2
+    %% highlight div2 duration=0.6
+    %% when C1 at d2
+    %% delay 0.401
+    %% move C1 to rj2 ease=in
+    %% when C2 at merge
+    %% delay 0.001
+    %% move C2 to gone ease=out
+    %% when C2 at iface_out
+    %% caption 7 · Release | Each carrier gets its Release when it has left the interface module.
+    %% when C2 at iface_out
+    IF->>AN: Release SampleId=SID-000124
+    %% when release C2 arrived
+    %% delay 0.1
+    %% for C2
+    AN-->>IF: OK
+    %% when C1 at rj2
+    %% delay 0.001
+    %% move C1 to merge ease=linear
+    %% when C1 at merge
+    %% move C1 to gone ease=out
+    %% when C1 at iface_out
+    IF->>AN: Release SampleId=SID-000123
+    %% when release C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.5
+    %% caption 8 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% when analyzer_ok C1 arrived
+    %% delay 0.5
+    AN->>DMX: Results SampleId=SID-000124

@@ -118,11 +118,11 @@ route = ["a", "w", "ts.in", "ts.out", "out"]
 speed = 100
 "#;
 
-/// The scenes in scenes/ (the shared files in scenes/common/ are not scenes).
+/// The scenes in scenes/, Mermaid diagrams (the shared files are in scenes/common/).
 fn scene_files() -> Vec<std::path::PathBuf> {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes");
     let list = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path());
-    list.filter(|p| p.extension().is_some_and(|e| e == "toml")).collect()
+    list.filter(|p| p.extension().is_some_and(|e| e == "mmd")).collect()
 }
 
 fn build(base: &str, steps: &str) -> Result<(Scene, Timeline), String> {
@@ -395,14 +395,11 @@ fn operator_rules() {
 
 #[test]
 fn all_scenes_in_the_repository_are_valid() {
-    let mut n = 0;
-    for path in scene_files() {
-        let doc = toml::parse_file(&path).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        Timeline::build(&sc).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        n += 1;
+    let list = scene_files();
+    assert!(list.len() >= 17, "found only {} scenes", list.len());
+    for path in list {
+        crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
     }
-    assert!(n >= 6, "found only {n} scenes");
 }
 
 #[test]
@@ -450,9 +447,7 @@ fn the_videos_do_not_mention_the_nsd() {
         assert!(!text.contains("NSD") && !text.contains("No Stop"), "{}: {what}: {text}", path.display());
     };
     for path in scene_files() {
-        let doc = toml::parse_file(&path).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap();
-        let tl = Timeline::build(&sc).unwrap();
+        let (sc, tl) = crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
         bad("title", &sc.video.title, &path);
         bad("subtitle", &sc.video.subtitle, &path);
         sc.devices.iter().for_each(|d| bad("device", &d.label, &path));
@@ -522,9 +517,7 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
 #[test]
 fn no_scene_has_warnings() {
     for path in scene_files() {
-        let doc = toml::parse_file(&path).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap();
-        let tl = Timeline::build(&sc).unwrap();
+        let (sc, tl) = crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
         let w = crate::lint::warnings(&sc, &tl);
         assert!(w.is_empty(), "{}: {w:?}", path.display());
     }
@@ -576,9 +569,9 @@ fn when_errors() {
 /// The scenes are a chain of causes: slowing the carriers moves everything after.
 #[test]
 fn a_slower_carrier_moves_the_whole_scene() {
-    let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/09_spur_happy_path.toml"));
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/09_spur_happy_path.mmd");
     let times = |slow: bool| {
-        let mut doc = toml::parse_file(path).unwrap();
+        let (mut doc, _) = crate::scene_doc(path).unwrap();
         if slow {
             for c in doc.arrays.get_mut("carrier").unwrap() {
                 c.entries.insert("speed".into(), toml::Value::Num(80.0));

@@ -1,0 +1,143 @@
+%% # Scene 07 — carrier run-away during sampling (sampling point)
+%% # Three carriers are diverted into the Pit-Lane. After Sample Acquisition for
+%% # the first one, before the needle goes down, the first carrier runs away and
+%% # goes back to the Main-Lane; the second slides under the needle and the
+%% # analyzer aspirates it, believing it is the first. On Sample Complete (with the
+%% # first SampleId) the interface sends Cancel, right after the reply sends
+%% # Clear All, while the carriers are sent away.
+%% # Carrier flow: right to left, Pit-Lane above the Main-Lane.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry sampling_queue2
+%% subtitle Three carriers — carrier run-away during sampling, Cancel and Clear All (sampling point)
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,queue2,queue,sampling,pit_out,merge,main_out,gone speed=75
+    %% carrier C2 SID-000124 route=spawn,main_in,nsd,pit_in,queue2,queue,sampling,pit_out,merge,main_out,gone speed=75 color=#0EA5E9
+    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,queue2,queue,sampling,pit_out,merge,main_out,gone speed=75 color=#DB2777
+
+    %% at 0
+    %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the Pit-Lane, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
+    %% at 1
+    %% move C1 to nsd ease=in
+    %% at 4
+    %% move C2 to nsd ease=linear
+    %% when C1 at nsd
+    %% move C1 to sampling ease=out
+    %% when C1 at nsd
+    %% highlight nsd duration=2
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare C1 sent
+    %% delay 1.65
+    AN-->>IF: OK SampleId=SID-000123
+    %% at 7
+    %% move C3 to nsd ease=linear
+    %% when C2 at nsd
+    %% move C2 to queue ease=out
+    %% when C2 at nsd
+    %% highlight nsd duration=2
+    %% when C2 at nsd
+    IF->>AN: Prepare SampleId=SID-000124
+    %% when sample_ok C1 arrived
+    %% delay 0.38
+    AN->>DMX: Query SampleId=SID-000123
+    %% when prepare C2 sent
+    %% delay 1.647
+    AN-->>IF: OK SampleId=SID-000124
+    %% when query C1 sent
+    %% delay 1.6
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C3 at nsd
+    %% move C3 to queue2 ease=out
+    %% when C3 at nsd
+    %% highlight nsd duration=2
+    %% when C3 at nsd
+    IF->>AN: Prepare SampleId=SID-000125
+    %% when tests C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000124
+    %% when prepare C3 sent
+    %% delay 1.647
+    AN-->>IF: OK SampleId=SID-000125
+    %% when query C2 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% when C1 at sampling
+    %% delay 0.48
+    %% caption 2 · Sample Acquisition | The first carrier is at the sampling point, the other two queue up behind it. The interface sends Sample Acquisition for the first sample.
+    %% when C1 at sampling
+    %% delay 0.68
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% when sample_acquisition C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when tests C2 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000125
+    %% when query C3 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000125
+    %% when sample_acquisition C1 arrived
+    %% delay 1.5
+    %% move C1 to gone ease=linear speed=120 runaway
+    %% when C3 at queue2
+    %% delay 0.23
+    %% caption 3 · Carrier run-away | Before the needle goes down, the first carrier runs away back to the Main-Lane, and the second one slides under the needle. The interface notices it and turns red.
+    %% when C3 at queue2
+    %% delay 0.23
+    %% status interface error
+    %% when C2 at queue
+    %% delay 2.873
+    %% move C2 to sampling ease=inout duration=1.2
+    %% when C3 at queue2
+    %% delay 1.33
+    %% move C3 to queue ease=inout duration=1.2
+    %% when C3 at queue
+    %% delay 0.3
+    %% caption 4 · The wrong sample is aspirated | The analyzer pipettes the tube under the needle: the second sample, while it believes it is sampling the first one.
+    %% when C3 at queue
+    %% delay 0.5
+    %% pipette sp duration=4.5
+    %% when pipette sp done
+    %% delay 0.1
+    %% caption 5 · Sample Complete — Cancel | The analyzer sends Sample Complete for the first sample. The interface knows the first carrier is gone: it sends Cancel for the first sample, and the analyzer replies OK.
+    %% when pipette sp done
+    %% delay 0.2
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% when sample_complete C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when sample_complete C1 arrived
+    %% delay 0.2
+    IF->>AN: Cancel SampleId=SID-000123
+    %% when cancel C1 sent
+    %% delay 1.7
+    AN-->>IF: OK SampleId=SID-000123
+    %% when sample_ok C1 arrived
+    %% delay 0.1
+    IF->>AN: Clear All
+    %% when sample_ok C1 arrived
+    %% delay 0.2
+    %% caption 6 · All carriers sent away — Clear All | Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away, without sampling. Once they have left the interface, it turns grey again.
+    %% when sample_ok C1 arrived
+    %% delay 0.2
+    %% move C2 to merge ease=in
+    %% when sample_ok C1 arrived
+    %% delay 1.4
+    %% move C3 to merge ease=in
+    %% when clear_all arrived
+    %% delay 0.17
+    %% status interface normal
+    %% when clear_all sent
+    %% delay 1.7
+    AN-->>IF: OK
+    %% when C2 at merge
+    %% move C2 to gone ease=out
+    %% when C3 at merge
+    %% move C3 to gone ease=out

@@ -5,6 +5,7 @@ use crate::scene::{Ev, Scene, Timeline};
 use crate::toml::Table;
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------- export
 
@@ -55,6 +56,66 @@ pub fn export(sc: &Scene, tl: &Timeline) -> String {
 }
 
 // ---------------------------------------------------------------- import
+
+/// A line of a diagram, with where it comes from (empty file: the text given).
+pub struct Line {
+    file: String,
+    no: usize,
+    text: String,
+}
+
+impl Line {
+    fn place(&self) -> String {
+        if self.file.is_empty() {
+            format!("line {}", self.no)
+        } else {
+            format!("{} line {}", self.file, self.no)
+        }
+    }
+}
+
+/// Reads a diagram replacing every `%% include <file>` with the lines of that file.
+/// Included files hold directives only: a message there would be missing from the
+/// diagram that Mermaid shows. `files` collects everything read.
+pub fn read_lines(path: &Path, files: &mut Vec<PathBuf>) -> Result<Vec<Line>, String> {
+    let mut out = Vec::new();
+    read_into(path, false, files, &mut Vec::new(), &mut out)?;
+    Ok(out)
+}
+
+fn read_into(path: &Path, nested: bool, files: &mut Vec<PathBuf>, stack: &mut Vec<PathBuf>, out: &mut Vec<Line>) -> Result<(), String> {
+    let name = path.display().to_string();
+    let real = path.canonicalize().map_err(|e| format!("{name}: {e}"))?;
+    if stack.contains(&real) {
+        return Err(format!("{name}: circular include"));
+    }
+    let src = std::fs::read_to_string(path).map_err(|e| format!("{name}: {e}"))?;
+    files.push(path.to_path_buf());
+    stack.push(real);
+    for (i, text) in src.lines().enumerate() {
+        let line = text.trim();
+        let directive = line.strip_prefix("%%").map(str::trim);
+        if let Some(target) = directive.and_then(|d| d.strip_prefix("include ")) {
+            read_into(&path.parent().unwrap_or(Path::new("")).join(target.trim()), true, files, stack, out)?;
+        } else if nested && !line.is_empty() && directive.is_none() {
+            return Err(format!("{name} line {}: an included file can only hold %% directives, so that the diagram stays complete", i + 1));
+        } else {
+            out.push(Line { file: name.clone(), no: i + 1, text: text.to_string() });
+        }
+    }
+    stack.pop();
+    Ok(())
+}
+
+/// Replaces a line of the generated scene in an error with the diagram line it
+/// comes from (each block of the scene starts with a `# from` comment).
+pub fn locate(text: &str, err: &str) -> String {
+    let Some(at) = err.find("at line ") else { return err.to_string() };
+    let digits: String = err[at + 8..].chars().take_while(char::is_ascii_digit).collect();
+    let Ok(n) = digits.parse::<usize>() else { return err.to_string() };
+    let origin = text.lines().take(n).filter_map(|l| l.strip_prefix("# from ")).last();
+    origin.map_or_else(|| err.to_string(), |o| err.replacen(&format!("at line {n}"), &format!("at {o}"), 1))
+}
 
 /// A message of the shared library.
 pub struct MsgType {
@@ -141,18 +202,23 @@ struct Importer {
     /// Timing keys for the next step.
     timing: String,
     last_pipette: bool,
+    /// Where the line being read comes from.
+    place: String,
+    /// `%% for`: the carrier of the next message, when its text doesn't say it.
+    next_carrier: Option<String>,
 }
 
 impl Importer {
     fn step(&mut self, action: &str, keys: &str) {
         let t = std::mem::take(&mut self.timing);
-        self.steps.push(format!("[[step]]\naction = \"{action}\"\n{t}{keys}\n"));
+        self.steps.push(format!("# from {}\n[[step]]\naction = \"{action}\"\n{t}{keys}\n", self.place));
         self.last_pipette = action == "pipette";
     }
 
     fn timing_key(&mut self, line: String) -> Result<(), String> {
-        if self.timing.contains("delay") && !line.starts_with("delay") || (!self.timing.is_empty() && !self.timing.starts_with("delay") && !line.starts_with("delay")) {
-            return Err("only one of when, at, with for a step".into());
+        let chosen = ["when =", "at =", "start =", "after_start =", "after_end ="].iter().any(|k| self.timing.contains(k));
+        if chosen && !line.starts_with("delay") {
+            return Err("only one of when, at, with, after_start, after_end for a step".into());
         }
         self.timing.push_str(&line);
         Ok(())
@@ -204,8 +270,17 @@ impl Importer {
                 };
                 self.timing_key(line)?;
             }
+            "for" => {
+                need(1, "for <carrier>")?;
+                self.next_carrier = Some(plain[0].to_string());
+            }
+            "duration" => {
+                need(1, "duration <seconds>")?;
+                plain[0].parse::<f64>().map_err(|_| format!("'duration' needs seconds, not '{}'", plain[0]))?;
+                self.timing.push_str(&format!("duration = {}\n", plain[0]));
+            }
             "move" => {
-                if plain.len() != 3 || plain[1] != "to" {
+                if plain.len() < 3 || plain[1] != "to" {
                     return Err("'move' is written: move <carrier> to <point> [ease=in|out|inout|linear] [speed=n] [duration=s] [runaway]".into());
                 }
                 let mut k = format!("carrier = {}\nto = {}\n", quote(plain[0]), quote(plain[2]));
@@ -238,7 +313,7 @@ impl Importer {
             }
             "show" | "hide" => {
                 need(1, &format!("{cmd} <carrier>"))?;
-                let k = format!("carrier = {}\n", quote(plain[0]));
+                let k = format!("carrier = {}\n{}", quote(plain[0]), Self::duration(&o));
                 self.step(cmd, &k);
             }
             "wait" => {
@@ -279,7 +354,7 @@ impl Importer {
         };
         let list: Vec<String> = route.iter().map(|p| quote(p)).collect();
         let speed = o.get("speed").map_or_else(|| if geometry.starts_with("spur") { "110" } else { "75" }.to_string(), |s| s.to_string());
-        let mut c = format!("[[carrier]]\nid = {}\ntube = true\nsample_id = {}\nroute = [{}]\nspeed = {speed}\n", quote(id), quote(sample), list.join(", "));
+        let mut c = format!("# from {}\n[[carrier]]\nid = {}\ntube = true\nsample_id = {}\nroute = [{}]\nspeed = {speed}\n", self.place, quote(id), quote(sample), list.join(", "));
         if let Some(col) = o.get("color") {
             let _ = writeln!(c, "cap_color = {}", quote(col));
         }
@@ -315,9 +390,10 @@ impl Importer {
         }
         let value = |key: &str| params.iter().find_map(|p| p.strip_prefix(key)?.strip_prefix('='));
         let sample = value("SampleId");
-        let carrier = match sample {
-            Some(s) => Some(self.samples.iter().find(|c| c.1 == s).ok_or_else(|| format!("no carrier has sample id '{s}'"))?.0.clone()),
-            None => None,
+        let carrier = match (self.next_carrier.take(), sample) {
+            (Some(c), _) => Some(c),
+            (None, Some(s)) => Some(self.samples.iter().find(|c| c.1 == s).ok_or_else(|| format!("no carrier has sample id '{s}'"))?.0.clone()),
+            _ => None,
         };
         let needle = value("Needle");
         // The same message in the library's terms.
@@ -375,17 +451,26 @@ impl Importer {
 }
 
 /// The geometry named in the diagram, if any.
-pub fn geometry_of(src: &str) -> Option<String> {
-    src.lines().find_map(|l| l.trim().strip_prefix("%%")?.trim().strip_prefix("geometry ").map(|g| g.trim().to_string()))
+pub fn geometry_of(lines: &[Line]) -> Option<String> {
+    lines.iter().find_map(|l| l.text.trim().strip_prefix("%%")?.trim().strip_prefix("geometry ").map(|g| g.trim().to_string()))
+}
+
+/// Builds the text of a scene from a diagram given as text.
+#[cfg(test)]
+pub fn import(src: &str, name: &str, geometry: Option<&str>, lib: &Library) -> Result<String, String> {
+    let lines: Vec<Line> = src.lines().enumerate().map(|(i, t)| Line { file: String::new(), no: i + 1, text: t.to_string() }).collect();
+    import_lines(&lines, name, geometry, lib)
 }
 
 /// Builds the text of a scene from a diagram. `geometry` wins over the one in the file.
-pub fn import(src: &str, name: &str, geometry: Option<&str>, lib: &Library) -> Result<String, String> {
+pub fn import_lines(lines: &[Line], name: &str, geometry: Option<&str>, lib: &Library) -> Result<String, String> {
     let mut im = Importer { geometry: geometry.map(String::from), ..Default::default() };
     let mut started = false;
-    for (i, raw) in src.lines().enumerate() {
-        let line = raw.trim();
-        let at = |e: String| format!("line {}: {e}", i + 1);
+    for l in lines {
+        let line = l.text.trim();
+        let place = l.place();
+        im.place = place.clone();
+        let at = |e: String| format!("{place}: {e}");
         if line.is_empty() || line.starts_with("%%{") {
             continue;
         }
@@ -478,7 +563,7 @@ mod tests {
         (sc, tl)
     }
 
-    const EX: &str = include_str!("../examples/spur_happy_path.mmd");
+    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete SampleId=SID-1\nIF-->>AN: OK\n";
 
     /// The arrows of a diagram, without comments and layout.
     fn lines(s: &str) -> Vec<String> {
@@ -486,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn the_example_builds_a_valid_scene_and_exports_the_same_messages() {
+    fn a_diagram_builds_a_valid_scene_and_exports_the_same_messages() {
         let text = import(EX, "example", None, &library()).unwrap();
         let (sc, tl) = build(&text, "example");
         assert!(crate::lint::warnings(&sc, &tl).is_empty(), "{:?}", crate::lint::warnings(&sc, &tl));
@@ -520,6 +605,15 @@ mod tests {
         let t = import(&src, "x", None, &library()).unwrap();
         assert!(t.contains("when = \"C1 at nsd\"\ndelay = 0.5\ntype = \"prepare\""), "{t}");
         assert!(t.contains("start = \"with\"\ndevice = \"nsd\"\nduration = 2"), "{t}");
+    }
+
+    #[test]
+    fn for_duration_and_runaway() {
+        let src = format!("{HEAD}%% move C1 to nsd runaway\n%% for C1\nAN-->>IF: OK\n%% duration 6\nNote over AN: Busy\n");
+        let t = import(&src, "x", None, &library()).unwrap();
+        assert!(t.contains("runaway = true"), "{t}");
+        assert!(t.contains("type = \"analyzer_ok\"\ncarrier = \"C1\""), "{t}");
+        assert!(t.contains("duration = 6\nactor = \"AN\""), "{t}");
     }
 
     #[test]
@@ -563,6 +657,64 @@ mod tests {
     fn a_plain_comment_and_mermaid_init_are_skipped() {
         let src = format!("{HEAD}%% # just a note\n%%{{init: {{}}}}%%\nIF->>AN: Hello\n");
         assert!(import(&src, "x", None, &library()).is_ok());
+    }
+
+    fn temp(tag: &str, list: &[(&str, &str)]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("trackviz_flow_{tag}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for (name, text) in list {
+            let p = dir.join(name);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn includes_replace_the_line_with_their_directives() {
+        let dir = temp(
+            "inc",
+            &[
+                ("a.mmd", "%% include common/b.mmd\nsequenceDiagram\nIF->>AN: Prepare SampleId=SID-1\n"),
+                ("common/b.mmd", "%% geometry spur\n%% include c.mmd\n\n%% caption T | x\n"),
+                ("common/c.mmd", "%% carrier C1 SID-1\n"),
+            ],
+        );
+        let mut files = Vec::new();
+        let lines = read_lines(&dir.join("a.mmd"), &mut files).unwrap();
+        assert_eq!(files.len(), 3);
+        let t = import_lines(&lines, "a", None, &library()).unwrap();
+        assert!(t.contains("id = \"C1\"") && t.contains("type = \"prepare\"") && t.contains("title = \"T\""), "{t}");
+        // Every block says where it comes from, in the file that holds it.
+        assert!(t.contains("c.mmd line 1"), "{t}");
+        assert!(t.contains("a.mmd line 3"), "{t}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn include_errors() {
+        let dir = temp(
+            "err",
+            &[
+                ("msg.mmd", "%% include m.mmd\n"),
+                ("m.mmd", "IF->>AN: Hello\n"),
+                ("loop.mmd", "%% include loop.mmd\n"),
+                ("no.mmd", "%% include missing.mmd\n"),
+            ],
+        );
+        let e = |f: &str| read_lines(&dir.join(f), &mut Vec::new()).err().unwrap();
+        assert!(e("msg.mmd").contains("can only hold %% directives"), "{}", e("msg.mmd"));
+        assert!(e("msg.mmd").contains("line 1"));
+        assert!(e("loop.mmd").contains("circular include"));
+        assert!(e("no.mmd").contains("missing.mmd"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn errors_point_to_the_line_of_the_diagram() {
+        let text = "x\n# from a.mmd line 7\n[[step]]\naction = \"move\"\n";
+        assert_eq!(locate(text, "[step] at line 3: unknown carrier"), "[step] at a.mmd line 7: unknown carrier");
+        assert_eq!(locate(text, "no place here"), "no place here");
     }
 
     #[test]

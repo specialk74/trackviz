@@ -1,0 +1,187 @@
+%% # Scene 10 — spur, a carrier expected in the spur is missing: Clear
+%% # Same situation as scene 03, on a spur. C2 is believed to be diverted (Prepare is sent)
+%% # but physically goes straight on the Main-Lane; its logical position is a dashed ghost
+%% # ("C2L"). C3 queues on top of it. At the sampling point the interface sends Clear for
+%% # C2 and, after the reply, Sample Acquisition for C3.
+%% # Carrier flow: right to left on the Main-Lane; the spur rises perpendicular to it.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry spur
+%% subtitle Spur — a carrier expected in the spur is missing, Clear
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone speed=110
+    %% # The real C2: it is not diverted and goes straight on the Main-Lane.
+    %% carrier C2 SID-000124 route=spawn,main_in,nsd,merge,iface_out,main_out,gone speed=110 color=#0EA5E9
+    %% # Where the interface believes C2 is: diverted into the spur.
+    %% carrier C2L SID-000124 route=nsd,pit_in,spur_in,queue2,queue,sampling speed=110 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone speed=110 color=#DB2777
+
+    %% at 0
+    %% caption 1 · Three carriers | Three carriers holding sample tubes travel on the Main-Lane towards the spur of the analyzer interface.
+    %% at 1.5
+    %% move C1 to nsd ease=in
+    %% when C1 at nsd
+    %% move C1 to sampling ease=out
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer.
+    %% when C1 at nsd
+    %% highlight nsd duration=2
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% at 3.59
+    %% move C2 to gone ease=linear
+    %% when prepare C1 sent
+    %% delay 1.629
+    AN-->>IF: OK SampleId=SID-000123
+    %% when C2 at nsd
+    IF->>AN: Prepare SampleId=SID-000124
+    %% when sample_ok C1 sent
+    %% delay 0.8
+    %% highlight nsd duration=2
+    %% when sample_ok C1 sent
+    %% delay 0.8
+    %% caption 3 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
+    %% when sample_ok C1 sent
+    %% delay 0.8
+    %% show C2L duration=0.4
+    %% at 5.5
+    %% move C2L to queue ease=out
+    %% when sample_ok C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000123
+    %% at 6.59
+    %% move C3 to nsd ease=linear
+    %% when prepare C2 sent
+    %% delay 1.6
+    AN-->>IF: OK SampleId=SID-000124
+    %% when query C1 sent
+    %% delay 1.8
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C3 at nsd
+    %% move C3 to queue ease=out
+    %% when C3 at nsd
+    %% highlight nsd duration=2
+    %% when C3 at nsd
+    %% caption 4 · Third carrier — Prepare | The third carrier is diverted into the spur: Prepare. For each Prepare the analyzer asks DMX which tests to perform.
+    %% when C3 at nsd
+    IF->>AN: Prepare SampleId=SID-000125
+    %% when tests C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000124
+    %% when prepare C3 sent
+    %% delay 1.601
+    AN-->>IF: OK SampleId=SID-000125
+    %% when query C2 arrived
+    %% delay 0.1
+    %% caption 5 · Sample Acquisition — the others queue up | The first carrier is at the sampling point: Sample Acquisition, and the analyzer aspirates. The second (expected) and the third carrier queue up below it.
+    %% when query C2 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% when C1 at sampling
+    %% delay 2.062
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% when sample_acquisition C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% pipette sp duration=5
+    %% when tests C2 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000125
+    %% when C3 at queue
+    %% delay 0.091
+    %% caption 6 · One position, two carriers | The third carrier stops on the same queue position as the second one: the second is not physically there, it went straight on along the Main-Lane.
+    %% when query C3 sent
+    %% delay 1.7
+    DMX-->>AN: Tests to perform SampleId=SID-000125
+    %% when pipette sp done
+    %% delay 0.2
+    %% caption 7 · Sample Complete | Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point.
+    %% when pipette sp done
+    %% delay 0.2
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% when sample_complete C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when interface_ok C1 sent
+    %% move C1 to spur_top_in ease=in
+    %% when interface_ok C1 sent
+    %% delay 0.6
+    %% move C2L to sampling ease=inout duration=1.2
+    %% when interface_ok C1 sent
+    %% delay 0.6
+    %% move C3 to sampling ease=inout duration=1.2
+    %% when C3 at sampling
+    %% delay 0.2
+    %% caption 8 · Clear | The interface expects the second sample at the sampling point, but finds the third one: the second never arrived. It sends Clear for the second sample and waits for the reply.
+    %% when C3 at sampling
+    %% delay 0.2
+    IF->>AN: Clear SampleId=SID-000124
+    %% when C1 at spur_top_in
+    %% move C1 to merge ease=linear
+    %% when clear C2 sent
+    %% delay 1.6
+    AN-->>IF: OK SampleId=SID-000124
+    %% when sample_ok C2 arrived
+    %% hide C2L duration=0.6
+    %% when sample_ok C2 arrived
+    %% delay 0.3
+    %% caption 9 · Sample Acquisition | Only after the reply to Clear the interface sends Sample Acquisition for the third sample.
+    %% when C3 at sampling
+    %% delay 3.6
+    IF->>AN: Sample Acquisition SampleId=SID-000125
+    %% when sample_acquisition C3 arrived
+    %% delay 0.1
+    %% for C3
+    AN-->>IF: OK
+    %% when analyzer_ok C3 arrived
+    %% delay 0.1
+    %% pipette sp duration=4.5
+    %% when C1 at merge
+    %% move C1 to gone ease=out
+    %% when C1 at iface_out
+    %% caption 10 · Release | The first carrier has left the interface module: Release.
+    %% when C1 at iface_out
+    IF->>AN: Release SampleId=SID-000123
+    %% when release C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when pipette sp done
+    %% delay 0.2
+    %% caption 11 · Back to normal | Sample Complete for the third sample: the carrier goes round the spur and, once it has left the module, the interface sends Release.
+    %% when pipette sp done
+    %% delay 0.2
+    AN->>IF: Sample Complete SampleId=SID-000125
+    %% when sample_complete C3 arrived
+    %% delay 0.1
+    %% for C3
+    IF-->>AN: OK
+    %% when interface_ok C3 sent
+    %% move C3 to spur_top_in ease=in
+    %% when C3 at spur_top_in
+    %% move C3 to merge ease=linear
+    %% when C3 at merge
+    %% move C3 to gone ease=out
+    %% when C3 at iface_out
+    IF->>AN: Release SampleId=SID-000125
+    %% when release C3 arrived
+    %% delay 0.1
+    %% for C3
+    AN-->>IF: OK
+    %% when analyzer_ok C3 arrived
+    %% delay 0.5
+    %% caption 12 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% when analyzer_ok C3 arrived
+    %% delay 0.5
+    AN->>DMX: Results SampleId=SID-000123
+    %% when results C1 arrived
+    %% delay 0.2
+    AN->>DMX: Results SampleId=SID-000125

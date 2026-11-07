@@ -69,10 +69,11 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 - `trackviz export` non è stato provato con un visualizzatore Mermaid reale: il formato è
   verificato solo dall'import del tool.
+- Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.toml` resta testo
+  libero, senza avvisi: rinominare un tipo non aggiorna i diagrammi.
 - `when` si riferisce all'ultimo step corrispondente già scritto nel file: gli step vanno
   tenuti in ordine di tempo.
-- Una scena non può estendere una lane definita in un file comune: le scene 03, 07 e 08
-  tengono la propria geometria.
+- Una geometria diversa richiede un proprio file in `scenes/common/`.
 - Con più scene il resto della divisione di `-j` resta inutilizzato (4 scene con `-j 6`:
   2 thread fermi).
 
@@ -89,4 +90,4 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 Parti comuni con `include`, messaggi con nome e `{Needle}`, nota "Pipetting" automatica,
 tempi legati agli eventi con `when`, scene come catena di cause, righe del diagramma in
 ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly,
-anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), export e import Mermaid.
+anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), scene scritte in Mermaid con parti comuni, export e import.

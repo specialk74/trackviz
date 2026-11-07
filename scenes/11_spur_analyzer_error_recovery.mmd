@@ -1,0 +1,118 @@
+%% # Scene 11 — spur, analyzer error during sampling with the needle down, operator recovery
+%% # Same situation as scene 05, on a spur. On error the analyzer sends Status (Error) and
+%% # Sample Complete; the carrier is released only after Status (Ready).
+%% # Carrier flow: right to left on the Main-Lane; the spur rises perpendicular to it.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+%% geometry spur
+%% subtitle Spur — analyzer error with the needle down, operator recovery
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone speed=110
+
+    %% at 0
+    %% caption 1 · Spur | A carrier holding a sample tube travels along the Main-Lane towards the spur of the analyzer interface.
+    %% at 1.5
+    %% move C1 to nsd ease=in
+    %% when C1 at nsd
+    %% move C1 to sampling ease=out
+    %% when C1 at nsd
+    %% caption 2 · Diverted — Prepare | The carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer.
+    %% when C1 at nsd
+    %% highlight nsd duration=2
+    %% when C1 at nsd
+    IF->>AN: Prepare SampleId=SID-000123
+    %% when prepare C1 sent
+    %% delay 1.829
+    AN-->>IF: OK SampleId=SID-000123
+    %% when sample_ok C1 sent
+    %% delay 1.4
+    %% caption 3 · Test query | After Prepare, the analyzer queries DMX (LIS) to know which tests must be performed on this sample.
+    %% when sample_ok C1 arrived
+    %% delay 0.1
+    AN->>DMX: Query SampleId=SID-000123
+    %% when query C1 sent
+    %% delay 1.5
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% when C1 at sampling
+    %% delay 0.262
+    %% caption 4 · Sampling point — Sample Acquisition | The carrier stops at the sampling point. The interface sends Sample Acquisition and the analyzer starts aspirating.
+    %% when C1 at sampling
+    %% delay 0.46
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% when sample_acquisition C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% needle sp down
+    %% when analyzer_ok C1 arrived
+    %% delay 0.1
+    %% duration 2.6
+    Note over AN: Pipetting
+    %% when needle sp done
+    %% delay 1.7
+    %% caption 5 · Instrument error | During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status.
+    %% when needle sp done
+    %% delay 1.7
+    %% status analyzer error
+    %% when needle sp done
+    %% delay 1.7
+    AN->>IF: Status State=Error
+    %% when status_error sent
+    %% delay 0.5
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% when sample_complete C1 arrived
+    %% delay 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% when status_error sent
+    %% delay 1.8
+    IF-->>AN: OK
+    %% when interface_ok arrived
+    %% delay 0.3
+    %% caption 6 · Operator recovery | Sample Complete is not enough: with the analyzer in error the carrier stays still, the needle is in the tube. An operator comes to the instrument for a recovery: the needle goes back up.
+    %% when interface_ok arrived
+    %% delay 0.3
+    %% operator analyzer duration=7
+    %% when interface_ok arrived
+    %% delay 0.3
+    %% duration 6
+    Note over AN: Operator recovery
+    %% when interface_ok arrived
+    %% delay 2.8
+    %% needle sp up duration=1.2
+    %% when needle sp done
+    %% delay 2.6
+    %% caption 7 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
+    %% when needle sp done
+    %% delay 2.6
+    %% status analyzer ready
+    %% when needle sp done
+    %% delay 2.6
+    AN->>IF: Status State=Ready
+    %% when status_ready sent
+    %% delay 1.7
+    IF-->>AN: OK
+    %% when status_ready sent
+    %% delay 3
+    %% status analyzer normal
+    %% when status_ready arrived
+    %% delay 1.9
+    %% move C1 to spur_top_in ease=in
+    %% when C1 at spur_top_in
+    %% move C1 to merge ease=linear
+    %% when C1 at merge
+    %% move C1 to gone ease=out
+    %% when C1 at iface_out
+    %% caption 8 · Release | The carrier went round the spur and has left the interface module: the interface sends Release.
+    %% when C1 at iface_out
+    IF->>AN: Release SampleId=SID-000123
+    %% when release C1 arrived
+    %% delay 0.1
+    %% for C1
+    AN-->>IF: OK
