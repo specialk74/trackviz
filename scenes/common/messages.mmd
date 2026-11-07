@@ -1,0 +1,51 @@
+%% # Named messages. A message in a diagram whose sender, receiver, text and
+%% # parameters match one of these becomes that message; {SampleId} and {Needle}
+%% # stand for the values written in the diagram. Changing a message here changes
+%% # it in every scene.
+
+%% # ---------------------------------------------------------------- sample flow
+%% @message id=prepare from=IF to=AN text=Prepare params="SampleId={SampleId}"
+
+%% # The second Prepare, sent when the carrier is read (antenna, divert).
+%% @message id=prepare_again from=IF to=AN text=Prepare params="SampleId={SampleId}" color=#9333EA
+
+%% @message id=sample_ok from=AN to=IF text=OK params="SampleId={SampleId}" reply=true
+
+%% @message id=sample_acquisition from=IF to=AN text="Sample Acquisition" params="SampleId={SampleId}"
+
+%% @message id=sample_acquisition_needle from=IF to=AN text="Sample Acquisition" params="SampleId={SampleId} Needle={Needle}"
+
+%% @message id=sample_complete from=AN to=IF text="Sample Complete" params="SampleId={SampleId}"
+
+%% @message id=sample_complete_needle from=AN to=IF text="Sample Complete" params="SampleId={SampleId} Needle={Needle}"
+
+%% @message id=release from=IF to=AN text=Release params="SampleId={SampleId}"
+
+%% # ---------------------------------------------------------------- DMX (LIS)
+%% @message id=query from=AN to=DMX text=Query params="SampleId={SampleId}"
+
+%% @message id=tests from=DMX to=AN text="Tests to perform" params="SampleId={SampleId}" reply=true
+
+%% @message id=results from=AN to=DMX text=Results params="SampleId={SampleId}"
+
+%% # ---------------------------------------------------------------- instrument status
+%% @message id=status_error from=AN to=IF text=Status params="State=Error"
+
+%% @message id=status_error_needle from=AN to=IF text=Status params="State=Error Needle={Needle}"
+
+%% @message id=status_ready from=AN to=IF text=Status params="State=Ready"
+
+%% @message id=status_ready_needle from=AN to=IF text=Status params="State=Ready Needle={Needle}"
+
+%% # The interface's reply to a Status.
+%% @message id=interface_ok from=IF to=AN text=OK reply=true
+
+%% # ---------------------------------------------------------------- recovery
+%% @message id=clear from=IF to=AN text=Clear params="SampleId={SampleId}"
+
+%% @message id=cancel from=IF to=AN text=Cancel params="SampleId={SampleId}"
+
+%% @message id=clear_all from=IF to=AN text="Clear All"
+
+%% # The analyzer's reply to Clear All.
+%% @message id=analyzer_ok from=AN to=IF text=OK reply=true

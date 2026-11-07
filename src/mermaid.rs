@@ -1,8 +1,8 @@
 //! Mermaid sequence diagrams: `export` writes the messages of a scene, `import`
 //! builds a scene from a diagram whose `%%` comments describe the physical side.
 
+use crate::doc::{parse_line, Doc, Table, Value};
 use crate::scene::{Ev, Scene, Timeline};
-use crate::toml::Table;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -107,16 +107,6 @@ fn read_into(path: &Path, nested: bool, files: &mut Vec<PathBuf>, stack: &mut Ve
     Ok(())
 }
 
-/// Replaces a line of the generated scene in an error with the diagram line it
-/// comes from (each block of the scene starts with a `# from` comment).
-pub fn locate(text: &str, err: &str) -> String {
-    let Some(at) = err.find("at line ") else { return err.to_string() };
-    let digits: String = err[at + 8..].chars().take_while(char::is_ascii_digit).collect();
-    let Ok(n) = digits.parse::<usize>() else { return err.to_string() };
-    let origin = text.lines().take(n).filter_map(|l| l.strip_prefix("# from ")).last();
-    origin.map_or_else(|| err.to_string(), |o| err.replacen(&format!("at line {n}"), &format!("at {o}"), 1))
-}
-
 /// A message of the shared library.
 pub struct MsgType {
     pub id: String,
@@ -142,12 +132,6 @@ impl MsgType {
     }
 }
 
-/// What the shared files offer: (actor id, label) and the named messages.
-pub struct Library {
-    pub actors: Vec<(String, String)>,
-    pub messages: Vec<MsgType>,
-}
-
 /// What the keyword directives need to know of a geometry.
 #[derive(Default)]
 pub struct Geometry {
@@ -160,7 +144,7 @@ pub struct Geometry {
 }
 
 impl Geometry {
-    pub fn from_doc(doc: &crate::toml::Doc) -> Result<Geometry, String> {
+    pub fn from_doc(doc: &Doc) -> Result<Geometry, String> {
         let mut g = Geometry::default();
         let mut points = Vec::new();
         for t in doc.arrays.get("point").map(|v| v.as_slice()).unwrap_or(&[]) {
@@ -236,12 +220,6 @@ fn default_route(geometry: &str, needle: &str) -> Option<Vec<&'static str>> {
     })
 }
 
-const GEOMETRIES: &str = "sampling, turnstile, spur, spur2";
-
-fn quote(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
 /// `key=value` options after the words of a directive.
 fn options<'a>(words: &[&'a str]) -> (Vec<&'a str>, HashMap<&'a str, &'a str>) {
     let (mut plain, mut opts) = (Vec::new(), HashMap::new());
@@ -256,28 +234,47 @@ fn options<'a>(words: &[&'a str]) -> (Vec<&'a str>, HashMap<&'a str, &'a str>) {
     (plain, opts)
 }
 
-#[derive(Default)]
+/// Keys of a table being built.
+type Keys = Vec<(&'static str, Value)>;
+
+fn text(s: &str) -> Value {
+    Value::Str(s.to_string())
+}
+
+fn seconds(what: &str, s: &str) -> Result<Value, String> {
+    s.parse::<f64>().map(Value::Num).map_err(|_| format!("'{what}' needs seconds, not '{s}'"))
+}
+
+fn duration(o: &HashMap<&str, &str>) -> Result<Keys, String> {
+    Ok(match o.get("duration") {
+        Some(d) => vec![("duration", seconds("duration", d)?)],
+        None => Vec::new(),
+    })
+}
+
+/// Turns a diagram into the data of a scene.
 struct Importer {
-    title: String,
-    subtitle: String,
+    doc: Doc,
+    /// Where `common/` is; None for a diagram given as text.
+    base: Option<PathBuf>,
+    files: Vec<PathBuf>,
+    started: bool,
     geometry: Option<String>,
-    /// Mermaid id -> actor id.
-    actors: Vec<(String, String, String)>,
-    carriers: Vec<String>,
+    /// Mermaid participant id -> actor id.
+    actors: Vec<(String, String)>,
     /// (carrier id, sample id)
     samples: Vec<(String, String)>,
     prepared: Vec<String>,
-    steps: Vec<String>,
     /// Timing keys for the next step.
-    timing: String,
+    timing: Keys,
     last_pipette: bool,
-    /// Where the line being read comes from.
-    place: String,
+    /// Where the line being read comes from: (file, line).
+    file: String,
+    line: usize,
     /// `%% for`: the carrier of the next message, when its text doesn't say it.
     next_carrier: Option<String>,
     /// A keyword directive waiting for its message: (keyword, number).
     keyword: Option<(&'static str, Option<usize>)>,
-    geo: Geometry,
     /// The carrier of the latest message, and its event name.
     last_message: Option<(Option<String>, String)>,
     /// The sampling device each carrier was last at.
@@ -288,40 +285,137 @@ struct Importer {
 }
 
 impl Importer {
-    fn step(&mut self, action: &str, keys: &str) {
-        let t = std::mem::take(&mut self.timing);
-        self.steps.push(format!("# from {}\n[[step]]\naction = \"{action}\"\n{t}{keys}\n", self.place));
+    fn new(base: Option<PathBuf>) -> Importer {
+        let mut doc = Doc::default();
+        doc.tables.insert(String::new(), Table { name: "(root)".into(), ..Default::default() });
+        Importer {
+            doc,
+            base,
+            files: Vec::new(),
+            started: false,
+            geometry: None,
+            actors: Vec::new(),
+            samples: Vec::new(),
+            prepared: Vec::new(),
+            timing: Vec::new(),
+            last_pipette: false,
+            file: String::new(),
+            line: 0,
+            next_carrier: None,
+            keyword: None,
+            last_message: None,
+            sampled_at: HashMap::new(),
+            queried: false,
+            ok_of: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, name: &str, keys: Keys) {
+        let entries = keys.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+        let t = Table { name: name.to_string(), line: self.line, file: self.file.clone(), entries };
+        self.doc.add(t);
+    }
+
+    fn step(&mut self, action: &str, keys: Keys) {
+        let mut all: Keys = vec![("action", text(action))];
+        all.append(&mut self.timing);
+        all.extend(keys);
+        self.add("step", all);
         self.last_pipette = action == "pipette";
     }
 
-    fn timing_key(&mut self, line: String) -> Result<(), String> {
-        let chosen = ["when =", "at =", "start =", "after_start =", "after_end ="].iter().any(|k| self.timing.contains(k));
-        if chosen && !line.starts_with("delay") {
+    fn timing_key(&mut self, key: &'static str, value: Value) -> Result<(), String> {
+        let chosen = self.timing.iter().any(|(k, _)| ["when", "at", "start", "after_start", "after_end"].contains(k));
+        if chosen && key != "delay" {
             return Err("only one of when, at, with, after_start, after_end for a step".into());
         }
-        self.timing.push_str(&line);
+        self.timing.push((key, value));
         Ok(())
     }
 
-    fn participant(&mut self, id: &str, label: &str, lib: &Library) {
+    fn list(&self, section: &str) -> &[Table] {
+        self.doc.arrays.get(section).map_or(&[], |v| v.as_slice())
+    }
+
+    fn geo(&self) -> Result<Geometry, String> {
+        Geometry::from_doc(&self.doc)
+    }
+
+    /// Reads the directives of a shared file here.
+    fn include(&mut self, path: &Path) -> Result<(), String> {
+        let mut lines = Vec::new();
+        read_into(path, true, &mut self.files, &mut Vec::new(), &mut lines)?;
+        let (file, line) = (std::mem::take(&mut self.file), self.line);
+        for l in &lines {
+            self.read(l)?;
+        }
+        (self.file, self.line) = (file, line);
+        Ok(())
+    }
+
+    fn participant(&mut self, id: &str, label: &str) {
         if self.actors.iter().any(|a| a.0 == id) {
             return;
         }
-        let known = lib.actors.iter().find(|a| a.0 == id || a.1 == label).map(|a| a.0.clone());
-        self.actors.push((id.to_string(), known.clone().unwrap_or_else(|| id.to_string()), if known.is_some() { String::new() } else { label.to_string() }));
+        let known = self.list("actor").iter().find_map(|t| {
+            let (aid, alabel) = (t.str_opt("id").ok()??, t.str_opt("label").ok()?);
+            (aid == id || alabel.as_deref() == Some(label)).then_some(aid)
+        });
+        let actor = known.clone().unwrap_or_else(|| id.to_string());
+        if known.is_none() {
+            self.add("actor", vec![("id", text(id)), ("label", text(label))]);
+        }
+        self.actors.push((id.to_string(), actor));
     }
 
     fn actor(&self, id: &str) -> String {
         self.actors.iter().find(|a| a.0 == id).map_or_else(|| id.to_string(), |a| a.1.clone())
     }
 
-    fn duration(o: &HashMap<&str, &str>) -> String {
-        o.get("duration").map_or(String::new(), |d| format!("duration = {d}\n"))
+    /// One line of a diagram or of a shared file.
+    fn read(&mut self, l: &Line) -> Result<(), String> {
+        let line = l.text.trim();
+        (self.file, self.line) = (l.file.clone(), l.no);
+        let at = |e: String| format!("{}: {e}", l.place());
+        if line.is_empty() || line.starts_with("%%{") {
+            return Ok(());
+        }
+        if let Some(d) = line.strip_prefix("%%") {
+            return self.directive(d.trim()).map_err(at);
+        }
+        if !self.started {
+            if line != "sequenceDiagram" {
+                return Err(at("the diagram must start with 'sequenceDiagram'".to_string()));
+            }
+            self.started = true;
+            return Ok(());
+        }
+        let first = line.split_whitespace().next().unwrap_or_default();
+        match first {
+            "participant" | "actor" => {
+                let rest = line[first.len()..].trim();
+                let (id, label) = rest.split_once(" as ").unwrap_or((rest, rest));
+                self.participant(id.trim(), label.trim());
+                Ok(())
+            }
+            "Note" | "note" => self.note(line).map_err(at),
+            "autonumber" | "activate" | "deactivate" | "rect" | "end" => Ok(()),
+            "alt" | "else" | "opt" | "loop" | "par" | "and" | "critical" | "break" => {
+                Err(at(format!("'{first}' is not supported: a scene is one path, write one diagram for each case")))
+            }
+            _ => self.message(line).map_err(at),
+        }
     }
 
     fn directive(&mut self, d: &str) -> Result<(), String> {
         if self.keyword.is_some() {
             return Err("a keyword directive must be followed by its message".into());
+        }
+        if let Some(raw) = d.strip_prefix('@') {
+            let (name, entries) = parse_line(raw)?;
+            let t = Table { name, line: self.line, file: self.file.clone(), entries };
+            self.doc.add(t);
+            return Ok(());
         }
         if let Some(kw) = KEYWORDS.iter().find(|k| d == **k || d.starts_with(&format!("{k} "))) {
             let rest = d[kw.len()..].trim();
@@ -349,27 +443,35 @@ impl Importer {
         let need = |n: usize, usage: &str| if plain.len() < n { Err(format!("'{cmd}' is written: {usage}")) } else { Ok(()) };
         match cmd {
             "#" => {}
-            "title" => self.title = tail.to_string(),
-            "subtitle" => self.subtitle = tail.to_string(),
+            "title" | "subtitle" => {
+                let key = if cmd == "title" { "title" } else { "subtitle" };
+                self.add("video", vec![(key, text(tail))]);
+            }
             "geometry" => {
                 need(1, "geometry <name>")?;
+                let base = self.base.clone().ok_or("'geometry' needs a diagram file, with its common/ folder")?;
+                let path = base.join("common").join(format!("{}.mmd", plain[0]));
+                if !path.exists() {
+                    return Err(format!("geometry '{}': {} not found", plain[0], path.display()));
+                }
                 self.geometry = Some(plain[0].to_string());
+                self.include(&path)?;
             }
             "carrier" => {
                 need(2, "carrier <id> <sample id> [needle=1|2|both] [route=a,b,c] [color=#hex] [speed=n] [ghost] [hidden]")?;
                 self.carrier(&plain, &o)?;
             }
-            "when" | "at" | "delay" | "with" | "after_end" | "after_start" => {
-                let line = match cmd {
-                    "when" => format!("when = {}\n", quote(tail)),
-                    "with" => "start = \"with\"\n".to_string(),
-                    _ => {
-                        need(1, &format!("{cmd} <seconds>"))?;
-                        plain[0].parse::<f64>().map_err(|_| format!("'{cmd}' needs seconds, not '{}'", plain[0]))?;
-                        format!("{cmd} = {}\n", plain[0])
-                    }
+            "when" => self.timing_key("when", text(tail))?,
+            "with" => self.timing_key("start", text("with"))?,
+            "at" | "delay" | "after_end" | "after_start" => {
+                need(1, &format!("{cmd} <seconds>"))?;
+                let key = match cmd {
+                    "at" => "at",
+                    "delay" => "delay",
+                    "after_end" => "after_end",
+                    _ => "after_start",
                 };
-                self.timing_key(line)?;
+                self.timing_key(key, seconds(cmd, plain[0])?)?;
             }
             "for" => {
                 need(1, "for <carrier>")?;
@@ -377,55 +479,54 @@ impl Importer {
             }
             "duration" => {
                 need(1, "duration <seconds>")?;
-                plain[0].parse::<f64>().map_err(|_| format!("'duration' needs seconds, not '{}'", plain[0]))?;
-                self.timing.push_str(&format!("duration = {}\n", plain[0]));
+                self.timing.push(("duration", seconds("duration", plain[0])?));
             }
             "move" => {
                 if plain.len() < 3 || plain[1] != "to" {
                     return Err("'move' is written: move <carrier> to <point> [ease=in|out|inout|linear] [speed=n] [duration=s] [runaway]".into());
                 }
-                let mut k = format!("carrier = {}\nto = {}\n", quote(plain[0]), quote(plain[2]));
+                let mut k: Keys = vec![("carrier", text(plain[0])), ("to", text(plain[2]))];
                 if let Some(e) = o.get("ease") {
-                    let _ = writeln!(k, "ease = {}", quote(e));
+                    k.push(("ease", text(e)));
                 }
                 if let Some(v) = o.get("speed") {
-                    let _ = writeln!(k, "speed = {v}");
+                    k.push(("speed", seconds("speed", v)?));
                 }
-                k.push_str(&Self::duration(&o));
+                k.extend(duration(&o)?);
                 if plain.contains(&"runaway") {
-                    k.push_str("runaway = true\n");
+                    k.push(("runaway", Value::Bool(true)));
                 }
-                self.step("move", &k);
+                self.step("move", k);
             }
             "pipette" | "rotate" | "highlight" | "operator" => {
                 need(1, &format!("{cmd} <device> [duration=s]"))?;
-                let k = format!("device = {}\n{}", quote(plain[0]), Self::duration(&o));
-                self.step(cmd, &k);
+                let mut k: Keys = vec![("device", text(plain[0]))];
+                k.extend(duration(&o)?);
+                self.step(cmd, k);
             }
             "needle" => {
                 need(2, "needle <device> down|up [duration=s]")?;
-                let k = format!("device = {}\nto = {}\n{}", quote(plain[0]), quote(plain[1]), Self::duration(&o));
-                self.step("needle", &k);
+                let mut k: Keys = vec![("device", text(plain[0])), ("to", text(plain[1]))];
+                k.extend(duration(&o)?);
+                self.step("needle", k);
             }
             "status" => {
                 need(2, "status <device> error|ready|normal")?;
-                let k = format!("device = {}\nstate = {}\n", quote(plain[0]), quote(plain[1]));
-                self.step("status", &k);
+                self.step("status", vec![("device", text(plain[0])), ("state", text(plain[1]))]);
             }
             "show" | "hide" => {
                 need(1, &format!("{cmd} <carrier>"))?;
-                let k = format!("carrier = {}\n{}", quote(plain[0]), Self::duration(&o));
-                self.step(cmd, &k);
+                let mut k: Keys = vec![("carrier", text(plain[0]))];
+                k.extend(duration(&o)?);
+                self.step(cmd, k);
             }
             "wait" => {
                 need(1, "wait <seconds>")?;
-                let k = format!("duration = {}\n", plain[0]);
-                self.step("wait", &k);
+                self.step("wait", vec![("duration", seconds("wait", plain[0])?)]);
             }
             "caption" => {
-                let (title, text) = tail.split_once('|').ok_or("'caption' is written: caption <title> | <text>")?;
-                let k = format!("title = {}\ntext = {}\n", quote(title.trim()), quote(text.trim()));
-                self.step("caption", &k);
+                let (title, body) = tail.split_once('|').ok_or("'caption' is written: caption <title> | <text>")?;
+                self.step("caption", vec![("title", text(title.trim())), ("text", text(body.trim()))]);
             }
             o => {
                 let hint = suggest(d).map_or(String::new(), |s| format!(": did you mean '{s}'?"));
@@ -436,13 +537,11 @@ impl Importer {
     }
 
     fn carrier(&mut self, plain: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
-        let geometry = self.geometry.clone().ok_or("the geometry must be given before the carriers")?;
         let (id, sample) = (plain[0], plain[1]);
-        let ghost = plain.contains(&"ghost");
-        let hidden = plain.contains(&"hidden");
         let route: Vec<String> = match o.get("route") {
             Some(r) => r.split(',').map(String::from).collect(),
             None => {
+                let geometry = self.geometry.clone().ok_or("the geometry must be given before a carrier without route=")?;
                 let needle = o.get("needle").copied().unwrap_or("1");
                 let mut r: Vec<String> = default_route(&geometry, needle)
                     .ok_or_else(|| format!("no default route for geometry '{geometry}' with needle={needle}: give route=a,b,c"))?
@@ -456,40 +555,48 @@ impl Importer {
                 r
             }
         };
-        let list: Vec<String> = route.iter().map(|p| quote(p)).collect();
-        let speed = o.get("speed").map_or_else(|| if geometry.starts_with("spur") { "110" } else { "75" }.to_string(), |s| s.to_string());
-        let mut c = format!("# from {}\n[[carrier]]\nid = {}\ntube = true\nsample_id = {}\nroute = [{}]\nspeed = {speed}\n", self.place, quote(id), quote(sample), list.join(", "));
+        let speed = match o.get("speed") {
+            Some(s) => seconds("speed", s)?,
+            None => Value::Num(if self.geometry.as_deref().is_some_and(|g| g.starts_with("spur")) { 110.0 } else { 75.0 }),
+        };
+        let mut k: Keys = vec![
+            ("id", text(id)),
+            ("tube", Value::Bool(true)),
+            ("sample_id", text(sample)),
+            ("route", Value::Arr(route.iter().map(|p| text(p)).collect())),
+            ("speed", speed),
+        ];
         if let Some(col) = o.get("color") {
-            let _ = writeln!(c, "cap_color = {}", quote(col));
+            k.push(("cap_color", text(col)));
         }
-        if ghost {
-            c.push_str("ghost = true\n");
+        if plain.contains(&"ghost") {
+            k.push(("ghost", Value::Bool(true)));
         }
-        if hidden {
-            c.push_str("visible = false\n");
+        if plain.contains(&"hidden") {
+            k.push(("visible", Value::Bool(false)));
         }
         if let Some(t) = o.get("tag") {
-            let _ = writeln!(c, "tag = {}", quote(&t.replace('_', " ")));
+            k.push(("tag", text(&t.replace('_', " "))));
         }
-        self.carriers.push(c);
+        self.add("carrier", k);
         self.samples.push((id.to_string(), sample.to_string()));
         Ok(())
     }
 
-    fn message(&mut self, line: &str, lib: &Library) -> Result<(), String> {
+    fn message(&mut self, line: &str) -> Result<(), String> {
         let (left, label) = line.split_once(':').ok_or("a message needs ': text'")?;
         let arrow = ["-->>", "->>", "--x", "-x", "--)", "-)", "-->", "->"].into_iter().find(|a| left.contains(a)).ok_or("no arrow in the message")?;
         let (a, b) = left.split_once(arrow).unwrap();
         let (a, b) = (a.trim(), b.trim());
-        self.participant(a, a, lib);
-        self.participant(b, b, lib);
+        self.participant(a, a);
+        self.participant(b, b);
         let (from, to) = (self.actor(a), self.actor(b));
         let reply = arrow.starts_with("--");
         // "Sample Complete SampleId=X Needle=1": the parameters start at the first key=value.
         let words: Vec<&str> = label.split_whitespace().collect();
         let split = words.iter().position(|w| w.contains('=')).unwrap_or(words.len());
-        let (text, params) = (words[..split].join(" "), &words[split..]);
-        if text.is_empty() {
+        let (body, params) = (words[..split].join(" "), &words[split..]);
+        if body.is_empty() {
             return Err("a message needs a name".into());
         }
         let value = |key: &str| params.iter().find_map(|p| p.strip_prefix(key)?.strip_prefix('='));
@@ -501,89 +608,94 @@ impl Importer {
         };
         let needle = value("Needle");
         // The same message in the library's terms.
-        let mut shape: Vec<String> = Vec::new();
-        for p in params {
-            shape.push(match p.split_once('=') {
+        let shape: Vec<String> = params
+            .iter()
+            .map(|p| match p.split_once('=') {
                 Some(("SampleId", _)) => "SampleId={SampleId}".to_string(),
                 Some(("Needle", _)) => "Needle={Needle}".to_string(),
                 _ => p.to_string(),
-            });
-        }
+            })
+            .collect();
         let shape = shape.join(" ");
-        let again = text == "Prepare" && sample.is_some_and(|s| self.prepared.iter().any(|p| p == s));
-        if text == "Prepare" {
+        let again = body == "Prepare" && sample.is_some_and(|s| self.prepared.iter().any(|p| p == s));
+        if body == "Prepare" {
             self.prepared.push(sample.unwrap_or_default().to_string());
         }
         if let Some((kw, n)) = self.keyword.take() {
-            return self.keyword_message(kw, n, &from, &to, &text, &params.join(" "), reply, carrier);
+            return self.keyword_message(kw, n, &from, &to, &body, &params.join(" "), reply, carrier);
         }
-        let found = lib.messages.iter().find(|m| m.from == from && m.to == to && m.text == text && m.params == shape && m.reply == reply && m.colored == again);
-        let mut k = String::new();
+        let types: Vec<MsgType> = self.list("message").iter().map(MsgType::from_table).collect::<Result<_, _>>()?;
+        let found = types.iter().find(|m| m.from == from && m.to == to && m.text == body && m.params == shape && m.reply == reply && m.colored == again);
+        let mut k: Keys = Vec::new();
         match found {
-            Some(m) => {
-                let _ = writeln!(k, "type = {}", quote(&m.id));
-            }
+            Some(m) => k.push(("type", text(&m.id))),
             None => {
-                let _ = writeln!(k, "from = {}\nto = {}\ntext = {}", quote(&from), quote(&to), quote(&text));
+                k.extend([("from", text(&from)), ("to", text(&to)), ("text", text(&body))]);
                 if !shape.is_empty() {
-                    let _ = writeln!(k, "params = {}", quote(&shape));
+                    k.push(("params", text(&shape)));
                 }
                 if reply {
-                    k.push_str("reply = true\n");
+                    k.push(("reply", Value::Bool(true)));
                 }
             }
         }
         if let Some(c) = &carrier {
-            let _ = writeln!(k, "carrier = {}", quote(c));
+            k.push(("carrier", text(c)));
         }
-        if let Some(n) = needle {
-            let _ = writeln!(k, "needle = {n}");
+        let needle_n = match needle {
+            Some(n) => Some(n.parse::<f64>().map_err(|_| format!("Needle={n} is not a number"))?),
+            None => None,
+        };
+        if let Some(n) = needle_n {
+            k.push(("needle", Value::Num(n)));
         }
-        let event = found.map_or_else(|| text.to_lowercase().replace(' ', "_"), |m| m.id.clone());
+        let event = found.map_or_else(|| body.to_lowercase().replace(' ', "_"), |m| m.id.clone());
         if found.is_none() {
-            let _ = writeln!(k, "event = {}", quote(&event));
+            k.push(("event", text(&event)));
         }
-        self.remember(&text, needle.and_then(|n| n.parse().ok()), &carrier, &event);
+        self.remember(&body, needle_n.map(|n| n as usize), &carrier, &event)?;
         self.last_message = Some((carrier, event));
-        self.step("message", &k);
+        self.step("message", k);
         Ok(())
     }
 
     /// What the keyword directives after this message need to know. `role` is
     /// the keyword, or the text of a message written without one.
-    fn remember(&mut self, role: &str, needle: Option<usize>, carrier: &Option<String>, event: &str) {
+    fn remember(&mut self, role: &str, needle: Option<usize>, carrier: &Option<String>, event: &str) -> Result<(), String> {
         match (role, carrier) {
             ("OK", Some(c)) => {
                 self.ok_of.insert(c.clone(), event.to_string());
             }
             ("Query", _) => self.queried = true,
             ("Sample Acquisition", Some(c)) => {
-                if let Some((dev, _)) = self.geo.samplers.get(needle.unwrap_or(1).saturating_sub(1)) {
+                if let Some((dev, _)) = self.geo()?.samplers.get(needle.unwrap_or(1).saturating_sub(1)) {
                     self.sampled_at.insert(c.clone(), dev.clone());
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// A message after a keyword directive: its text as written, at the moment
     /// the keyword stands for.
     #[allow(clippy::too_many_arguments)]
-    fn keyword_message(&mut self, kw: &str, n: Option<usize>, from: &str, to: &str, text: &str, params: &str, reply: bool, carrier: Option<String>) -> Result<(), String> {
+    fn keyword_message(&mut self, kw: &str, n: Option<usize>, from: &str, to: &str, body: &str, params: &str, reply: bool, carrier: Option<String>) -> Result<(), String> {
         let carrier = carrier.or_else(|| self.last_message.as_ref().and_then(|m| m.0.clone()));
         let need_carrier = || carrier.clone().ok_or_else(|| format!("'{kw}': no SampleId in the message and no carrier in the message before"));
         let event = kw.to_lowercase().replace(' ', "_");
+        let geo = self.geo()?;
         let mut purple = false;
-        let when = match kw {
+        let (key, when) = match kw {
             "Prepare" => {
                 let n = n.unwrap();
-                let point = self.geo.diverts.get(n - 1).ok_or_else(|| format!("'Prepare {n}': this geometry has {} divert point(s)", self.geo.diverts.len()))?;
+                let point = geo.diverts.get(n - 1).ok_or_else(|| format!("'Prepare {n}': this geometry has {} divert point(s)", geo.diverts.len()))?;
                 purple = n > 1;
-                format!("when = {}\n", quote(&format!("{} at {point}", need_carrier()?)))
+                ("when", format!("{} at {point}", need_carrier()?))
             }
             "OK" => {
                 let (c, e) = self.last_message.clone().ok_or("'OK' answers a message: there is none before it")?;
-                format!("when = {}\n", quote(&c.map_or_else(|| format!("{e} arrived"), |c| format!("{e} {c} arrived"))))
+                ("when", c.map_or_else(|| format!("{e} arrived"), |c| format!("{e} {c} arrived")))
             }
             "Query" => {
                 let c = need_carrier()?;
@@ -592,204 +704,162 @@ impl Importer {
                 if self.queried {
                     w.push_str(" and tests arrived");
                 }
-                format!("when = {}\n", quote(&w))
+                ("when", w)
             }
-            "Tests" => format!("when = {}\n", quote(&format!("query {} arrived", need_carrier()?))),
+            "Tests" => ("when", format!("query {} arrived", need_carrier()?)),
             "Sample Acquisition" => {
-                let count = self.geo.samplers.len();
+                let count = geo.samplers.len();
                 let n = match n {
                     Some(n) => n,
                     None if count == 1 => 1,
                     None => return Err(format!("'Sample Acquisition' needs the number of the sampling point: this geometry has {count}")),
                 };
-                let (dev, point) = self.geo.samplers.get(n - 1).cloned().ok_or_else(|| format!("'Sample Acquisition {n}': this geometry has {count} sampling point(s)"))?;
+                let (dev, point) = geo.samplers.get(n - 1).cloned().ok_or_else(|| format!("'Sample Acquisition {n}': this geometry has {count} sampling point(s)"))?;
                 let c = need_carrier()?;
                 self.sampled_at.insert(c.clone(), dev.clone());
                 // In a turnstile the carrier reaches the needle with a rotation.
-                let w = point.map_or_else(|| format!("rotate {dev} done"), |p| format!("{c} at {p}"));
-                format!("when = {}\n", quote(&w))
+                ("when", point.map_or_else(|| format!("rotate {dev} done"), |p| format!("{c} at {p}")))
             }
             "Sample Complete" => {
                 let c = need_carrier()?;
                 let dev = self.sampled_at.get(&c).ok_or_else(|| format!("'Sample Complete': no Sample Acquisition for carrier '{c}' before it"))?;
-                format!("when = {}\n", quote(&format!("pipette {dev} done")))
+                ("when", format!("pipette {dev} done"))
             }
-            "Release" => format!("when = {}\n", quote(&format!("{} at {}", need_carrier()?, self.geo.exit))),
-            _ => "start = \"after_all\"\n".to_string(), // Results: at the end of the scene
+            "Release" => ("when", format!("{} at {}", need_carrier()?, geo.exit)),
+            _ => ("start", "after_all".to_string()), // Results: at the end of the scene
         };
-        self.timing = when;
-        let mut k = format!("from = {}\nto = {}\ntext = {}\n", quote(from), quote(to), quote(text));
+        self.timing = vec![(key, text(&when))];
+        let mut k: Keys = vec![("from", text(from)), ("to", text(to)), ("text", text(body))];
         if !params.is_empty() {
-            let _ = writeln!(k, "params = {}", quote(params));
+            k.push(("params", text(params)));
         }
         if reply {
-            k.push_str("reply = true\n");
+            k.push(("reply", Value::Bool(true)));
         }
         if purple {
-            k.push_str("color = \"#9333EA\"\n");
+            k.push(("color", text("#9333EA")));
         }
         if let Some(c) = &carrier {
-            let _ = writeln!(k, "carrier = {}", quote(c));
+            k.push(("carrier", text(c)));
         }
-        let _ = writeln!(k, "event = {}", quote(&event));
-        self.remember(kw, n, &carrier, &event);
+        k.push(("event", text(&event)));
+        self.remember(kw, n, &carrier, &event)?;
         self.last_message = Some((carrier, event));
-        self.step("message", &k);
+        self.step("message", k);
         Ok(())
     }
 
-    fn note(&mut self, line: &str, lib: &Library) -> Result<(), String> {
+    fn note(&mut self, line: &str) -> Result<(), String> {
         if self.keyword.is_some() {
             return Err("a keyword directive must be followed by its message, not a note".into());
         }
-        let (place, text) = line.split_once(':').ok_or("a note needs ': text'")?;
+        let (place, body) = line.split_once(':').ok_or("a note needs ': text'")?;
         let who = place.split_whitespace().last().unwrap_or_default().split(',').next().unwrap_or_default().to_string();
-        self.participant(&who, &who, lib);
+        self.participant(&who, &who);
         // A pipette already adds this note.
-        if self.last_pipette && text.trim().starts_with("Pipetting") {
+        if self.last_pipette && body.trim().starts_with("Pipetting") {
             return Ok(());
         }
-        let k = format!("actor = {}\ntext = {}\n", quote(&self.actor(&who)), quote(text.trim()));
-        self.step("note", &k);
+        let actor = self.actor(&who);
+        self.step("note", vec![("actor", text(&actor)), ("text", text(body.trim()))]);
         Ok(())
     }
+
+    fn finish(mut self, name: &str) -> Result<Doc, String> {
+        if let Some((kw, _)) = self.keyword {
+            return Err(format!("'{kw}' at the end of the diagram: its message is missing"));
+        }
+        let video = self.doc.tables.get("video");
+        if !video.is_some_and(|v| v.entries.contains_key("subtitle")) {
+            self.add("video", vec![("subtitle", text(name))]);
+        }
+        self.doc.files = self.files;
+        Ok(self.doc)
+    }
 }
 
-/// The geometry named in the diagram, if any.
-pub fn geometry_of(lines: &[Line]) -> Option<String> {
-    lines.iter().find_map(|l| l.text.trim().strip_prefix("%%")?.trim().strip_prefix("geometry ").map(|g| g.trim().to_string()))
+/// The shared files every scene starts from, in `common/`.
+const SHARED: [&str; 3] = ["video", "actors", "messages"];
+
+/// The data of a scene written as a Mermaid diagram. `base` is where `common/` is:
+/// its video, actors and messages come first, a geometry with `%% geometry`.
+pub fn load(path: &Path, base: &Path) -> Result<Doc, String> {
+    let mut im = Importer::new(Some(base.to_path_buf()));
+    for name in SHARED {
+        let f = base.join("common").join(format!("{name}.mmd"));
+        if f.exists() {
+            im.include(&f)?;
+        }
+    }
+    let mut files = Vec::new();
+    let lines = read_lines(path, &mut files)?;
+    for l in &lines {
+        im.read(l)?;
+    }
+    im.files.splice(0..0, files);
+    im.finish(path.file_stem().and_then(|s| s.to_str()).unwrap_or("scene"))
 }
 
-/// Builds the text of a scene from a diagram given as text.
+/// The data of a scene given as text, without shared files (used by the tests).
 #[cfg(test)]
-pub fn import(src: &str, name: &str, geometry: Option<&str>, lib: &Library) -> Result<String, String> {
-    let lines: Vec<Line> = src.lines().enumerate().map(|(i, t)| Line { file: String::new(), no: i + 1, text: t.to_string() }).collect();
-    let g = geometry.map(String::from).or_else(|| geometry_of(&lines));
-    let geo = match g {
-        Some(g) => {
-            let path = format!("{}/scenes/common/{g}.toml", env!("CARGO_MANIFEST_DIR"));
-            crate::toml::parse_file(Path::new(&path)).ok().map(|d| Geometry::from_doc(&d).unwrap()).unwrap_or_default()
-        }
-        None => Geometry::default(),
-    };
-    import_lines(&lines, name, geometry, lib, geo)
-}
-
-/// Builds the text of a scene from a diagram. `geometry` wins over the one in the file.
-pub fn import_lines(lines: &[Line], name: &str, geometry: Option<&str>, lib: &Library, geo: Geometry) -> Result<String, String> {
-    let mut im = Importer { geometry: geometry.map(String::from), geo, ..Default::default() };
-    let mut started = false;
-    for l in lines {
-        let line = l.text.trim();
-        let place = l.place();
-        im.place = place.clone();
-        let at = |e: String| format!("{place}: {e}");
-        if line.is_empty() || line.starts_with("%%{") {
-            continue;
-        }
-        if let Some(d) = line.strip_prefix("%%") {
-            if !(geometry.is_some() && d.trim().starts_with("geometry ")) {
-                im.directive(d.trim()).map_err(at)?;
-            }
-            continue;
-        }
-        if !started {
-            if line != "sequenceDiagram" {
-                return Err(at("the diagram must start with 'sequenceDiagram'".to_string()));
-            }
-            started = true;
-            continue;
-        }
-        let first = line.split_whitespace().next().unwrap_or_default();
-        match first {
-            "participant" | "actor" => {
-                let rest = line[first.len()..].trim();
-                let (id, label) = rest.split_once(" as ").unwrap_or((rest, rest));
-                im.participant(id.trim(), label.trim(), lib);
-            }
-            "Note" | "note" => im.note(line, lib).map_err(at)?,
-            "autonumber" | "activate" | "deactivate" | "rect" | "end" => {}
-            "alt" | "else" | "opt" | "loop" | "par" | "and" | "critical" | "break" => {
-                return Err(at(format!("'{first}' is not supported: a scene is one path, write one diagram for each case")));
-            }
-            _ => im.message(line, lib).map_err(at)?,
-        }
+pub fn parse_text(src: &str) -> Result<Doc, String> {
+    let mut im = Importer::new(None);
+    for (i, t) in src.lines().enumerate() {
+        im.read(&Line { file: String::new(), no: i + 1, text: t.to_string() })?;
     }
-    if !started {
-        return Err("the diagram must start with 'sequenceDiagram'".into());
-    }
-    if let Some((kw, _)) = im.keyword {
-        return Err(format!("'{kw}' at the end of the diagram: its message is missing"));
-    }
-    let g = im.geometry.clone().ok_or_else(|| format!("no geometry: add '%% geometry <name>' or --geometry ({GEOMETRIES})"))?;
-    if im.steps.is_empty() {
-        return Err("the diagram has no messages or actions".into());
-    }
-    let mut o = format!("# Scene generated from the Mermaid diagram {name}.\n\n");
-    let _ = writeln!(o, "include = [\"common/video.toml\", \"common/actors.toml\", \"common/messages.toml\", \"common/{g}.toml\"]\n");
-    o.push_str("[video]\n");
-    if !im.title.is_empty() {
-        let _ = writeln!(o, "title = {}", quote(&im.title));
-    }
-    let _ = writeln!(o, "subtitle = {}\n", quote(if im.subtitle.is_empty() { name } else { &im.subtitle }));
-    for (_, id, label) in im.actors.iter().filter(|a| !a.2.is_empty()) {
-        let _ = writeln!(o, "[[actor]]\nid = {}\nlabel = {}\n", quote(id), quote(label));
-    }
-    for c in &im.carriers {
-        o.push_str(c);
-        o.push('\n');
-    }
-    for s in &im.steps {
-        o.push_str(s);
-        o.push('\n');
-    }
-    Ok(o)
+    im.finish("test")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::toml;
-    use std::path::{Path, PathBuf};
 
-    fn library() -> Library {
-        let doc = toml::parse_file(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/common/messages.toml"))).unwrap();
-        let actors = toml::parse_file(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/common/actors.toml"))).unwrap();
-        Library {
-            actors: actors.arrays["actor"].iter().map(|t| (t.str_req("id").unwrap(), t.str_req("label").unwrap())).collect(),
-            messages: doc.arrays["message"].iter().map(|t| MsgType::from_table(t).unwrap()).collect(),
+    const SCENES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes");
+
+    /// A diagram given as text, with the shared files of scenes/common.
+    fn doc(src: &str) -> Result<Doc, String> {
+        let mut im = Importer::new(Some(PathBuf::from(SCENES)));
+        for name in SHARED {
+            im.include(&Path::new(SCENES).join("common").join(format!("{name}.mmd")))?;
         }
+        for (i, t) in src.lines().enumerate() {
+            im.read(&Line { file: String::new(), no: i + 1, text: t.to_string() })?;
+        }
+        im.finish("test")
     }
 
-    /// Compiles generated scene text next to the shared files.
-    fn build(text: &str, tag: &str) -> (Scene, Timeline) {
-        let dir: PathBuf = std::env::temp_dir().join(format!("trackviz_mmd_{tag}_{}", std::process::id()));
-        let common = dir.join("common");
-        std::fs::create_dir_all(&common).unwrap();
-        for e in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/common")).unwrap() {
-            let p = e.unwrap().path();
-            std::fs::copy(&p, common.join(p.file_name().unwrap())).unwrap();
-        }
-        let f = dir.join("s.toml");
-        std::fs::write(&f, text).unwrap();
-        let doc = toml::parse_file(&f).unwrap();
-        let sc = Scene::from_doc(&doc).unwrap();
-        let tl = Timeline::build(&sc).unwrap();
-        std::fs::remove_dir_all(dir).unwrap();
+    fn build(d: &Doc) -> (Scene, Timeline) {
+        let sc = Scene::from_doc(d).unwrap_or_else(|e| panic!("{e}"));
+        let tl = Timeline::build(&sc).unwrap_or_else(|e| panic!("{e}"));
         (sc, tl)
     }
 
-    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete SampleId=SID-1\nIF-->>AN: OK\n";
+    /// Does a table of the section hold all these keys with these values?
+    fn has(d: &Doc, section: &str, keys: &[(&str, &str)]) -> bool {
+        let same = |v: &Value, want: &str| match v {
+            Value::Str(s) => s == want,
+            Value::Num(n) => want.parse::<f64>().is_ok_and(|w| w == *n),
+            Value::Bool(b) => want == if *b { "true" } else { "false" },
+            Value::Arr(_) => false,
+        };
+        d.arrays.get(section).is_some_and(|ts| ts.iter().any(|t| keys.iter().all(|(k, w)| t.entries.get(*k).is_some_and(|v| same(v, w)))))
+    }
+
+    fn fails(src: &str, what: &str) {
+        let e = doc(src).err().unwrap_or_else(|| panic!("expected an error with '{what}'"));
+        assert!(e.contains(what), "'{e}' does not contain '{what}'");
+    }
 
     /// The arrows of a diagram, without comments and layout.
     fn lines(s: &str) -> Vec<String> {
         s.lines().map(str::trim).filter(|l| l.contains("->>") || l.starts_with("Note")).filter(|l| !l.starts_with("%%")).map(String::from).collect()
     }
 
+    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete SampleId=SID-1\nIF-->>AN: OK\n";
+
     #[test]
     fn a_diagram_builds_a_valid_scene_and_exports_the_same_messages() {
-        let text = import(EX, "example", None, &library()).unwrap();
-        let (sc, tl) = build(&text, "example");
+        let (sc, tl) = build(&doc(EX).unwrap());
         assert!(crate::lint::warnings(&sc, &tl).is_empty(), "{:?}", crate::lint::warnings(&sc, &tl));
         assert_eq!(lines(&export(&sc, &tl)), lines(EX));
     }
@@ -799,37 +869,35 @@ mod tests {
     #[test]
     fn messages_use_the_library_and_a_second_prepare_is_the_purple_one() {
         let src = format!("{HEAD}IF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nIF->>AN: Prepare SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1 Needle=2\n");
-        let t = import(&src, "x", None, &library()).unwrap();
-        for ty in ["prepare", "sample_ok", "prepare_again", "sample_acquisition_needle"] {
-            assert!(t.contains(&format!("type = \"{ty}\"")), "{ty}: {t}");
+        let d = doc(&src).unwrap();
+        for ty in ["prepare", "sample_ok", "prepare_again"] {
+            assert!(has(&d, "step", &[("type", ty), ("carrier", "C1")]), "{ty}");
         }
-        assert!(t.contains("needle = 2"));
+        assert!(has(&d, "step", &[("type", "sample_acquisition_needle"), ("needle", "2")]));
     }
 
     #[test]
     fn participants_are_found_by_label_and_new_ones_are_added() {
-        let src = "%% geometry spur\nsequenceDiagram\nparticipant I as Interface\nparticipant L as Lab\n%% carrier C1 SID-1\nI->>AN: Prepare SampleId=SID-1\nI->>L: Hello\n";
-        let t = import(src, "x", None, &library()).unwrap();
-        assert!(t.contains("type = \"prepare\""), "{t}");
-        assert!(t.contains("[[actor]]\nid = \"L\"\nlabel = \"Lab\""), "{t}");
-        assert!(t.contains("text = \"Hello\""));
+        let d = doc("%% geometry spur\nsequenceDiagram\nparticipant I as Interface\nparticipant L as Lab\n%% carrier C1 SID-1\nI->>AN: Prepare SampleId=SID-1\nI->>L: Hello\n").unwrap();
+        assert!(has(&d, "step", &[("type", "prepare")]));
+        assert!(has(&d, "actor", &[("id", "L"), ("label", "Lab")]));
+        assert!(has(&d, "step", &[("from", "IF"), ("to", "L"), ("text", "Hello")]));
     }
 
     #[test]
     fn timing_directives_apply_to_the_next_step() {
-        let src = format!("{HEAD}%% move C1 to nsd ease=in\n%% when C1 at nsd\n%% delay 0.5\nIF->>AN: Prepare SampleId=SID-1\n%% with\n%% highlight nsd duration=2\n");
-        let t = import(&src, "x", None, &library()).unwrap();
-        assert!(t.contains("when = \"C1 at nsd\"\ndelay = 0.5\ntype = \"prepare\""), "{t}");
-        assert!(t.contains("start = \"with\"\ndevice = \"nsd\"\nduration = 2"), "{t}");
+        let d = doc(&format!("{HEAD}%% move C1 to nsd ease=in\n%% when C1 at nsd\n%% delay 0.5\nIF->>AN: Prepare SampleId=SID-1\n%% with\n%% highlight nsd duration=2\n")).unwrap();
+        assert!(has(&d, "step", &[("when", "C1 at nsd"), ("delay", "0.5"), ("type", "prepare")]));
+        assert!(has(&d, "step", &[("start", "with"), ("device", "nsd"), ("duration", "2")]));
+        assert!(has(&d, "step", &[("action", "move"), ("ease", "in")]) && !has(&d, "step", &[("action", "move"), ("when", "C1 at nsd")]));
     }
 
     #[test]
     fn for_duration_and_runaway() {
-        let src = format!("{HEAD}%% move C1 to nsd runaway\n%% for C1\nAN-->>IF: OK\n%% duration 6\nNote over AN: Busy\n");
-        let t = import(&src, "x", None, &library()).unwrap();
-        assert!(t.contains("runaway = true"), "{t}");
-        assert!(t.contains("type = \"analyzer_ok\"\ncarrier = \"C1\""), "{t}");
-        assert!(t.contains("duration = 6\nactor = \"AN\""), "{t}");
+        let d = doc(&format!("{HEAD}%% move C1 to nsd runaway\n%% for C1\nAN-->>IF: OK\n%% duration 6\nNote over AN: Busy\n")).unwrap();
+        assert!(has(&d, "step", &[("action", "move"), ("runaway", "true")]));
+        assert!(has(&d, "step", &[("type", "analyzer_ok"), ("carrier", "C1")]));
+        assert!(has(&d, "step", &[("action", "note"), ("duration", "6"), ("actor", "AN")]));
     }
 
     const KW: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1 needle=both\n%% carrier C2 SID-2 needle=2\n\
@@ -838,22 +906,17 @@ mod tests {
         %% Prepare 2\nIF->>AN: Prepare SampleId=SID-1\n%% Prepare 1\nIF->>AN: Prepare SampleId=SID-2\n%% OK\nAN-->>IF: OK\n%% Query\nAN->>DMX: Query SampleId=SID-2\n\
         %% Sample Acquisition 1\nIF->>AN: Go SampleId=SID-1\n%% pipette sp1 duration=3\n%% Sample Complete\nAN->>IF: Done SampleId=SID-1\n%% Results\nAN->>DMX: Results SampleId=SID-1\n";
 
-    fn kw_times(src: &str) -> Vec<(String, f64)> {
-        let (_, tl) = build(&import(src, "x", None, &library()).unwrap(), "kw");
-        tl.events.iter().filter_map(|e| match &e.ev { Ev::Message { text, .. } => Some((text.clone(), (e.t0 * 100.0).round() / 100.0)), _ => None }).collect()
-    }
-
     #[test]
     fn keywords_send_the_message_written_by_the_user_at_its_moment() {
-        let t = import(KW, "x", None, &library()).unwrap();
+        let d = doc(KW).unwrap();
         // The text as written, not a library message; the second divert point is purple.
-        assert!(t.contains("text = \"Prepare it now\"\nparams = \"SampleId=SID-1\""), "{t}");
-        assert!(t.contains("when = \"C1 at d1\"") && t.contains("color = \"#9333EA\""), "{t}");
-        assert!(t.contains("when = \"C1 at nsd\"") && t.contains("when = \"C2 at nsd\""), "{t}");
-        assert!(t.contains("when = \"ok C1 arrived\"") && t.contains("when = \"ok C2 arrived and tests arrived\""), "{t}");
-        assert!(t.contains("when = \"C1 at s1\"") && t.contains("when = \"pipette sp1 done\"") && t.contains("start = \"after_all\""), "{t}");
-        let m = kw_times(KW);
-        let at = |name: &str| m.iter().find(|x| x.0 == name).unwrap().1;
+        assert!(has(&d, "step", &[("text", "Prepare it now"), ("params", "SampleId=SID-1"), ("when", "C1 at nsd")]));
+        assert!(has(&d, "step", &[("when", "C1 at d1"), ("color", "#9333EA")]));
+        assert!(has(&d, "step", &[("when", "C2 at nsd")]));
+        assert!(has(&d, "step", &[("when", "ok C1 arrived")]) && has(&d, "step", &[("when", "ok C2 arrived and tests arrived")]));
+        assert!(has(&d, "step", &[("when", "C1 at s1")]) && has(&d, "step", &[("when", "pipette sp1 done")]) && has(&d, "step", &[("start", "after_all")]));
+        let (_, tl) = build(&d);
+        let at = |name: &str| tl.events.iter().find(|e| matches!(&e.ev, Ev::Message { text, .. } if text == name)).unwrap().t0;
         let same = |a: f64, b: f64| assert!((a - b).abs() < 0.011, "{a} != {b}");
         // OK as soon as the Prepare has arrived, Tests as soon as the Query has.
         same(at("Fine"), at("Prepare it now") + 1.5);
@@ -863,6 +926,8 @@ mod tests {
         // The pipette starts when the message has arrived and lasts 3 s.
         same(at("Done"), at("Go") + 1.5 + 3.0);
     }
+
+    const KW_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1\n";
 
     #[test]
     fn keyword_errors() {
@@ -880,36 +945,26 @@ mod tests {
         fails(&k("%% Release 2\nIF->>AN: X SampleId=SID-1\n"), "takes no number");
     }
 
-    const KW_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1\n";
-
     #[test]
     fn a_note_after_a_pipette_is_not_repeated() {
-        let src = format!("{HEAD}%% pipette sp\nNote over AN: Pipetting\nNote over AN: Other\n");
-        let t = import(&src, "x", None, &library()).unwrap();
-        assert_eq!(t.matches("action = \"note\"").count(), 1, "{t}");
+        let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Pipetting\nNote over AN: Other\n")).unwrap();
+        assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
     }
 
     #[test]
     fn every_default_route_exists() {
         for (g, needle) in [("sampling", "1"), ("turnstile", "1"), ("spur", "1"), ("spur2", "1"), ("spur2", "2"), ("spur2", "both")] {
             let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier C1 SID-1 needle={needle}\n%% carrier C2 SID-2 needle={needle}\n%% move C1 to merge\n");
-            let t = import(&src, "x", None, &library()).unwrap_or_else(|e| panic!("{g}: {e}"));
-            if g == "turnstile" {
-                continue; // a move through the wheel needs rotations
+            let d = doc(&src).unwrap_or_else(|e| panic!("{g}: {e}"));
+            if g != "turnstile" {
+                build(&d); // a move through the wheel needs rotations
             }
-            build(&t, &format!("{g}{needle}"));
         }
-    }
-
-    fn fails(src: &str, what: &str) {
-        let e = import(src, "x", None, &library()).unwrap_err();
-        assert!(e.contains(what), "'{e}' does not contain '{what}'");
     }
 
     #[test]
     fn import_errors() {
         fails("graph TD\n", "must start with");
-        fails("sequenceDiagram\nIF->>AN: Hello\n", "no geometry");
         fails(&format!("{HEAD}%% mvoe C1 to nsd\n"), "unknown directive 'mvoe'");
         fails(&format!("{HEAD}%% move C1 nsd\n"), "'move' is written");
         fails(&format!("{HEAD}alt ok\nIF->>AN: A\nend\n"), "'alt' is not supported");
@@ -917,12 +972,22 @@ mod tests {
         fails("sequenceDiagram\n%% carrier C1 SID-1\n", "geometry must be given before");
         fails(&format!("{HEAD}%% when C1 at nsd\n%% at 3\nIF->>AN: A\n"), "only one of");
         fails(&format!("{HEAD}%% delay soon\nIF->>AN: A\n"), "needs seconds");
+        fails("%% geometry nowhere\n", "nowhere.mmd not found");
+        fails("%% @point id=a id=b\n", "duplicate key 'id'");
     }
 
     #[test]
     fn a_plain_comment_and_mermaid_init_are_skipped() {
-        let src = format!("{HEAD}%% # just a note\n%%{{init: {{}}}}%%\nIF->>AN: Hello\n");
-        assert!(import(&src, "x", None, &library()).is_ok());
+        assert!(doc(&format!("{HEAD}%% # just a note\n%%{{init: {{}}}}%%\nIF->>AN: Hello\n")).is_ok());
+    }
+
+    #[test]
+    fn at_lines_become_tables_with_their_place() {
+        let d = parse_text("%% @video title=t\n%% @point id=a x=1 y=2\n%% @video tail=3\n").unwrap();
+        assert!(has(&d, "point", &[("id", "a"), ("x", "1")]));
+        assert_eq!(d.arrays["point"][0].line, 2);
+        assert_eq!(d.tables["video"].num_req("tail").unwrap(), 3.0);
+        assert_eq!(d.tables["video"].str_req("subtitle").unwrap(), "test", "the name is the default subtitle");
     }
 
     fn temp(tag: &str, list: &[(&str, &str)]) -> PathBuf {
@@ -942,18 +1007,19 @@ mod tests {
             "inc",
             &[
                 ("a.mmd", "%% include common/b.mmd\nsequenceDiagram\nIF->>AN: Prepare SampleId=SID-1\n"),
-                ("common/b.mmd", "%% geometry spur\n%% include c.mmd\n\n%% caption T | x\n"),
-                ("common/c.mmd", "%% carrier C1 SID-1\n"),
+                ("common/b.mmd", "%% @point id=p x=1 y=1\n%% include c.mmd\n\n%% caption T | x\n"),
+                ("common/c.mmd", "%% carrier C1 SID-1 route=p,p\n"),
+                ("common/messages.mmd", "%% @message id=prepare from=IF to=AN text=Prepare params=\"SampleId={SampleId}\"\n"),
             ],
         );
-        let mut files = Vec::new();
-        let lines = read_lines(&dir.join("a.mmd"), &mut files).unwrap();
-        assert_eq!(files.len(), 3);
-        let t = import_lines(&lines, "a", None, &library(), Geometry::default()).unwrap();
-        assert!(t.contains("id = \"C1\"") && t.contains("type = \"prepare\"") && t.contains("title = \"T\""), "{t}");
-        // Every block says where it comes from, in the file that holds it.
-        assert!(t.contains("c.mmd line 1"), "{t}");
-        assert!(t.contains("a.mmd line 3"), "{t}");
+        let d = load(&dir.join("a.mmd"), &dir).unwrap();
+        assert!(has(&d, "carrier", &[("id", "C1")]) && has(&d, "step", &[("type", "prepare")]) && has(&d, "step", &[("title", "T")]));
+        assert_eq!(d.files.len(), 4, "{:?}", d.files);
+        // Every table knows the file and line it comes from.
+        let c1 = &d.arrays["carrier"][0];
+        assert!(c1.file.ends_with("c.mmd") && c1.line == 1, "{} {}", c1.file, c1.line);
+        let prepare = d.arrays["step"].iter().find(|t| t.entries.contains_key("type")).unwrap();
+        assert!(prepare.file.ends_with("a.mmd") && prepare.line == 3);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -974,13 +1040,6 @@ mod tests {
         assert!(e("loop.mmd").contains("circular include"));
         assert!(e("no.mmd").contains("missing.mmd"));
         std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn errors_point_to_the_line_of_the_diagram() {
-        let text = "x\n# from a.mmd line 7\n[[step]]\naction = \"move\"\n";
-        assert_eq!(locate(text, "[step] at line 3: unknown carrier"), "[step] at a.mmd line 7: unknown carrier");
-        assert_eq!(locate(text, "no place here"), "no place here");
     }
 
     #[test]

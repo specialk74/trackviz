@@ -22,7 +22,7 @@ e una prima didascalia.
 
 ### 1.3 Autocompletamento nell'editor
 
-Schema per i file `.toml` e snippet che suggeriscono azioni, chiavi e i 20 tipi di
+Schema per le direttive dei file `.mmd` e snippet che suggeriscono azioni, chiavi e i 20 tipi di
 messaggio, segnalando gli errori di battitura mentre si scrive. Utile solo con un
 editor compatibile, come VS Code.
 
@@ -69,7 +69,7 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 - `trackviz export` non è stato provato con un visualizzatore Mermaid reale: il formato è
   verificato solo dall'import del tool.
-- Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.toml` resta testo
+- Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.mmd` resta testo
   libero, senza avvisi: rinominare un tipo non aggiorna i diagrammi.
 - `when` si riferisce all'ultimo step corrispondente già scritto nel file: gli step vanno
   tenuti in ordine di tempo.

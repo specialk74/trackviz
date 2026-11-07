@@ -102,7 +102,7 @@ mod tests {
         warnings(&sc, &tl)
     }
     fn msg(text: &str, at: f64, params: &str) -> String {
-        format!("[[step]]\naction = \"message\"\nat = {at}\nfrom = \"IF\"\nto = \"AN\"\ntext = \"{text}\"\nparams = \"{params}\"\n")
+        format!("\n%% @step action=message at={at} from=IF to=AN text=\"{text}\" params=\"{params}\" ")
     }
 
     #[test]
@@ -113,19 +113,19 @@ mod tests {
     #[test]
     fn overlapping_carriers_are_reported_once_per_contact() {
         // Two real carriers on the same point: the second one starts there too.
-        let base = SAMPLING.replace("ghost = true\nvisible = false\n", "");
+        let base = SAMPLING.replace("ghost=true visible=false ", "");
         let (sc, tl) = ok(&base, &msg("A", 0.0, ""));
         let w = warnings(&sc, &tl);
         assert_eq!(w.len(), 1, "{w:?}");
         assert!(w[0].contains("'C1' and 'G' overlap at t=0.00s"), "{w:?}");
         // A ghost on the same point is not a contact.
-        assert!(warned("[[step]]\naction = \"show\"\ncarrier = \"G\"\n").is_empty());
+        assert!(warned("\n%% @step action=show carrier=G ").is_empty());
     }
 
     #[test]
     fn cut_captions_are_reported() {
         let long = "word ".repeat(60);
-        let w = warned(&format!("[[step]]\naction = \"caption\"\ntitle = \"Long\"\ntext = \"{long}\"\n"));
+        let w = warned(&format!("\n%% @step action=caption title=Long text=\"{long}\" "));
         assert!(w[0].contains("caption 'Long'") && w[0].contains("is cut"), "{w:?}");
     }
 

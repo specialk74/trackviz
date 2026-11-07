@@ -1,0 +1,44 @@
+%% # Spur: U-shaped branch perpendicular to the Main-Lane, analyzer on the right.
+
+%% # ---------------------------------------------------------------- track
+%% # Spur: a U-shaped branch perpendicular to the Main-Lane. The NSD diverts the
+%% # carrier, without stopping, into a short piece of pit-lane that turns 90° into
+%% # the up branch of the spur; the sampling point is on the up branch, with the
+%% # analyzer on its right. At the top the carrier crosses to the down branch and
+%% # goes back to the Main-Lane.
+%% @point id=spawn x=1010 y=760
+%% @point id=main_in x=910 y=760
+%% @point id=nsd x=800 y=760
+%% @point id=merge x=290 y=760
+%% # A carrier here has completely left the interface module.
+%% @point id=iface_out x=227 y=760
+%% @point id=main_out x=65 y=760
+%% @point id=gone x=-40 y=760
+%% # Divert: diagonal off the NSD, then a 90° turn into the up branch.
+%% @point id=pit_in x=740 y=700
+%% @point id=spur_in x=660 y=700
+%% # Up branch: two queue positions below the sampling point.
+%% @point id=queue2 x=660 y=560
+%% @point id=queue x=660 y=500
+%% @point id=sampling x=660 y=440
+%% @point id=spur_top_in x=660 y=250
+%% @point id=spur_top_out x=380 y=250
+%% # Down branch, then a 90° turn back towards the Main-Lane.
+%% @point id=spur_out x=380 y=700
+%% @point id=pit_out x=350 y=700
+
+%% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=820
+
+%% @lane id=spur label=Spur kind=pit points=pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out label_x=490 label_y=330
+
+%% @lane id=divert kind=link points=nsd,pit_in
+
+%% @lane id=return kind=link points=pit_out,merge
+
+%% @device id=interface kind=zone label="Interface module" x=250 y=170 w=640 h=660
+
+%% @device id=analyzer kind=analyzer label=Analyzer x=730 y=330 w=200 h=220
+
+%% @device id=nsd kind=nsd at=nsd
+
+%% @device id=sp kind=sampling at=sampling label="Sampling point" label_x=560 label_y=396

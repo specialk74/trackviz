@@ -23,7 +23,7 @@ Uno strumento che genera **video esplicativi** (MP4) dell'interazione tra l'auto
 | **Tubo / provetta** | Contiene il campione biologico. Ha un'etichetta con il **SampleId**. |
 | **SampleId** | Identificativo del campione letto dall'etichetta. **Deve comparire in tutti i messaggi.** |
 | **Main-Lane** | Corsia principale del track. |
-| **NSD** | **No Stop Divert**: il dispositivo che sposta il carrier, pieno o vuoto, dalla Main-Lane alla Pit-Lane **senza fermarlo**. Il termine è solo interno: **nei video non compare** (il riquadro non ha etichetta e le didascalie dicono "diverted without stopping"). Lo verifica un test su tutte le scene; nei file di scena restano `kind = "nsd"` e l'id `nsd`. |
+| **NSD** | **No Stop Divert**: il dispositivo che sposta il carrier, pieno o vuoto, dalla Main-Lane alla Pit-Lane **senza fermarlo**. Il termine è solo interno: **nei video non compare** (il riquadro non ha etichetta e le didascalie dicono "diverted without stopping"). Lo verifica un test su tutte le scene; nei file di scena restano `kind=nsd` e l'id `nsd`. |
 | **Pit-Lane** | Corsia secondaria, parallela alla Main-Lane, in cui il carrier viene fermato per farlo campionare dall'analizzatore. Dopo il punto di campionamento rientra nella Main-Lane, così i carrier processati (pieni o vuoti) tornano nella corsia principale. |
 | **Punto di campionamento** | Posizione sulla Pit-Lane in cui il carrier si ferma e l'analizzatore aspira (pipetta) il campione. |
 | **Turnstile** | Ruota con **3 tasche** a 120° alla fine della Pit-Lane. Posizioni: **ingresso** (all'altezza della Pit-Lane), **sotto l'ago** dell'analizzatore (in alto: il campionamento avviene qui), **uscita** (all'altezza della Pit-Lane, dal lato opposto, verso la Main-Lane). Ogni rotazione porta ingresso → ago → uscita. Quando il carrier con il tubo arriva sotto l'ago, l'Interfaccia manda Sample Acquisition. Dopo ogni Sample Complete la ruota gira: il carrier in ingresso va sotto l'ago e quello campionato va verso l'uscita. A ruota vuota, appena il primo carrier è in ingresso la ruota gira subito. |
@@ -73,8 +73,8 @@ Comportamento descritto dall'utente:
 | Decisione | Motivazione |
 |---|---|
 | **Linguaggio: Rust** | Richiesta dell'utente: tool riutilizzabile e da far evolvere. |
-| **Poche dipendenze: `resvg`, `dejavu`** | All'inizio crates.io era bloccato e il tool usava solo `std`. Il parser TOML resta scritto a mano; per la rasterizzazione si usa `resvg`, che rende il tool un unico eseguibile portabile (anche Windows). |
-| **Parser TOML scritto a mano** (sottoinsieme) | Al posto di `serde`/`toml`. |
+| **Poche dipendenze: `resvg`, `dejavu`** | All'inizio crates.io era bloccato e il tool usava solo `std`. La lettura delle scene resta scritta a mano; per la rasterizzazione si usa `resvg`, che rende il tool un unico eseguibile portabile (anche Windows). |
+| **Scene in Mermaid** | Le scene sono sequence diagram Mermaid: i messaggi si leggono come diagramma, il lato fisico sta nei commenti `%%`, i dati (punti, lane, device, attori, messaggi, video) in righe `%% @<sezione> chiave=valore`. Nessun altro formato di file. |
 | **Rendering: un SVG per fotogramma** | L'SVG viene generato come stringa, così la grafica vettoriale è semplice da scrivere e scalabile. |
 | **Rasterizzazione in-process con `resvg`** | Il decoder SVG integrato in ffmpeg (`svg_pipe`) **non funzionava** con più fotogrammi concatenati. In origine si usava `rsvg-convert` (un processo per fotogramma); `resvg` elimina la dipendenza di sistema ed è molto più veloce. I fotogrammi vanno a ffmpeg come RGBA grezzo (`-f rawvideo`), senza passare dal PNG. |
 | **Encoding con `ffmpeg`** | I PNG vengono passati via `image2pipe` e codificati in H.264 (`libx264`, `-preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart`). |
@@ -114,12 +114,12 @@ trackviz/
 │   ├── 15_spur2_analyzer_error_recovery.mmd
 │   ├── 16_spur2_carrier_runaway.mmd
 │   ├── 17_mermaid_spur_happy_path.mmd
-│   └── common/           # parti comuni: video, attori, messaggi, geometrie, direttive Mermaid
+│   └── common/           # parti comuni .mmd: video, attori, messaggi, geometrie, direttive
 ├── out/                  # video generati
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
-    ├── toml.rs           # parser del sottoinsieme TOML
-    ├── mermaid.rs        # export e import dei sequence diagram Mermaid
+    ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
+    ├── mermaid.rs        # lettura delle scene Mermaid ed export del diagramma
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
@@ -129,12 +129,12 @@ trackviz/
 ### CLI
 
 ```
-trackviz <scene.toml>... [-o out.mp4] [-j jobs]   # video completo (senza -o: out/<nome del .toml>.mp4)
+trackviz <scene.mmd>... [-o out.mp4] [-j jobs]   # video completo (senza -o: out/<nome della scena>.mp4)
 trackviz "scenes/*.mmd"                          # più scene in parallelo (* e ? nel nome del file)
-trackviz <scene.toml> --still <sec> [-o f.png]    # singolo fotogramma PNG
-trackviz <scene.toml> --still <sec> --svg -o f.svg
-trackviz <scene.toml>... --check                  # valida e stampa la timeline
-trackviz <scene.toml> --preview [--from S] [--to S] [--watch]   # anteprima veloce
+trackviz <scene.mmd> --still <sec> [-o f.png]    # singolo fotogramma PNG
+trackviz <scene.mmd> --still <sec> --svg -o f.svg
+trackviz <scene.mmd>... --check                  # valida e stampa la timeline
+trackviz <scene.mmd> --preview [--from S] [--to S] [--watch]   # anteprima veloce
 trackviz <flusso.mmd>                             # le scene possono essere diagrammi Mermaid
 ```
 
@@ -142,28 +142,29 @@ trackviz <flusso.mmd>                             # le scene possono essere diag
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
-**Mermaid come file principale:** tutte le scene in `scenes/` sono diagrammi `.mmd`, i file `.toml` restano per le parti comuni (geometrie, attori, messaggi, video). Il formato TOML completo è ancora accettato. Un diagramma `.mmd` con le direttive `%%` è una scena a tutti gli effetti: ogni comando lo accetta come un `.toml` (`trackviz flusso.mmd`, `--preview`, `--watch`, `--check`, caratteri jolly). Il diagramma viene convertito in memoria nel testo di una scena e poi passa dalla stessa strada (`src/mermaid.rs`, `toml::parse_source`). Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%`. Una direttiva sconosciuta è un errore, `%% # testo` è un commento, gli errori indicano la riga del diagramma. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso.
+**Scene in Mermaid:** una scena è un sequence diagram Mermaid (`.mmd`) e ogni comando lo accetta (`trackviz scena.mmd`, `--preview`, `--watch`, `--check`, caratteri jolly). `src/mermaid.rs` legge il diagramma e costruisce direttamente i dati della scena (`src/doc.rs`), che passano poi al modello (`scene.rs`). Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%`. Una direttiva sconosciuta è un errore, `%% # testo` è un commento, gli errori indicano file e riga. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso.
+
+**Righe `@`:** `%% @<sezione> chiave=valore ...` descrive una tabella di dati (`point`, `lane`, `device`, `actor`, `message`, `carrier`, `step`, `video`). Valori: `true`/`false`, numeri, liste separate da virgole (`points=a,b,c`), testo tra virgolette se ha spazi (con `\"` e `\\`), oppure una parola. Le righe `@video` aggiungono chiavi all'unica tabella video (vince l'ultima); le altre sezioni sono liste nell'ordine del file. Le direttive producono le stesse tabelle.
 
 **Parole chiave nei diagrammi:** `%% Prepare n`, `OK`, `Query`, `Tests`, `Sample Acquisition n`, `Sample Complete`, `Release`, `Results` scritte subito prima di un messaggio lo fanno partire nel suo momento, con il testo scritto dall'utente così com'è. `n` di Prepare è il punto di deviazione nell'ordine della geometria (device `nsd`, `antenna`, `divert` nell'ordine del file: sampling, spur: 1 = NSD; turnstile: 1 = NSD, 2 = antenna; spur2: 1 = NSD, 2 = Divert 1, 3 = Divert 2), e da 2 in poi il Prepare è viola. `n` di Sample Acquisition è il punto di campionamento (device `sampling` o `turnstile` nell'ordine del file), omettibile se ce n'è uno. Il carrier è quello del `SampleId` del messaggio, altrimenti quello del messaggio precedente. Momenti: Prepare al punto; OK all'arrivo del messaggio precedente; Query dopo l'OK al carrier e la risposta alla Query precedente; Tests all'arrivo della Query; Sample Acquisition al punto di campionamento (nel turnstile dopo la rotazione); Sample Complete alla fine della `pipette`; Release all'uscita dal modulo (`iface_out`, altrimenti `main_out`); Results alla fine della scena. Le parole chiave sono esatte: un errore di battitura blocca e suggerisce quella giusta. La scena 17 è scritta così; le 01–16 usano ancora `when`/`delay`. Nel motore `when` accetta più cause unite da `and` e un messaggio scritto per esteso ha un nome di evento (`event`) per essere agganciato.
 
-**Parti comuni dei diagrammi:** `common/` è cercata accanto al diagramma e poi in `scenes/`, con gli stessi file `.toml` delle altre scene. `%% include <file>` inserisce altre direttive (percorso relativo, annidabile, niente inclusioni circolari). Un file incluso può contenere solo righe `%%`: un messaggio incluso mancherebbe dal diagramma mostrato da Mermaid. `--watch` controlla anche i file inclusi e i `.toml` comuni.
+**Parti comuni:** `common/` è cercata accanto al diagramma e poi in `scenes/`. Ogni scena legge prima `common/video.mmd`, `common/actors.mmd` e `common/messages.mmd`; `%% geometry <nome>` legge `common/<nome>.mmd`. `%% include <file>` inserisce altre direttive (percorso relativo, annidabile, niente inclusioni circolari). Un file incluso può contenere solo righe `%%`: un messaggio incluso mancherebbe dal diagramma mostrato da Mermaid. `--watch` controlla anche i file inclusi e quelli comuni.
 
-**Altri comandi:** `trackviz export <scene>...` scrive il sequence diagram semplice in `out/<nome>.mmd`, senza direttive. `trackviz import <flusso.mmd> [--geometry g] [-o file]` salva la scena come `.toml`; non sovrascrive una scena esistente senza `-o`. Le route di default per geometria sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate.
+**Export:** `trackviz export <scene>...` scrive il sequence diagram semplice in `out/<nome>.mmd`, senza direttive. Le route di default per geometria (carrier senza `route=`) sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate (lo verifica un test).
 
 **Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 
-**Più scene:** i caratteri jolly `*` e `?` sono espansi dal programma (solo nel nome del file), così funzionano anche tra virgolette e su Windows. I thread di `-j` sono divisi tra le scene: `min(scene, jobs)` in contemporanea, `jobs / scene` thread ciascuna, almeno 1. Una scena che fallisce non ferma le altre: gli errori sono elencati alla fine, con codice d'uscita 1. Due scene che scriverebbero lo stesso video sono un errore; `-o` e `--still` accettano una sola scena. L'help mostra versione e repository, letti da `Cargo.toml`.
+**Più scene:** i caratteri jolly `*` e `?` sono espansi dal programma (solo nel nome del file), così funzionano anche tra virgolette e su Windows. I thread di `-j` sono divisi tra le scene: `min(scene, jobs)` in contemporanea, `jobs / scene` thread ciascuna, almeno 1. Una scena che fallisce non ferma le altre: gli errori sono elencati alla fine, con codice d'uscita 1. Due scene che scriverebbero lo stesso video sono un errore; `-o` e `--still` accettano una sola scena. L'help mostra versione e repository, letti dal manifesto del pacchetto Rust.
 
 ---
 
 ## 7. Moduli in dettaglio
 
-### 7.1 `toml.rs` — parser
+### 7.1 `doc.rs` e `mermaid.rs` — lettura delle scene
 
-- Supporta: commenti `#` (ignorati dentro le stringhe), `[tabella]`, `[[array_di_tabelle]]`, `chiave = valore`.
-- Valori: stringhe tra doppi apici (escape `\" \\ \n \t`), numeri (int/float, `_` ammesso), `true`/`false`, array, anche su più righe (letti finché le parentesi non si bilanciano).
-- Errori con **numero di riga**: chiavi duplicate, tabelle duplicate, valori malformati.
-- `Table` offre accessor tipizzati (`str_opt/str_req`, `num_opt/num_req`, `bool_opt`, `str_list`) e `check_keys(allowed)`, che **rifiuta le chiavi sconosciute** (protegge dagli errori di battitura).
+- `doc.rs`: i dati di una scena sono tabelle (`Table`) di chiavi e valori (`Value`: testo, numero, booleano, lista), raccolte in sezioni (`Doc`). `parse_line` legge una riga `@`; chiavi duplicate e valori malformati sono errori.
+- `Table` offre accessor tipizzati (`str_opt/str_req`, `num_opt/num_req`, `bool_opt`, `str_list`) e `check_keys(allowed)`, che **rifiuta le chiavi sconosciute** (protegge dagli errori di battitura). Ogni tabella ricorda file e riga da cui viene, per gli errori.
+- `mermaid.rs`: legge il diagramma con i suoi `%% include`, i file comuni e la geometria, e trasforma direttive, parole chiave, messaggi e righe `@` in tabelle.
 
 ### 7.2 `scene.rs` — modello e timeline
 
@@ -172,11 +173,11 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 **Validazioni:** riferimenti a point/actor/device/carrier esistenti, punto `start` sulla route, target del `move` **più avanti** sulla route del carrier, carrier che non può ricevere un nuovo move mentre è ancora in movimento, `pipette` solo su device `sampling` o `turnstile` e solo se esiste un `analyzer`, route che attraversano un turnstile solo come `<id>.in`, `<id>.out` consecutivi, regole della ruota (vedi sotto), `wait` con `duration` obbligatoria, niente messaggi di un attore verso sé stesso.
 
 **Calcolo dei tempi degli step** (in ordine di file):
-- `start = "after"` (default): inizia alla fine dello step precedente.
-- `start = "with"`: inizia insieme allo step precedente.
-- `start = "after_all"`: inizia quando tutti gli step precedenti sono finiti.
+- `start=after` (default): inizia alla fine dello step precedente.
+- `start=with`: inizia insieme allo step precedente.
+- `start=after_all`: inizia quando tutti gli step precedenti sono finiti.
 - A questi si somma `delay`. Il primo step parte da 0 (+ delay).
-- Senza nessuna chiave di tempo (`start`, `at`, `after_start`, `after_end`) vale `after`: gli step sono in sequenza, non contemporanei. Per farli partire insieme serve `start = "with"` (o `after_start = 0`). `caption` e `status` durano 0 s, quindi lo step che li segue parte nello stesso istante.
+- Senza nessuna chiave di tempo (`start`, `at`, `after_start`, `after_end`) vale `after`: gli step sono in sequenza, non contemporanei. Per farli partire insieme serve `start=with` (o `after_start=0`). `caption` e `status` durano 0 s, quindi lo step che li segue parte nello stesso istante.
 
 **Durate di default:** caption 0 (resta visibile fino alla caption successiva), message 1,5 s (tempo di volo della freccia), note 1,5 s, pipette 3 s, highlight 1,5 s, rotate 2 s, move calcolata (vedi sotto).
 
@@ -188,7 +189,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la Sample Acquisition, la Sample Complete la fine della `pipette`, un `move` l'arrivo del carrier (con la sosta come `delay`) o la sua causa. Restano assoluti solo le prime partenze dei carrier e le didascalie iniziali. Cambiando una velocità o una durata la scena si sposta a catena; se nasce un conflitto fisico (carrier che si toccano, ruota che gira con un carrier nel cerchio) `--check` lo segnala. Un test lo verifica sulla scena 09.
 
-**`at`, `after_start`, `after_end`:** uno step con `at = <secondi>` parte a un istante assoluto; con `after_start = <secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start = "with"` + `delay`), con `after_end = <secondi>` dopo la sua **fine** (equivale a `start = "after"` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end`, `when` e `start`; valori negativi di `after_*` sono rifiutati.
+**`at`, `after_start`, `after_end`:** uno step con `at=<secondi>` parte a un istante assoluto; con `after_start=<secondi>` parte quei secondi dopo l'**inizio** dello step precedente nel file (equivale a `start=with` + `delay`), con `after_end=<secondi>` dopo la sua **fine** (equivale a `start=after` + `delay`). A tutti si somma `delay`. Si può usare una sola tra `at`, `after_start`, `after_end`, `when` e `start`; valori negativi di `after_*` sono rifiutati.
 
 **Movimento dei carrier:**
 - La route è una polilinea di punti con le distanze cumulative.
@@ -247,20 +248,20 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 ## 8. Formato delle scene (riferimento)
 
-Una scena può iniziare con `include = ["common/video.toml", ...]`: percorsi relativi al file che include, inclusioni annidate ammesse. Le sezioni `[[...]]` incluse vengono prima di quelle della scena; le chiavi di `[video]` si fondono e vince la scena. Sono errori gli id duplicati (point, lane, device, actor, carrier) e le inclusioni circolari; gli errori in un file incluso ne riportano il nome. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.mmd"` prende solo le scene. Le geometrie delle scene 03, 07 e 08 stanno in `sampling_queue.toml`, `sampling_queue2.toml` e `turnstile_queue.toml`.
+Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse tabelle. Sono errori gli id duplicati (point, lane, device, actor, carrier, message) e le inclusioni circolari. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.mmd"` prende solo le scene. Le geometrie delle scene 03, 07 e 08 stanno in `sampling_queue.mmd`, `sampling_queue2.mmd` e `turnstile_queue.mmd`.
 
-**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.toml` (`[[message]]`) e gli step li richiamano con `type`, più `carrier` e, se il messaggio contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer = true`; la nota compare alla stessa riga di tempo del `pipette`.
+**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.mmd` (`@message`); un messaggio del diagramma che corrisponde a un tipo diventa quello, con `carrier` e, se il tipo contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo la nota "Pipetting" ("Pipetting · Needle n" con più punti di campionamento), con gli stessi tempi, sull'attore con `analyzer=true`; la nota compare alla stessa riga di tempo del `pipette`.
 
 | Sezione | Chiavi |
 |---|---|
-| `[video]` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
-| `[[point]]` | `id`, `x`, `y` |
-| `[[lane]]` | `id`, `label`, `kind` = main\|pit\|link, `points` = [id…], `label_x`, `label_y` |
-| `[[device]]` | `id`, `kind` = nsd\|sampling\|divert (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
-| `[[actor]]` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
-| `[[message]]` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |
-| `[[carrier]]` | `id`, `tube` (true), `sample_id`, `route` = [id…], `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
-| `[[step]]` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `when` = "<carrier> at <punto>", `delay`, `duration` + le chiavi specifiche dell'azione |
+| `@video` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
+| `@point` | `id`, `x`, `y` |
+| `@lane` | `id`, `label`, `kind` = main\|pit\|link, `points` = lista di id, `label_x`, `label_y` |
+| `@device` | `id`, `kind` = nsd\|sampling\|divert (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
+| `@actor` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
+| `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |
+| `@carrier` | `id`, `tube` (true), `sample_id`, `route` = lista di id, `start` (primo punto della route), `speed` (100 px/s), `cap_color`, `ghost` (false), `visible` (true), `tag` (SampleId) |
+| `@step` | `action`, uno tra `start` = after\|with\|after_all, `at` (secondi assoluti), `after_start` / `after_end` (secondi dopo l'inizio / la fine dello step precedente), `when` = `<carrier> at <punto>` e le altre cause, `delay`, `duration` + le chiavi specifiche dell'azione |
 
 | action | Chiavi specifiche |
 |---|---|
@@ -432,9 +433,9 @@ Miglioramenti proposti e punti da confermare: vedi [`IMPROVEMENTS.md`](IMPROVEME
 
 ## 12. Limiti noti e note per chi riparte
 
-- **Test:** `cargo test` esegue gli unit test del parser (`toml.rs`), della timeline (`scene_tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
+- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid.rs`), della timeline (`scene_tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
 
-- Il parser TOML è un sottoinsieme: niente tabelle inline `{}`, chiavi puntate, date o stringhe multilinea `"""`. Se la rete lo permette, si possono adottare `serde` + `toml`.
+- Le righe `@` non hanno testo su più righe: un valore lungo va su una riga sola.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
 - Con `resvg` la scena 01 (1432 fotogrammi) si genera in ~9 s su un Mac a 10 core.
 - La pipetta usa sempre il primo device `analyzer` della scena.

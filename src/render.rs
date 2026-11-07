@@ -751,8 +751,8 @@ mod tests {
 
     #[test]
     fn analyzer_status_badges() {
-        let steps = "[[step]]\naction = \"status\"\nat = 1\ndevice = \"an\"\nstate = \"error\"\n\
-                     [[step]]\naction = \"status\"\nat = 5\ndevice = \"an\"\nstate = \"ready\"\n";
+        let steps = "\n%% @step action=status at=1 device=an state=error \
+                     \n%% @step action=status at=5 device=an state=ready ";
         assert!(!frame_at(steps, 0.5).contains(">ERROR<"));
         assert!(frame_at(steps, 2.0).contains(">ERROR<"));
         let f = frame_at(steps, 6.0);
@@ -761,8 +761,8 @@ mod tests {
 
     #[test]
     fn needle_label_depends_on_the_device_state() {
-        let steps = "[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp\"\nto = \"down\"\n\
-                     [[step]]\naction = \"status\"\nat = 3\ndevice = \"an\"\nstate = \"error\"\n";
+        let steps = "\n%% @step action=needle at=0 device=sp to=down \
+                     \n%% @step action=status at=3 device=an state=error ";
         assert!(frame_at(steps, 2.0).contains("Aspirating…"));
         let f = frame_at(steps, 4.0);
         assert!(f.contains("Needle down") && !f.contains("Aspirating…"));
@@ -770,8 +770,8 @@ mod tests {
 
     #[test]
     fn ghost_is_drawn_only_while_visible_with_a_custom_tag() {
-        let base_tag = SAMPLING.replace("ghost = true", "ghost = true\ntag = \"SID-2 (expected)\"");
-        let steps = "[[step]]\naction = \"show\"\nat = 1\ncarrier = \"G\"\n";
+        let base_tag = SAMPLING.replace("ghost=true ", "ghost=true tag=\"SID-2 (expected)\" ");
+        let steps = "\n%% @step action=show at=1 carrier=G ";
         let (sc, tl) = ok(&base_tag, steps);
         assert!(!frame(&sc, &tl, 0.5).contains("(expected)"));
         assert!(frame(&sc, &tl, 2.0).contains("(expected)"));
@@ -779,7 +779,7 @@ mod tests {
 
     #[test]
     fn operator_is_drawn_only_during_its_step() {
-        let steps = "[[step]]\naction = \"operator\"\nat = 1\ndevice = \"an\"\n";
+        let steps = "\n%% @step action=operator at=1 device=an ";
         assert!(!frame_at(steps, 0.5).contains(">Operator<"));
         assert!(frame_at(steps, 4.0).contains(">Operator<"));
         assert!(!frame_at(steps, 9.0).contains(">Operator<"));
@@ -787,8 +787,8 @@ mod tests {
 
     #[test]
     fn the_last_started_caption_is_shown() {
-        let steps = "[[step]]\naction = \"caption\"\nat = 0\ntitle = \"first\"\ntext = \"x\"\n\
-                     [[step]]\naction = \"caption\"\nat = 2\ntitle = \"second\"\ntext = \"y\"\n";
+        let steps = "\n%% @step action=caption at=0 title=first text=x \
+                     \n%% @step action=caption at=2 title=second text=y ";
         assert!(frame_at(steps, 1.0).contains("FIRST"));
         let f = frame_at(steps, 3.0);
         assert!(f.contains("SECOND") && !f.contains("FIRST"));
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn runaway_tag_is_shown_during_the_move() {
-        let steps = "[[step]]\naction = \"move\"\nat = 1\ncarrier = \"C1\"\nto = \"s\"\nrunaway = true\n";
+        let steps = "\n%% @step action=move at=1 carrier=C1 to=s runaway=true ";
         assert!(!frame_at(steps, 0.5).contains("RUN-AWAY"));
         assert!(frame_at(steps, 1.5).contains("SID-1 · RUN-AWAY"));
     }
@@ -804,8 +804,8 @@ mod tests {
     #[test]
     fn side_probe_puts_the_label_inside_the_analyzer() {
         // Analyzer on the right of the sampling point (as in a spur): x 650..850, center y 700.
-        let base = SAMPLING.replace("x = 100\ny = 150\nw = 400\nh = 150", "x = 650\ny = 600\nw = 200\nh = 200");
-        let (sc, tl) = ok(&base, "[[step]]\naction = \"pipette\"\ndevice = \"sp\"\nduration = 5\n");
+        let base = SAMPLING.replace("x=100 y=150 w=400 h=150\n", "x=650 y=600 w=200 h=200\n");
+        let (sc, tl) = ok(&base, "\n%% @step action=pipette device=sp duration=5 ");
         let f = frame(&sc, &tl, 2.5);
         // label centered in the analyzer (x 750), probe leaving its left side (x 650)
         assert!(f.contains(r##"<text x="750" y="764" font-size="17" font-weight="600" text-anchor="middle" fill="#1D4ED8">Aspirating…</text>"##), "{f}");
@@ -814,15 +814,15 @@ mod tests {
 
     #[test]
     fn device_label_position_can_be_given() {
-        let base = SAMPLING.replace("id = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "id = \"sp\"\nkind = \"sampling\"\nat = \"s\"\nlabel = \"Sampling point\"\nlabel_x = 123\nlabel_y = 456");
-        let (sc, tl) = ok(&base, "[[step]]\naction = \"wait\"\nduration = 1\n");
+        let base = SAMPLING.replace("id=sp kind=sampling at=s\n", "id=sp kind=sampling at=s label=\"Sampling point\" label_x=123 label_y=456\n");
+        let (sc, tl) = ok(&base, "\n%% @step action=wait duration=1 ");
         assert!(frame(&sc, &tl, 0.5).contains(r#"<text x="123" y="456""#));
     }
 
     #[test]
     fn a_diversion_turns_blue_while_a_carrier_is_stopped_on_it() {
-        let base = SAMPLING.replace("id = \"nsd\"\nkind = \"nsd\"\nat = \"b\"", "id = \"nsd\"\nkind = \"divert\"\nat = \"b\"\nlabel = \"D\"");
-        let (sc, tl) = ok(&base, "[[step]]\naction = \"move\"\ncarrier = \"C1\"\nto = \"b\"\nduration = 2\n[[step]]\naction = \"move\"\nat = 5\ncarrier = \"C1\"\nto = \"s\"\n");
+        let base = SAMPLING.replace("id=nsd kind=nsd at=b\n", "id=nsd kind=divert at=b label=D\n");
+        let (sc, tl) = ok(&base, "\n%% @step action=move carrier=C1 to=b duration=2 \n%% @step action=move at=5 carrier=C1 to=s ");
         let read = r##"fill="#2563EB">D</text>"##;
         assert!(!frame(&sc, &tl, 1.0).contains(read));
         assert!(frame(&sc, &tl, 3.0).contains(read));
@@ -831,8 +831,8 @@ mod tests {
 
     #[test]
     fn with_two_needles_the_status_of_one_leaves_the_other_working() {
-        let base = SAMPLING.replace("[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"", "[[device]]\nid = \"sp2\"\nkind = \"sampling\"\nat = \"c\"\n[[device]]\nid = \"sp\"\nkind = \"sampling\"\nat = \"s\"");
-        let steps = "[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp\"\nto = \"down\"\n[[step]]\naction = \"needle\"\nat = 0\ndevice = \"sp2\"\nto = \"down\"\n[[step]]\naction = \"status\"\nat = 2\ndevice = \"sp\"\nstate = \"error\"\n";
+        let base = SAMPLING.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp2 kind=sampling at=c\n%% @device id=sp kind=sampling at=s\n");
+        let steps = "\n%% @step action=needle at=0 device=sp to=down \n%% @step action=needle at=0 device=sp2 to=down \n%% @step action=status at=2 device=sp state=error ";
         let (sc, tl) = ok(&base, steps);
         let f = frame(&sc, &tl, 3.0);
         assert!(f.contains(">ERROR<") && f.contains("Needle down") && f.contains("Aspirating…"), "{f}");

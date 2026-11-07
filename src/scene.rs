@@ -1,6 +1,6 @@
 //! Scene model (parsed from the scenario file) and timeline computation.
 
-use crate::toml::{Doc, Table};
+use crate::doc::{Doc, Table};
 use std::collections::HashMap;
 
 pub struct Video {

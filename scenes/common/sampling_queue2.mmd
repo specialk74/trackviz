@@ -1,0 +1,31 @@
+%% # Geometry of scene 07.
+
+%% # ---------------------------------------------------------------- track
+%% @point id=spawn x=1010 y=740
+%% @point id=main_in x=910 y=740
+%% @point id=nsd x=730 y=740
+%% @point id=pit_in x=620 y=540
+%% # Queue positions behind the sampling point.
+%% @point id=queue2 x=560 y=540
+%% @point id=queue x=500 y=540
+%% @point id=sampling x=440 y=540
+%% @point id=pit_out x=290 y=540
+%% @point id=merge x=180 y=740
+%% @point id=main_out x=65 y=740
+%% @point id=gone x=-40 y=740
+
+%% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=830 label_y=800
+
+%% @lane id=pit label=Pit-Lane kind=pit points=pit_in,queue2,queue,sampling,pit_out label_x=250 label_y=500
+
+%% @lane id=divert kind=link points=nsd,pit_in
+
+%% @lane id=return kind=link points=pit_out,merge
+
+%% @device id=interface kind=zone label="Interface module" x=90 y=425 w=720 h=420
+
+%% @device id=analyzer kind=analyzer label=Analyzer x=200 y=185 w=480 h=175
+
+%% @device id=nsd kind=nsd at=nsd
+
+%% @device id=sp kind=sampling at=sampling label="Sampling point"
