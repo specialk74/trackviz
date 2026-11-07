@@ -73,6 +73,27 @@ colored `rect`. It has no directives, so it isn't a scene until they are added.
 to go on from there. It never replaces a scene unless `-o` names it, and the target
 folder needs its `common/`.
 
+**Keywords.** Written right before a message, they send it at its moment, with the
+text written in the diagram exactly as it is (it doesn't have to match a named
+message). The carrier is the one of the `SampleId` in the message, or the one of the
+message before. Keywords are case-sensitive; a typo is an error that suggests the
+right one.
+
+| Keyword | The message starts |
+|---|---|
+| `Prepare n` | when the carrier is at divert point n: the points where a carrier is diverted or read, in the order of the geometry (sampling, spur: 1 = NSD; turnstile: 1 = NSD, 2 = antenna; spur2: 1 = NSD, 2 = Divert 1, 3 = Divert 2). From 2 on it is the purple Prepare |
+| `OK` | as soon as the message before has arrived |
+| `Query` | after the OK to the carrier and the reply to the Query before |
+| `Tests` | as soon as the Query has arrived |
+| `Sample Acquisition n` | when the carrier is at sampling point n (n can be left out if there is only one); in a turnstile, after the rotation |
+| `Sample Complete` | at the end of the pipette |
+| `Release` | when the carrier has left the interface module |
+| `Results` | at the end of the scene |
+
+Other messages, and actions such as `move` or `pipette`, are timed with the
+directives below. `when` takes several causes joined by `and`: the step starts at the
+last one.
+
 | Directive | Meaning |
 |---|---|
 | `geometry <name>` | `sampling`, `turnstile`, `spur`, `spur2`, or `--geometry` on the command line |

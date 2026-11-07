@@ -148,8 +148,12 @@ fn diagram_text(path: &str, geometry: Option<&str>, base: &Path) -> Result<(Stri
         }
     }
     let lib = library(base)?;
+    let geo = match &g {
+        Some(g) => mermaid::Geometry::from_doc(&toml::parse_file(&base.join("common").join(format!("{g}.toml")))?)?,
+        None => mermaid::Geometry::default(),
+    };
     let name = file.file_stem().and_then(|s| s.to_str()).unwrap_or("scene");
-    Ok((mermaid::import_lines(&lines, name, geometry, &lib)?, files))
+    Ok((mermaid::import_lines(&lines, name, geometry, &lib, geo)?, files))
 }
 
 /// A scene as a document, from a .toml or from a Mermaid diagram.

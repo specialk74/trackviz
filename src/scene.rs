@@ -180,8 +180,9 @@ pub enum StartMode {
     AfterAll,
     /// Absolute start time in seconds (`at = ...`); `delay` is added on top.
     At(f64),
-    /// `when = ...`: when something earlier in the file happens.
-    When(Anchor),
+    /// `when = ...`: when something earlier in the file happens; with several
+    /// causes joined by " and ", when the last of them happens.
+    When(Vec<Anchor>),
 }
 
 /// What a `when` refers to.
@@ -424,7 +425,7 @@ impl Scene {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed", "runaway"],
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
-                "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle"],
+                "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
                 "pipette" => &["device"],
                 "highlight" => &["device"],
@@ -460,7 +461,8 @@ impl Scene {
                         None => t,
                     };
                     Action::Message {
-                        kind: t.str_opt("type")?,
+                        // The name `when` uses: the type, or `event` for a message written out.
+                        kind: t.str_opt("type")?.or(t.str_opt("event")?),
                         from: src.str_req("from")?,
                         to: src.str_req("to")?,
                         text: src.str_req("text")?,
@@ -518,10 +520,10 @@ impl Scene {
             }
             let mut delay = t.num_opt("delay")?.unwrap_or(0.0);
             let start = if let Some(w) = when {
-                let anchor = Anchor::parse(&w).ok_or_else(|| {
-                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] sent|arrived\" or \"pipette|rotate|needle <device> done\", not \"{w}\"", t.location())
+                let anchors = w.split(" and ").map(|p| Anchor::parse(p.trim())).collect::<Option<Vec<_>>>().ok_or_else(|| {
+                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] sent|arrived\" or \"pipette|rotate|needle <device> done\", joined by \" and \", not \"{w}\"", t.location())
                 })?;
-                StartMode::When(anchor)
+                StartMode::When(anchors)
             } else if let Some(at) = at {
                 StartMode::At(at)
             } else if let Some(d) = after_start {
@@ -995,19 +997,27 @@ impl Timeline {
         for st in &sc.steps {
             let base = match &st.start {
                 StartMode::At(at) => *at,
-                StartMode::When(Anchor::Event { key, end }) => {
-                    let &(_, a, b) = history.iter().rev().find(|h| h.0 == *key)
-                        .ok_or_else(|| format!("{}: no earlier step matches '{key}' (it must come before this step in the file)", st.loc))?;
-                    if *end { b } else { a }
-                }
-                StartMode::When(Anchor::Arrival { carrier, point }) => {
-                    let ci = sc.need_carrier(carrier, &st.loc)?;
-                    let i = sc.carriers[ci].route.iter().position(|p| p == point)
-                        .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
-                    let path = &carriers[ci];
-                    path.reaches(path.cum[i]).ok_or_else(|| {
-                        format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
-                    })?
+                StartMode::When(anchors) => {
+                    let mut base = f64::NEG_INFINITY;
+                    for anchor in anchors {
+                        base = base.max(match anchor {
+                            Anchor::Event { key, end } => {
+                                let &(_, a, b) = history.iter().rev().find(|h| h.0 == *key)
+                                    .ok_or_else(|| format!("{}: no earlier step matches '{key}' (it must come before this step in the file)", st.loc))?;
+                                if *end { b } else { a }
+                            }
+                            Anchor::Arrival { carrier, point } => {
+                                let ci = sc.need_carrier(carrier, &st.loc)?;
+                                let i = sc.carriers[ci].route.iter().position(|p| p == point)
+                                    .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
+                                let path = &carriers[ci];
+                                path.reaches(path.cum[i]).ok_or_else(|| {
+                                    format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
+                                })?
+                            }
+                        });
+                    }
+                    base
                 }
                 _ if first => 0.0,
                 StartMode::After => prev_end,
