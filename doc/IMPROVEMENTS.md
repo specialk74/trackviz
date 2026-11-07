@@ -98,5 +98,5 @@ carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pas
 route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
 accensione automatica dei device letti dalle antenne, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
-ordine, Query), più scene in parallelo con i caratteri jolly, anteprima veloce
+ordine), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).

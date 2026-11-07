@@ -28,10 +28,7 @@ sequenceDiagram
     IF->>AN: Prepare SampleId=SID-000123
     %% at 4.6
     %% move C2 to gone
-    %% after 0.1 antenna2 C1
-    %% color #9333EA
-    IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna1 C2
+    %% after 0.1 Prepare C1
     AN-->>IF: OK SampleId=SID-000123
     %% on antenna1 C2
     %% caption 3 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
@@ -41,52 +38,53 @@ sequenceDiagram
     IF->>AN: Prepare SampleId=SID-000124
     %% on antenna1 C2
     %% show C2L duration=0.4
+    %% after 0.1 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% at 7.6
+    %% move C3 to d1
+    %% after 0.1 antenna2 C1
+    %% color #9333EA
+    IF->>AN: Prepare SampleId=SID-000123
+    %% after 0.2 Prepare C2
+    AN-->>IF: OK SampleId=SID-000124
     %% after 0.6 antenna2 C1
     %% pass div1
+    %% after 0.2 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
-    %% after 1.7 antenna1 C2
-    AN->>DMX: Query SampleId=SID-000123
-    %% after 0.2 Prepare C2
-    AN-->>IF: OK SampleId=SID-000124
-    %% after 0.2 antenna3 C1
-    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
-    %% at 7.6
-    %% move C3 to d1
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.2 Query C1
-    DMX-->>AN: Tests to perform SampleId=SID-000123
+    %% after 0.1 Tests to perform C1
+    AN->>DMX: Query SampleId=SID-000124
+    %% after 0.2 antenna3 C1
+    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
+    %% after 0.2 Prepare C3
+    AN-->>IF: OK SampleId=SID-000125
+    %% after 0.2 Query C2
+    DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
-    %% after 0.2 Prepare C3
-    AN-->>IF: OK SampleId=SID-000125
-    %% after 0.1 Tests to perform C1
-    AN->>DMX: Query SampleId=SID-000124
-    %% after 0.1 OK C1
-    %% pipette sp1 duration=6.6 sid=SID-000123
+    %% after 0.1 Tests to perform C2
+    AN->>DMX: Query SampleId=SID-000125
     %% on antenna2 C3
     %% caption 4 · Read at the divert — Clear | The third carrier stops at the divert on top of the second one, which is not there. It reads the third sample instead of the second: the interface sends Clear for the second.
+    %% after 0.1 OK C1
+    %% pipette sp1 duration=6.6 sid=SID-000123
     %% after 0.195 antenna2 C3
     IF->>AN: Clear SampleId=SID-000124
     %% after 0.6 antenna2 C3
     %% move C3 to q1
-    %% after 0.2 Query C2
-    DMX-->>AN: Tests to perform SampleId=SID-000124
+    %% after 0.2 Query C3
+    DMX-->>AN: Tests to perform SampleId=SID-000125
     %% after 0.1 Clear C2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.1 Tests to perform C2
-    AN->>DMX: Query SampleId=SID-000125
-    %% after 0 OK C2
     %% hide C2L duration=0.6
     %% after 0.1 OK C2
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.2 Query C3
-    DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% after 0 Prepare C3
     %% caption 5 · Prepare again for the third carrier | The carrier does not wait for the reply to Clear: it is diverted right away, behind the first one. Once the reply has arrived the interface sends Prepare again for it.
     %% after 0.1 Prepare C3
     %% for C3
@@ -102,26 +100,25 @@ sequenceDiagram
     %% move C3 to s1
     %% after 0.2 antenna3 C3
     IF->>AN: Sample Acquisition SampleId=SID-000125 Needle=1
-    %% after 0.401 antenna4 C1
-    %% pass div2
-    %% after 0.1 Sample Acquisition C3
+    %% after 0.1
     %% for C3
     AN-->>IF: OK
-    %% after 0.1
+    %% after 0.401 antenna4 C1
+    %% pass div2
+    %% after 0.1 OK C3
     %% pipette sp1 duration=4 sid=SID-000125
-    %% on antenna6
-    IF->>AN: Release SampleId=SID-000123
-    %% after 0.2 pipette sp1
+    %% after 0.2
     AN->>IF: Sample Complete SampleId=SID-000125 Needle=1
-    %% after 0.1 Release C1
-    %% for C1
-    AN-->>IF: OK
-    %% after 0 Sample Complete C3
     %% caption 7 · Back to normal | Sample Complete for the third sample: the carrier goes on up the spur, stops at the second divert and, once it has left the module, gets its Release.
     %% after 0.1 Sample Complete C3
     %% for C3
     IF-->>AN: OK
     %% pass sp1
+    %% on antenna6
+    IF->>AN: Release SampleId=SID-000123
+    %% after 0.1
+    %% for C1
+    AN-->>IF: OK
     %% after 0.401 antenna4 C3
     %% pass div2
     %% on antenna6

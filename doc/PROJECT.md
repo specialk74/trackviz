@@ -140,7 +140,7 @@ trackviz <scene.mmd> --preview [--from S] [--to S] [--watch]   # anteprima veloc
 trackviz <flusso.mmd>                             # le scene possono essere diagrammi Mermaid
 ```
 
-**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate e Query prima dell'OK al suo Prepare o della risposta alla precedente. Un test verifica che nessuna scena ne abbia.
+**Avvisi** (`lint.rs`, stampati con `--check` e in generazione, non bloccano e il codice d'uscita resta 0): carrier fisici sovrapposti, didascalie tagliate, troppo brevi o fuori ordine, messaggi scritti in un ordine diverso da quello di invio. Il programma non controlla la logica del protocollo (risposte, OK, ordine di Query e Tests): quella la decide chi scrive la scena. Un test verifica che nessuna scena ne abbia.
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
@@ -162,7 +162,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Accensione automatica:** quando un'antenna visibile legge un carrier (fermo o in transito; non fantasmi né nascosti), il device su cui sta (NSD, divert, oppure l'antenna stessa se è da sola, come davanti al tornello) resta acceso finché il carrier è sull'antenna, almeno 1 s (`READ_LIGHT`): all'NSD, dove il carrier passa senza fermarsi, dura il minimo; davanti al tornello dura tutta l'attesa al gate. I punti di campionamento non si accendono. Le scene non hanno più gli `highlight` di NSD, divert e antenna 2 (66 righe tolte); `highlight` resta per i casi particolari (il tornello nella 08). `--check` li elenca come "highlight nsd (C1 read by antenna1)".
 
-**Nastro:** 17,5 cm/s; un carrier largo 4 cm è disegnato largo 44 px (11 px/cm), quindi 192,5 px/s (`BELT_SPEED`). Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
+**Nastro:** 17,5 cm/s, impostato in `common/video.mmd` con `belt=` (cm/s; una scena può avere il suo con `%% @video belt=...`; senza, vale `BELT_SPEED`). Un carrier largo 4 cm è disegnato largo 44 px (11 px/cm, `PX_PER_CM`), quindi 192,5 px/s. `speed=` (px/s) su un carrier o su un move lo sostituisce. Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
 

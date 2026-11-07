@@ -14,6 +14,15 @@ pub struct Video {
     pub tail: f64,
     pub show_clock: bool,
     pub show_times: bool,
+    /// Speed of the belt under the carriers, in cm/s (`belt=`).
+    pub belt: f64,
+}
+
+impl Video {
+    /// The belt speed on screen: a carrier 4 cm wide is drawn 44 px wide (11 px/cm).
+    pub fn belt_px(&self) -> f64 {
+        self.belt * PX_PER_CM
+    }
 }
 
 #[derive(Clone)]
@@ -81,9 +90,11 @@ pub struct Device {
     pub part_of: Option<String>,
 }
 
-/// Speed of the belt under the carriers: 17.5 cm/s, with a carrier 4 cm wide
-/// drawn 44 px wide (11 px/cm).
-pub const BELT_SPEED: f64 = 17.5 * 2.0 * CARRIER_R / 4.0;
+/// Default speed of the belt under the carriers (cm/s); `belt=` in `@video`
+/// changes it.
+pub const BELT_SPEED: f64 = 17.5;
+/// Scale of the drawing: a carrier, 4 cm wide, is drawn 2 × CARRIER_R px wide.
+pub const PX_PER_CM: f64 = 2.0 * CARRIER_R / 4.0;
 
 /// Shortest time (s) a device stays lit when its antenna reads a carrier.
 pub const READ_LIGHT: f64 = 1.0;
@@ -431,7 +442,7 @@ impl Scene {
             return Err("keys outside of any section are not allowed".into());
         }
         let v = doc.tables.get("video").ok_or("missing [video] section")?;
-        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times"])?;
+        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times", "belt"])?;
         let video = Video {
             title: v.str_opt("title")?.unwrap_or_default(),
             subtitle: v.str_opt("subtitle")?.unwrap_or_default(),
@@ -441,6 +452,11 @@ impl Scene {
             tail: v.num_opt("tail")?.unwrap_or(2.0),
             show_clock: v.bool_opt("show_clock")?.unwrap_or(true),
             show_times: v.bool_opt("show_times")?.unwrap_or(true),
+            belt: match v.num_opt("belt")? {
+                Some(b) if b > 0.0 => b,
+                Some(b) => return Err(format!("{}: belt must be a speed in cm/s above 0, not {b}", v.location())),
+                None => BELT_SPEED,
+            },
         };
 
         let mut points = HashMap::new();
@@ -597,7 +613,7 @@ impl Scene {
                 sample_id: t.str_opt("sample_id")?.unwrap_or_default(),
                 route,
                 start,
-                speed: t.num_opt("speed")?.unwrap_or(BELT_SPEED),
+                speed: t.num_opt("speed")?.unwrap_or(video.belt_px()),
                 cap_color: t.str_opt("cap_color")?.unwrap_or_else(|| "#7C3AED".into()),
                 ghost: t.bool_opt("ghost")?.unwrap_or(false),
                 visible: t.bool_opt("visible")?.unwrap_or(true),

@@ -180,8 +180,6 @@ valid but looks wrong; they don't stop anything and the exit code stays 0:
   from the one in which they appear
 - messages written in a different order from the one in which they are sent (the
   video follows time, the Mermaid diagram follows the file)
-- a Query sent before the OK to its Prepare or the reply to the previous Query has
-  arrived
 
 ### Routes
 
@@ -209,7 +207,9 @@ The layout image shows every point: a route can also name them one by one.
 
 Carriers ride a belt that runs at 17.5 cm/s, 192.5 px/s on screen (a carrier, 4 cm
 wide, is drawn 44 px wide): every move is at that constant speed, starting and stopping
-at once. `speed=` and `ease=` are still accepted, but the scenes don't use them.
+at once. The belt speed is `belt=` (cm/s) in `common/video.mmd`; a scene can set its
+own with `%% @video belt=10`. `speed=` (px/s) on a carrier or a move overrides it for
+that carrier or that move; `ease=` is still accepted, but the scenes don't use it.
 
 Two carriers never take the same space, and they only go forward. `move C2 to
 sampling` means "C2 sets off towards the sampling point": if the way is taken, C2

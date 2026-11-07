@@ -912,6 +912,19 @@ mod tests {
     }
 
     #[test]
+    fn the_belt_speed_is_in_the_video_settings() {
+        let speed = |extra: &str| {
+            let d = doc(&format!("%% geometry sampling\n{extra}sequenceDiagram\n%% carrier id=C1 sid=SID-1 route=main_in,pit,main_out\n%% caption a | b\n")).unwrap();
+            build(&d).0.carriers[0].speed
+        };
+        // 11 px/cm on screen.
+        assert!((speed("%% @video belt=17.5\n") - 192.5).abs() < 1e-9);
+        assert!((speed("%% @video belt=10\n") - 110.0).abs() < 1e-9);
+        let d = doc("%% geometry sampling\n%% @video belt=0\nsequenceDiagram\n%% caption a | b\n").unwrap();
+        assert!(Scene::from_doc(&d).err().unwrap().contains("belt must be a speed"));
+    }
+
+    #[test]
     fn every_default_route_exists() {
         for (g, needle) in [("sampling", "1"), ("turnstile", "1"), ("spur", "1"), ("spur2", "1"), ("spur2", "2"), ("spur2", "both")] {
             let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle={needle}\n%% carrier id=C2 sid=SID-2 needle={needle}\n%% move C1 to merge\n");
