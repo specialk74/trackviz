@@ -16,19 +16,15 @@ sequenceDiagram
 
     %% caption 1 · One analyzer, two sampling points | Two carriers travel towards the spur: the first one needs needle 1, the second one needle 2.
     %% at 2.5
-    %% move C1 to nsd
+    %% move C1 to d1
     %% at 2.89
-    %% move C2 to nsd
+    %% move C2 to d1
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare | Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer.
     %% on antenna1 C1
     %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna1
-    %% move C1 to d1
-    %% on antenna1
-    %% move C2 to d1
     %% on antenna1 C2
     %% highlight nsd duration=1.6
     %% on antenna1
@@ -43,13 +39,13 @@ sequenceDiagram
     %% after 0.2 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
     %% after 0.6 antenna2 C1
-    %% move C1 to s1
+    %% pass div1
     %% on antenna2 C2
     %% highlight div1 duration=0.6
     %% after 0.2 OK C1
     AN->>DMX: Query SampleId=SID-000123
     %% after 0.401 antenna2 C2
-    %% move C2 to d2
+    %% pass div1
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
@@ -78,7 +74,7 @@ sequenceDiagram
     %% duration 2.6
     Note over AN: Pipetting Analyzer · Needle 1 - SampleId=SID-000123
     %% after 0.1 OK C2
-    %% move C2 to s2
+    %% pass div2
     %% after 0.2 Query C2
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0.57 antenna5 C2
@@ -122,17 +118,17 @@ sequenceDiagram
     %% after 0.8 Sample Complete C2
     AN->>IF: Status State=Ready Needle=1
     %% after 0 OK C2
-    %% move C2 to gone
+    %% pass sp2
     %% after 0.2 Status
     IF-->>AN: OK
     %% after 1.5 Status
     %% status sp1 normal
     %% after 1.8 Status
-    %% move C1 to d2
+    %% pass sp1
     %% on antenna4 C1
     %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C1
-    %% move C1 to gone
+    %% pass div2
     %% on antenna6 C2
     %% caption 7 · Release | Each carrier gets its Release when it has left the interface module.
     %% on antenna6

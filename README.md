@@ -125,6 +125,7 @@ has to wait. `when`, `with`, `delay`, `after_start` and `after_end` no longer ex
 | `duration <seconds>` | duration of the next message or note |
 | `carrier id=<id> [sid=<sample id>]` | without `sid=` the carrier is empty (no tube, its tag reads `<id> (empty)`); options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
 | `move <carrier> to <point>` | options: `ease=`, `speed=`, `duration=`, `runaway` |
+| `pass <device>` | the carrier stopped on the device (`sp`, `div1`, `antenna2`, ...) sets off and rides the belt to the next stop of its route (an antenna with a gate, a turnstile entry) or to its end. No carrier stopped there is an error |
 | `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=`; `pipette` also `sid=` (the sample it aspirates, shown in its note) |
 | `needle <device> down\|up`, `status <device> <state>` | as the steps |
 | `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
@@ -204,6 +205,8 @@ antennaN`, `when C2 at ...`) moves with it. `--check` shows the waits:
 - Carriers that start on the same spot (the spawn point) go in the order they are
   declared.
 - A `move` asked while the carrier is still moving starts when it stops.
+- `pass sp` releases the carrier held at the gate of `sp`: the scenes use it instead of
+  a `move` whenever a carrier sets off from a gate.
 - Ghosts, hidden carriers and carriers in a turnstile pocket don't take space;
   outside the panel carriers don't stop.
 

@@ -155,6 +155,9 @@ pub enum Action {
     Caption { title: String, text: String },
     /// `runaway`: the carrier escapes by itself (drawn in red, tag "RUN-AWAY").
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
+    /// The carrier stopped on the point of `device` sets off and rides the belt to
+    /// the next stop of its route (a gated antenna, a turnstile entry) or its end.
+    Pass { device: String },
     Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
     /// `note`: the text of the note on the analyzer, if the diagram gives it;
@@ -493,6 +496,7 @@ impl Scene {
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed", "runaway"],
+                "pass" => &["device"],
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
@@ -510,6 +514,7 @@ impl Scene {
             t.check_keys(&allowed)?;
             let action = match action_name.as_str() {
                 "caption" => Action::Caption { title: t.str_opt("title")?.unwrap_or_default(), text: t.str_req("text")? },
+                "pass" => Action::Pass { device: t.str_req("device")? },
                 "move" => Action::Move {
                     carrier: t.str_req("carrier")?,
                     to: t.str_req("to")?,
@@ -646,6 +651,49 @@ impl Scene {
     fn need_actor(&self, id: &str, loc: &str) -> Result<usize, String> {
         self.actor_idx(id).ok_or_else(|| format!("{loc}: unknown actor '{id}'"))
     }
+    /// Points where the belt can't carry a carrier further: antennas with a gate,
+    /// turnstile entries.
+    fn stops(&self) -> Vec<String> {
+        let mut stops = Vec::new();
+        for d in &self.devices {
+            match d.kind {
+                DeviceKind::Antenna if self.devices.iter().any(|g| g.id == format!("{}.gate", d.id)) => stops.extend(d.at.clone()),
+                DeviceKind::Turnstile => stops.push(format!("{}.in", d.id)),
+                _ => {}
+            }
+        }
+        stops
+    }
+
+    /// The move a `pass` stands for: the carrier stopped on the point of the
+    /// device at time t sets off to the next stop of its route, or to its end.
+    fn pass_move(&self, device: &str, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
+        let d = self.devices.iter().find(|d| d.id == device).ok_or_else(|| format!("{loc}: unknown device '{device}'"))?;
+        let at = d
+            .at
+            .as_deref()
+            .filter(|_| matches!(d.kind, DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Divert | DeviceKind::Antenna | DeviceKind::Gate))
+            .ok_or_else(|| format!("{loc}: 'pass' needs a device on a point of the track, not '{device}'"))?;
+        let p = self.pt(at);
+        let ci = (0..self.carriers.len())
+            .find(|&ci| {
+                let c = &paths[ci];
+                let q = c.pos(t);
+                attached[ci].is_none() && !c.ghost && c.opacity(t) > 0.0 && !c.moving(t) && ((q.0 - p.0).powi(2) + (q.1 - p.1).powi(2)).sqrt() < 3.0
+            })
+            .ok_or_else(|| format!("{loc}: pass {device}: no carrier is stopped on '{at}' at t={t:.2}s"))?;
+        let c = &self.carriers[ci];
+        let from = cur_idx[ci];
+        let stops = self.stops();
+        let to = c.route[from + 1..]
+            .iter()
+            .find(|p| stops.contains(p))
+            .or(c.route.last())
+            .filter(|_| from + 1 < c.route.len())
+            .ok_or_else(|| format!("{loc}: pass {device}: carrier '{}' is at the end of its route", c.id))?;
+        Ok(Action::Move { carrier: c.id.clone(), to: to.clone(), ease: Ease::Linear, speed: None, runaway: false })
+    }
+
     fn need_carrier(&self, id: &str, loc: &str) -> Result<usize, String> {
         self.carrier_idx(id).ok_or_else(|| format!("{loc}: unknown carrier '{id}'"))
     }
@@ -1117,7 +1165,16 @@ impl Timeline {
             };
             first = false;
             let t0 = base + st.delay;
-            let (dur, ev, desc) = match &st.action {
+            // `pass`: a move of the carrier stopped on the device, to its next stop.
+            let passed;
+            let action = match &st.action {
+                Action::Pass { device } => {
+                    passed = sc.pass_move(device, &carriers, &cur_idx, &attached, t0, &st.loc)?;
+                    &passed
+                }
+                a => a,
+            };
+            let (dur, ev, desc) = match action {
                 Action::Caption { title, text } => {
                     (st.duration.unwrap_or(0.0), Ev::Caption { title: title.clone(), text: text.clone() }, format!("caption   {title}"))
                 }
@@ -1237,6 +1294,7 @@ impl Timeline {
                     (d, Ev::Operator { device: di }, format!("operator  at {device}"))
                 }
                 Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
+                Action::Pass { .. } => unreachable!("a pass is laid out as a move"),
             };
             let t1 = t0 + dur;
             match &st.action {

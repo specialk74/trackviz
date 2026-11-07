@@ -20,17 +20,13 @@ sequenceDiagram
 
     %% caption 1 · Four carriers | Three carriers need needle 1, one needs needle 2. Each one gets Prepare when it enters the spur and Prepare again at the divert that sends it to its needle.
     %% at 1
-    %% move C1 to nsd
+    %% move C1 to d1
     %% at 1.39
-    %% move C4 to nsd
+    %% move C4 to d1
     %% on antenna1 C1
     %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna1
-    %% move C1 to d1
-    %% on antenna1
-    %% move C4 to d1
     %% on antenna1 C4
     %% highlight nsd duration=1.6
     %% on antenna1
@@ -38,7 +34,7 @@ sequenceDiagram
     %% after 0.2 Prepare C1
     AN-->>IF: OK SampleId=SID-000123
     %% at 3.39
-    %% move C2 to nsd
+    %% move C2 to d1
     %% on antenna2 C1
     %% highlight div1 duration=0.6
     %% after 0.1 antenna2 C1
@@ -46,22 +42,20 @@ sequenceDiagram
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.2 Prepare C4
     AN-->>IF: OK SampleId=SID-000126
-    %% on antenna1
-    %% move C2 to d1
     %% on antenna1 C2
     %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.6 antenna2 C1
-    %% move C1 to s1
+    %% pass div1
     %% on antenna2 C4
     %% highlight div1 duration=0.6
     %% after 0.2 OK C1
     AN->>DMX: Query SampleId=SID-000123
     %% after 0.401 antenna2 C4
-    %% move C4 to d2
+    %% pass div1
     %% at 5.39
-    %% move C3 to nsd
+    %% move C3 to d1
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
@@ -71,8 +65,6 @@ sequenceDiagram
     %% caption 2 · Sample Acquisition | The first carrier is at sampling point 1: Sample Acquisition with Needle=1. The next ones queue up behind it; the one for needle 2 goes on.
     %% after 0.2 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
-    %% on antenna1
-    %% move C3 to d1
     %% on antenna1 C3
     %% highlight nsd duration=1.6
     %% on antenna1
@@ -90,9 +82,9 @@ sequenceDiagram
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.6 antenna4 C4
-    %% move C4 to s2
+    %% pass div2
     %% after 0.601 antenna2 C2
-    %% move C2 to s1
+    %% pass div1
     %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
@@ -160,7 +152,7 @@ sequenceDiagram
     %% for C4
     IF-->>AN: OK
     %% after 0 OK C1
-    %% move C4 to gone
+    %% pass sp2
     %% after 0.2 Cancel C1
     AN-->>IF: OK SampleId=SID-000123
     %% after 0.1
@@ -168,13 +160,13 @@ sequenceDiagram
     %% after 0.2 OK C1
     %% caption 5 · Pit-lane emptied — Clear All | Right after the reply to Cancel: Clear All, which cancels every Prepare. The carriers of needle 1 are sent away without sampling; once they have left its pit-lane, it turns grey.
     %% after 0.2 OK C1
-    %% move C2 to d2
+    %% pass sp1
     %% after 0.2 Clear All
     AN-->>IF: OK
     %% on antenna4 C2
     %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C2
-    %% move C2 to gone
+    %% pass div2
     %% on antenna6
     IF->>AN: Release SampleId=SID-000126
     %% after 0.2 OK C1
@@ -191,4 +183,4 @@ sequenceDiagram
     %% after 0.5 OK C4
     AN->>DMX: Results SampleId=SID-000126
     %% after 0.4 antenna4 C3
-    %% move C3 to gone
+    %% pass div2

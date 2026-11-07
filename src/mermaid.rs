@@ -81,9 +81,9 @@ impl MsgType {
 }
 
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 22] = [
+const DIRECTIVES: [&str; 23] = [
     "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
-    "show", "hide", "wait", "caption",
+    "show", "hide", "wait", "caption", "pass",
 ];
 
 fn distance(a: &str, b: &str) -> usize {
@@ -418,6 +418,10 @@ impl Importer {
                     _ => {}
                 }
                 self.step(cmd, k)?;
+            }
+            "pass" => {
+                need(1, "pass <device>")?;
+                self.step("pass", vec![("device", text(plain[0]))])?;
             }
             "needle" => {
                 need(2, "needle <device> down|up [duration=s]")?;
@@ -882,6 +886,7 @@ mod tests {
         let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
         assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
         assert!(has(&d, "step", &[("action", "pipette"), ("note", "Aspirating SID-1")]));
+        assert!(has(&doc(&format!("{HEAD}%% pass sp\n")).unwrap(), "step", &[("action", "pass"), ("device", "sp")]));
         let d = doc(&format!("{HEAD}%% pipette sp duration=4 sid=SID-1\n%% pipette sp sid=SID-2\n")).unwrap();
         assert!(has(&d, "step", &[("action", "pipette"), ("sample_id", "SID-1"), ("duration", "4")]) && has(&d, "step", &[("sample_id", "SID-2")]));
         fails(&format!("{HEAD}%% rotate sp sid=SID-1\n"), "only pipette does");

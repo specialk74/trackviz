@@ -22,8 +22,6 @@ sequenceDiagram
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the Pit-Lane, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
     %% at 2.26
-    %% move C1 to nsd
-    %% on antenna1
     %% move C1 to pit_wait
     %% on antenna1 C1
     %% highlight nsd duration=2
@@ -37,15 +35,13 @@ sequenceDiagram
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% after 1.777 antenna2 C1
-    %% move C1 to ts.in
+    %% pass antenna2
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
     %% after 3.797 antenna1 C1
     AN->>DMX: Query SampleId=SID-000123
     %% at 6.97
-    %% move C2 to nsd
-    %% on antenna1
     %% move C2 to pit_wait
     %% on antenna1 C2
     %% highlight nsd duration=2
@@ -63,11 +59,9 @@ sequenceDiagram
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
     %% at 9.97
-    %% move C3 to nsd
+    %% move C3 to pit_q
     %% after 0.25 rotate ts
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% on antenna1
-    %% move C3 to pit_q
     %% on antenna1 C3
     %% highlight nsd duration=2
     %% on antenna1
@@ -118,7 +112,7 @@ sequenceDiagram
     %% after 0.2 OK C1
     %% caption 5 · All carriers sent away — Clear All | Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away through the wheel, without sampling. Once they have left the interface, it turns grey again.
     %% after 0.2 OK C1
-    %% move C2 to ts.in
+    %% pass antenna2
     %% after 0.2 OK C1
     %% move C3 to pit_wait
     %% after 0.2 Clear All
@@ -126,7 +120,7 @@ sequenceDiagram
     %% after 2.35 OK C1
     %% rotate ts
     %% after 0.15
-    %% move C3 to ts.in
+    %% pass antenna2
     %% after 0.15
     %% rotate ts
     %% after 0.15

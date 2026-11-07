@@ -312,6 +312,22 @@ fn a_device_can_carry_its_antenna_and_gate() {
     err(&bad, "\n%% @step action=caption title=t text=x ", "gate= needs antenna=");
 }
 
+#[test]
+fn pass_sends_the_stopped_carrier_to_its_next_stop_or_to_the_end() {
+    let gated = SAMPLING.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp kind=sampling at=s antenna=ant gate=true\n");
+    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=pass device=sp ";
+    // No other stop on the route: to its end.
+    let (_, tl) = ok(&gated, steps);
+    assert!(tl.log[1].contains("move      C1 -> c"), "{}", tl.log[1]);
+    // A gated antenna further on: it stops there.
+    let two = format!("{gated}%% @point id=d x=300 y=700\n%% @device id=far kind=antenna at=c gate=true\n").replace("route=a,b,s,c ", "route=a,b,s,c,d ").replace("%% @lane id=main points=a,b,s,c\n", "%% @lane id=main points=a,b,s,c,d\n");
+    let (_, tl) = ok(&two, steps);
+    assert!(tl.log[1].contains("move      C1 -> c"), "{}", tl.log[1]);
+    // Nobody stopped there.
+    err(&gated, "\n%% @step action=pass device=sp ", "no carrier is stopped on 's'");
+    err(&gated, "\n%% @step action=pass device=an ", "'pass' needs a device on a point");
+}
+
 // ------------------------------------------------------------ turnstile
 
 const C1_IN: &str = "\n%% @step action=move carrier=C1 to=ts.in ";

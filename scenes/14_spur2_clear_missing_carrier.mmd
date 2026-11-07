@@ -21,15 +21,13 @@ sequenceDiagram
 
     %% caption 1 · Three carriers | Three carriers meant for needle 1 of the analyzer travel on the Main-Lane towards the spur.
     %% at 2.5
-    %% move C1 to nsd
+    %% move C1 to d1
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare | The first carrier is diverted into the spur without stopping: the interface sends Prepare to the analyzer.
     %% on antenna1 C1
     %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna1
-    %% move C1 to d1
     %% after 0 Prepare C1
     %% highlight nsd duration=1.6
     %% at 4.6
@@ -50,7 +48,7 @@ sequenceDiagram
     %% on antenna1 C2
     %% show C2L duration=0.4
     %% after 0.6 antenna2 C1
-    %% move C1 to s1
+    %% pass div1
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
@@ -61,8 +59,6 @@ sequenceDiagram
     %% after 0.2 antenna3 C1
     IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
     %% at 7.6
-    %% move C3 to nsd
-    %% on antenna1
     %% move C3 to d1
     %% on antenna1 C3
     %% highlight nsd duration=1.6
@@ -111,7 +107,7 @@ sequenceDiagram
     %% after 0.1 Sample Complete C1
     %% for C1
     IF-->>AN: OK
-    %% move C1 to d2
+    %% pass sp1
     %% after 0 OK C1
     %% move C3 to s1
     %% after 0.2 antenna3 C3
@@ -119,7 +115,7 @@ sequenceDiagram
     %% on antenna4 C1
     %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C1
-    %% move C1 to gone
+    %% pass div2
     %% after 0.1 Sample Acquisition C3
     %% for C3
     AN-->>IF: OK
@@ -137,11 +133,11 @@ sequenceDiagram
     %% after 0.1 Sample Complete C3
     %% for C3
     IF-->>AN: OK
-    %% move C3 to d2
+    %% pass sp1
     %% on antenna4 C3
     %% highlight div2 duration=0.6
     %% after 0.401 antenna4 C3
-    %% move C3 to gone
+    %% pass div2
     %% on antenna6
     IF->>AN: Release SampleId=SID-000125
     %% after 0.1

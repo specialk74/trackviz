@@ -16,17 +16,13 @@ sequenceDiagram
 
     %% caption 1 · One analyzer, two sampling points | The spur serves one analyzer with two needles, each on its own pit-lane. Which needles a sample needs depends on its tests: one of them, or both.
     %% at 2.5
-    %% move C1 to nsd
+    %% move C1 to d1
     %% at 2.89
-    %% move C2 to nsd
+    %% move C2 to d1
     %% on antenna1 C1
     %% highlight nsd duration=1.6
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% on antenna1
-    %% move C1 to d1
-    %% on antenna1
-    %% move C2 to d1
     %% on antenna1 C2
     %% highlight nsd duration=1.6
     %% on antenna1
@@ -43,13 +39,13 @@ sequenceDiagram
     %% after 0.2 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
     %% after 0.6 antenna2 C1
-    %% move C1 to s1
+    %% pass div1
     %% on antenna2 C2
     %% highlight div1 duration=0.6
     %% after 0.2 OK C1
     AN->>DMX: Query SampleId=SID-000123
     %% after 0.401 antenna2 C2
-    %% move C2 to d2
+    %% pass div1
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
@@ -63,7 +59,7 @@ sequenceDiagram
     %% after 0.2 Query C1
     DMX-->>AN: Tests to perform SampleId=SID-000123
     %% after 0.6 antenna4 C2
-    %% move C2 to s2
+    %% pass div2
     %% after 0.1 Sample Acquisition C1
     %% for C1
     AN-->>IF: OK
@@ -93,7 +89,7 @@ sequenceDiagram
     %% after 0.2 pipette sp2
     AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
     %% after 0 OK C1
-    %% move C1 to d2
+    %% pass sp1
     %% after 0.1 Sample Complete C2
     %% for C2
     IF-->>AN: OK
@@ -105,9 +101,9 @@ sequenceDiagram
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0 OK C2
-    %% move C1 to s2
+    %% pass div2
     %% after 0 OK C2
-    %% move C2 to gone
+    %% pass sp2
     %% after 0.1 Prepare C1
     %% for C1
     AN-->>IF: OK
@@ -130,7 +126,7 @@ sequenceDiagram
     %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% move C1 to gone
+    %% pass sp2
     %% on antenna6
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
