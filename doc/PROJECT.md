@@ -158,6 +158,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Route:** una route elenca tappe, punti o id di corsie. Un id di corsia vale tutti i suoi punti, compresi quelli che cadono sui suoi segmenti (code, punti di campionamento: `lane_paths`); tra due tappe il programma completa il percorso più breve lungo le corsie, nel loro verso, attraversando un tornello da `<id>.in` a `<id>.out` (`expand_route`). Due punti che nessuna corsia collega sono uniti in linea retta (come prima). Le scene usano la forma corta: `main_in,pit,main_out`, `spawn,pit_entry,pit_exit,gone`, `spawn,pit1,gone`, `spawn,gone`.
 
+**Capienza della pit-lane:** `capacity=N` sulla corsia, nella geometria (nessun valore = nessun limite). Un carrier conta da quando lascia la Main-Lane a quando ci rientra; i fantasmi non contano. Dopo aver calcolato la timeline, `Scene::overflow` cerca il primo carrier che troverebbe la corsia piena; `Scene::with_straight` rifà la scena con quel carrier dritto sulla Main-Lane fino alla fine della sua route e senza i suoi step dopo la deviazione (move oltre quel punto, messaggi, pipette del suo `sid`, step legati al suo arrivo alla deviazione o a punti dove non passa più, e a cascata quelli che partivano da questi; un `pass` che non trova nessuno è saltato). Si ripete finché nessuna corsia supera la sua capienza; `--check` scrive in testa "C3 goes straight on: its pit-lane is full". Attenzione: anche step generali (per esempio l'interfaccia che torna grigia quando l'ultimo carrier esce) possono essere saltati se erano legati a quel carrier.
+
 **Nastro:** 17,5 cm/s; un carrier largo 4 cm è disegnato largo 44 px (11 px/cm), quindi 192,5 px/s (`BELT_SPEED`). Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
@@ -274,7 +276,7 @@ Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse ta
 |---|---|
 | `@video` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
 | `@point` | `id`, `x`, `y` |
-| `@lane` | `id`, `label`, `kind` = main\|pit\|link, `points` = lista di id, `label_x`, `label_y` |
+| `@lane` | `id`, `label`, `kind` = main\|pit\|link, `points` = lista di id, `label_x`, `label_y`, `capacity` |
 | `@device` | `id`, `kind` = nsd\|sampling\|divert\|antenna (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta o, per un'antenna, il lettore; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |
 | `@actor` | `id`, `label`, `sub`, `color`, `analyzer` (false) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (messaggio con nome) |

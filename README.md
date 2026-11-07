@@ -229,6 +229,13 @@ antennaN`, `when C2 at ...`) moves with it. `--check` shows the waits:
 - A `move` asked while the carrier is still moving starts when it stops.
 - `pass sp` releases the carrier held at the gate of `sp`: the scenes use it instead of
   a `move` whenever a carrier sets off from a gate.
+- A lane can have a `capacity` (in the geometry: `%% @lane id=pit ... capacity=3`). A
+  carrier counts from when it leaves the Main-Lane until it is back on it; one that
+  would find the lane full goes straight on along the Main-Lane to the end of its
+  route. Its steps after the diversion are skipped: its moves past that point, its
+  messages (Prepare included), the pipettes of its `sid`, the steps that start when
+  it reaches the diversion or a point it no longer passes, and those that start from
+  them. `--check` says so at the top of the timeline. Ghosts don't count.
 - Ghosts, hidden carriers and carriers in a turnstile pocket don't take space;
   outside the panel carriers don't stop.
 
@@ -276,7 +283,7 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 |---|---|
 | `@video` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times` |
 | `@point` | `id`, `x`, `y` |
-| `@lane` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = list of ids, `label_x`, `label_y` |
+| `@lane` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = list of ids, `label_x`, `label_y`, `capacity` (most carriers in it at once, see Carrier physics) |
 | `@device` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `@actor` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (this actor gets the "Pipetting" note) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |

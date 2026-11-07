@@ -4,6 +4,7 @@ use crate::doc::{Doc, Table};
 use crate::physics;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct Video {
     pub title: String,
     pub subtitle: String,
@@ -15,6 +16,7 @@ pub struct Video {
     pub show_times: bool,
 }
 
+#[derive(Clone)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -27,10 +29,15 @@ pub enum LaneKind {
     Link,
 }
 
+#[derive(Clone)]
 pub struct Lane {
     pub id: String,
     pub label: String,
     pub points: Vec<String>,
+    /// The most carriers that can be in this lane at once, counted from their
+    /// diversion off the Main-Lane until they pass the first antenna (and its
+    /// gate); one more goes straight on.
+    pub capacity: Option<usize>,
     pub kind: LaneKind,
     pub label_pos: Option<(f64, f64)>,
 }
@@ -52,6 +59,7 @@ pub enum DeviceKind {
     Divert,
 }
 
+#[derive(Clone)]
 pub struct Device {
     pub id: String,
     pub kind: DeviceKind,
@@ -96,6 +104,7 @@ pub fn turnstile_slot_angle(entry_right: bool, slot: f64) -> f64 {
     a0 + slot * delta
 }
 
+#[derive(Clone)]
 pub struct Actor {
     pub id: String,
     pub label: String,
@@ -105,6 +114,7 @@ pub struct Actor {
     pub analyzer: bool,
 }
 
+#[derive(Clone)]
 pub struct Carrier {
     pub id: String,
     pub tube: bool,
@@ -152,6 +162,7 @@ impl Ease {
     }
 }
 
+#[derive(Clone)]
 pub enum Action {
     Caption { title: String, text: String },
     /// `runaway`: the carrier escapes by itself (drawn in red, tag "RUN-AWAY").
@@ -229,6 +240,7 @@ impl Anchor {
     }
 }
 
+#[derive(Clone)]
 pub struct Step {
     pub action: Action,
     pub start: StartMode,
@@ -237,6 +249,7 @@ pub struct Step {
     pub loc: String,
 }
 
+#[derive(Clone)]
 pub struct Scene {
     pub video: Video,
     pub points: HashMap<String, Point>,
@@ -245,6 +258,9 @@ pub struct Scene {
     pub actors: Vec<Actor>,
     pub carriers: Vec<Carrier>,
     pub steps: Vec<Step>,
+    /// Carriers sent straight on because their pit-lane was full (set by
+    /// `Timeline::build`).
+    pub straight: Vec<String>,
 }
 
 fn sc_pt(points: &HashMap<String, Point>, id: &str) -> (f64, f64) {
@@ -526,7 +542,7 @@ impl Scene {
 
         let mut lanes = Vec::new();
         for t in arr(doc, "lane") {
-            t.check_keys(&["id", "label", "points", "kind", "label_x", "label_y"])?;
+            t.check_keys(&["id", "label", "points", "kind", "label_x", "label_y", "capacity"])?;
             let pts = t.str_list("points")?;
             if pts.len() < 2 {
                 return Err(format!("{}: a lane needs at least 2 points", t.location()));
@@ -544,7 +560,12 @@ impl Scene {
                 (Some(x), Some(y)) => Some((x, y)),
                 _ => None,
             };
-            lanes.push(Lane { id: t.str_opt("id")?.unwrap_or_default(), label: t.str_opt("label")?.unwrap_or_default(), points: pts, kind, label_pos });
+            let capacity = match t.num_opt("capacity")? {
+                Some(c) if c >= 1.0 && c.fract() == 0.0 => Some(c as usize),
+                Some(c) => return Err(format!("{}: capacity must be a whole number from 1, not {c}", t.location())),
+                None => None,
+            };
+            lanes.push(Lane { id: t.str_opt("id")?.unwrap_or_default(), label: t.str_opt("label")?.unwrap_or_default(), points: pts, kind, label_pos, capacity });
         }
 
         let mut actors = Vec::new();
@@ -738,7 +759,7 @@ impl Scene {
             let part_of = Some(devices[di].part_of.clone().unwrap_or_else(|| devices[di].id.clone()));
             devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true, part_of });
         }
-        Ok(Scene { video, points, lanes, devices, actors, carriers, steps })
+        Ok(Scene { video, points, lanes, devices, actors, carriers, steps, straight: Vec::new() })
     }
 
     pub fn actor_idx(&self, id: &str) -> Option<usize> {
@@ -753,6 +774,137 @@ impl Scene {
     fn need_actor(&self, id: &str, loc: &str) -> Result<usize, String> {
         self.actor_idx(id).ok_or_else(|| format!("{loc}: unknown actor '{id}'"))
     }
+    /// The points of the Main-Lane (main lanes, with the points on their segments).
+    fn main_points(&self) -> Vec<String> {
+        lane_paths(&self.points, &self.lanes).into_iter().zip(&self.lanes).filter(|(_, l)| l.kind == LaneKind::Main).flat_map(|((_, p), _)| p).collect()
+    }
+
+    /// Where the route of a carrier leaves the Main-Lane (index of its last point
+    /// there), and where it is back on it, if it gets back.
+    fn off_main(&self, ci: usize, main: &[String]) -> Option<(usize, Option<usize>)> {
+        let r = &self.carriers[ci].route;
+        let i = (0..r.len().saturating_sub(1)).find(|&i| main.contains(&r[i]) && !main.contains(&r[i + 1]))?;
+        Some((i, (i + 1..r.len()).find(|&j| main.contains(&r[j]))))
+    }
+
+    /// The first carrier that would leave the Main-Lane into a lane with a
+    /// capacity already full.
+    fn overflow(&self, tl: &Timeline) -> Option<usize> {
+        let main = self.main_points();
+        let paths = lane_paths(&self.points, &self.lanes);
+        let antennas: Vec<String> = self.devices.iter().filter(|d| d.kind == DeviceKind::Antenna).filter_map(|d| d.at.clone()).collect();
+        for (li, lane) in self.lanes.iter().enumerate() {
+            let Some(cap) = lane.capacity else { continue };
+            let pts = &paths[li].1;
+            let mut users: Vec<(usize, f64, f64)> = Vec::new();
+            for (ci, c) in self.carriers.iter().enumerate() {
+                if c.ghost || self.straight.contains(&c.id) || !c.route.iter().any(|p| pts.contains(p) && !main.contains(p)) {
+                    continue;
+                }
+                let Some((i, j)) = self.off_main(ci, &main) else { continue };
+                let path = &tl.carriers[ci];
+                let Some(t_in) = path.reaches(path.cum[i]) else { continue };
+                // It stops counting once past the first antenna after the diversion
+                // (where the gate holds it), or when back on the Main-Lane.
+                let route = &self.carriers[ci].route;
+                let end = (i + 1..route.len()).find(|&k| antennas.contains(&route[k])).or(j);
+                let t_out = end.and_then(|k| path.reaches(path.cum[k] + 1.0)).unwrap_or(f64::INFINITY);
+                users.push((ci, t_in, t_out));
+            }
+            users.sort_by(|a, b| a.1.total_cmp(&b.1));
+            for (k, &(ci, t_in, _)) in users.iter().enumerate() {
+                if users[..k].iter().filter(|u| u.2 > t_in + 1e-9).count() >= cap {
+                    return Some(ci);
+                }
+            }
+        }
+        None
+    }
+
+    /// The scene with carrier ci going straight on along the Main-Lane where it
+    /// would leave it. Its steps after the diversion are left out: its moves past
+    /// that point (the first one goes to the end of the new route instead), its
+    /// messages, the pipettes of its sample, the steps that start when it reaches
+    /// the diversion or a point it no longer passes, and, in turn, the steps that
+    /// start from those.
+    fn with_straight(&self, ci: usize) -> Result<Scene, String> {
+        let mut sc = self.clone();
+        let main = sc.main_points();
+        let (i, _) = sc.off_main(ci, &main).ok_or("a carrier sent straight on must leave the Main-Lane")?;
+        let old = sc.carriers[ci].route.clone();
+        let end = old[i..].iter().rev().find(|p| main.contains(p)).cloned().unwrap_or_else(|| old[i].clone());
+        let mut written: Vec<String> = old[..=i].to_vec();
+        written.push(end);
+        let route = expand_route(&written, &sc.points, &sc.lanes, &sc.devices)?;
+        let (cid, sid) = (sc.carriers[ci].id.clone(), sc.carriers[ci].sample_id.clone());
+        sc.carriers[ci].route = route.clone();
+        sc.straight.push(cid.clone());
+        let after_diversion = |p: &str| old.iter().position(|q| q == p).is_some_and(|k| k >= i) || !route.iter().any(|q| q == p);
+        let mut dropped = vec![false; sc.steps.len()];
+        let mut gone = false;
+        for (k, st) in sc.steps.iter_mut().enumerate() {
+            match &mut st.action {
+                Action::Move { carrier, to, .. } if *carrier == cid => {
+                    if gone {
+                        dropped[k] = true;
+                    } else if !route.contains(to) {
+                        *to = route.last().unwrap().clone();
+                        gone = true;
+                    }
+                }
+                Action::Message { carrier: Some(c), .. } if *c == cid => dropped[k] = true,
+                Action::Pipette { sample: Some(s), .. } if !sid.is_empty() && *s == sid => dropped[k] = true,
+                _ => {}
+            }
+            if let StartMode::When(anchors) = &st.start {
+                if anchors.iter().any(|a| matches!(a, Anchor::Arrival { carrier, point } if *carrier == cid && after_diversion(point))) {
+                    dropped[k] = true;
+                }
+            }
+        }
+        // What each step makes happen, for the steps that start from it.
+        let keys = |st: &Step| -> Vec<String> {
+            match &st.action {
+                Action::Message { kind: Some(k), carrier, .. } => {
+                    let mut v = vec![k.clone()];
+                    v.extend(carrier.iter().map(|c| format!("{k} {c}")));
+                    v
+                }
+                Action::Pipette { device, .. } => vec![format!("pipette {device}")],
+                Action::Rotate { device } => vec![format!("rotate {device}")],
+                Action::Needle { device, .. } => vec![format!("needle {device}")],
+                _ => Vec::new(),
+            }
+        };
+        loop {
+            let mut more = false;
+            for k in 0..sc.steps.len() {
+                if dropped[k] {
+                    continue;
+                }
+                if let StartMode::When(anchors) = &sc.steps[k].start {
+                    let lost = anchors.iter().any(|a| match a {
+                        Anchor::Event { key, .. } => sc.steps[..k].iter().enumerate().rev().find(|(_, s)| keys(s).contains(key)).is_some_and(|(j, _)| dropped[j]),
+                        _ => false,
+                    });
+                    if lost {
+                        dropped[k] = true;
+                        more = true;
+                    }
+                }
+            }
+            if !more {
+                break;
+            }
+        }
+        let mut k = 0;
+        sc.steps.retain(|_| {
+            k += 1;
+            !dropped[k - 1]
+        });
+        Ok(sc)
+    }
+
     /// Points where the belt can't carry a carrier further: antennas with a gate,
     /// turnstile entries.
     fn stops(&self) -> Vec<String> {
@@ -1159,6 +1311,25 @@ impl Timeline {
     /// Lays out the steps in time. On error, the message also lists the
     /// timeline computed up to that point (useful to fix delays in a scene).
     pub fn build(sc: &Scene) -> Result<Timeline, String> {
+        // A carrier that would find its pit-lane full goes straight on: lay out
+        // again without it in the pit-lane, until every lane is within its capacity.
+        let mut changed: Option<Scene> = None;
+        loop {
+            let cur = changed.as_ref().unwrap_or(sc);
+            let mut tl = Self::build_settled(cur)?;
+            match cur.overflow(&tl) {
+                None => {
+                    for (k, c) in cur.straight.iter().enumerate() {
+                        tl.log.insert(k, format!("{c} goes straight on: its pit-lane is full (its steps after the diversion are skipped)"));
+                    }
+                    return Ok(tl);
+                }
+                Some(ci) => changed = Some(cur.with_straight(ci)?),
+            }
+        }
+    }
+
+    fn build_settled(sc: &Scene) -> Result<Timeline, String> {
         // The moves depend on the steps (when they start) and the steps on the
         // moves (when a carrier arrives): lay out, play the moves together, and
         // again until nothing changes.
@@ -1270,10 +1441,18 @@ impl Timeline {
             // `pass`: a move of the carrier stopped on the device, to its next stop.
             let passed;
             let action = match &st.action {
-                Action::Pass { device } => {
-                    passed = sc.pass_move(device, &carriers, &cur_idx, &attached, t0, &st.loc)?;
-                    &passed
-                }
+                Action::Pass { device } => match sc.pass_move(device, &carriers, &cur_idx, &attached, t0, &st.loc) {
+                    Ok(a) => {
+                        passed = a;
+                        &passed
+                    }
+                    // The carrier it was for went straight on.
+                    Err(_) if !sc.straight.is_empty() => {
+                        passed = Action::Wait;
+                        &passed
+                    }
+                    Err(e) => return Err(e),
+                },
                 a => a,
             };
             let (dur, ev, desc) = match action {
@@ -1395,7 +1574,7 @@ impl Timeline {
                     }
                     (d, Ev::Operator { device: di }, format!("operator  at {device}"))
                 }
-                Action::Wait => (st.duration.unwrap(), Ev::Wait, "wait".to_string()),
+                Action::Wait => (st.duration.unwrap_or(0.0), Ev::Wait, "wait".to_string()),
                 Action::Pass { .. } => unreachable!("a pass is laid out as a move"),
             };
             let t1 = t0 + dur;

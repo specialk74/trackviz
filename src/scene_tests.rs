@@ -328,6 +328,44 @@ fn pass_sends_the_stopped_carrier_to_its_next_stop_or_to_the_end() {
     err(&gated, "\n%% @step action=pass device=an ", "'pass' needs a device on a point");
 }
 
+/// A pit-lane with room for one carrier.
+const PIT: &str = r#"
+%% @video title=t tail=1
+%% @point id=a x=900 y=700
+%% @point id=n x=800 y=700
+%% @point id=p1 x=750 y=600
+%% @point id=s x=600 y=600
+%% @point id=p2 x=450 y=600
+%% @point id=m x=400 y=700
+%% @point id=z x=100 y=700
+%% @lane id=main points=a,n,m,z
+%% @lane id=pit kind=pit points=p1,s,p2 capacity=1
+%% @lane id=in kind=link points=n,p1
+%% @lane id=out kind=link points=p2,m
+%% @device id=an kind=analyzer x=100 y=150 w=400 h=150
+%% @device id=sp kind=sampling at=s antenna=ant gate=true
+%% @actor id=IF label=Interface
+%% @actor id=AN label=Analyzer analyzer=true
+%% @carrier id=C1 sample_id=SID-1 route=a,pit,z speed=100
+%% @carrier id=C2 sample_id=SID-2 route=a,pit,z speed=100
+"#;
+
+#[test]
+fn a_carrier_that_finds_its_pit_lane_full_goes_straight_on() {
+    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=move at=0.5 carrier=C2 to=s                  \n%% @step action=message when=\"C2 at n\" from=IF to=AN text=Prepare carrier=C2 event=prepare                  \n%% @step action=message type=analyzer_ok when=\"prepare C2 arrived\" carrier=C2                  \n%% @step action=pipette at=8 device=sp sample_id=SID-1 \n%% @step action=pass device=sp ";
+    let base = format!("{PIT}%% @message id=analyzer_ok from=AN to=IF text=OK\n");
+    let (sc, tl) = ok(&base, steps);
+    assert!(tl.log[0].contains("C2 goes straight on"), "{}", tl.log[0]);
+    // C2 stays on the Main-Lane, to the end of its route; its messages are skipped.
+    assert_eq!(tl.carrier_pos(1, 30.0), sc.pt("z"));
+    assert!(!tl.events.iter().any(|e| matches!(&e.ev, Ev::Message { .. })));
+    // C1 is sampled and leaves.
+    assert!(tl.log.iter().any(|l| l.contains("move      C1 -> z")), "{:?}", tl.log);
+    // With room for two, both go in.
+    let (_, tl) = ok(&base.replace("capacity=1", "capacity=2"), steps);
+    assert_eq!(tl.events.iter().filter(|e| matches!(&e.ev, Ev::Message { .. })).count(), 2);
+}
+
 // ------------------------------------------------------------ turnstile
 
 const C1_IN: &str = "\n%% @step action=move carrier=C1 to=ts.in ";
