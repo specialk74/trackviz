@@ -35,9 +35,10 @@ sequenceDiagram
     %% when C1 at pit_wait
     %% caption 3 · Antenna — Prepare again | The carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
     %% when C1 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C1 at pit_wait
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% when prepare_again C1 arrived
     %% delay 0.1

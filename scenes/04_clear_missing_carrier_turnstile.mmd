@@ -46,9 +46,10 @@ sequenceDiagram
     %% when C1 at pit_wait
     %% caption 3 · Antenna — Prepare again | The first carrier is read at the antenna: Prepare again. Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
     %% when C1 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C1 at pit_wait
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% when prepare_again C1 arrived
     %% delay 0.1
@@ -117,7 +118,7 @@ sequenceDiagram
     %% when C3 at pit_wait
     %% caption 7 · Antenna reads the third carrier — Clear | The third carrier stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
     %% when C3 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C3 at pit_wait
     %% delay 0.197
     IF->>AN: Clear SampleId=SID-000124
@@ -133,6 +134,7 @@ sequenceDiagram
     %% caption 8 · Prepare again for the third carrier | Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete.
     %% when sample_ok C2 arrived
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000125
     %% when prepare_again C3 arrived
     %% delay 0.1

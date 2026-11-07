@@ -278,12 +278,13 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                 );
             }
             DeviceKind::Antenna => {
-                // Small reader above the lane; waves while a carrier stands on its point.
+                // A reader above the lane (or where label_x/label_y put it), with a dashed
+                // line to the point it reads; waves while a carrier is over the point.
                 let (ax, ay) = sc.pt(d.at.as_deref().unwrap());
-                let by = ay - 36.0;
-                let reading = carrier_stopped_at(sc, tl, (ax, ay), t);
+                let (rx, ry) = d.label_pos.unwrap_or((ax, ay - 36.0));
+                let reading = carrier_over(sc, tl, (ax, ay), t);
                 if let Some(a) = glow {
-                    let _ = write!(o, r#"<circle cx="{ax}" cy="{by}" r="22" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
+                    let _ = write!(o, r#"<circle cx="{rx}" cy="{ry}" r="22" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
                 }
                 let wave = if reading { "#2563EB" } else { "#94A3B8" };
                 for k in 1..=2 {
@@ -293,18 +294,26 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
                     let _ = write!(
                         o,
                         r##"<path d="M{:.1},{:.1} A{r},{r} 0 0 0 {:.1},{:.1} M{:.1},{:.1} A{r},{r} 0 0 1 {:.1},{:.1}" fill="none" stroke="{wave}" stroke-width="2.5" stroke-linecap="round" opacity="{op:.2}"/>"##,
-                        ax - r * 0.7, by - r * 0.7, ax - r * 0.7, by + r * 0.7,
-                        ax + r * 0.7, by - r * 0.7, ax + r * 0.7, by + r * 0.7
+                        rx - r * 0.7, ry - r * 0.7, rx - r * 0.7, ry + r * 0.7,
+                        rx + r * 0.7, ry - r * 0.7, rx + r * 0.7, ry + r * 0.7
                     );
                 }
-                if reading {
-                    let _ = write!(o, r##"<line x1="{ax}" y1="{}" x2="{ax}" y2="{}" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 4"/>"##, by + 6.0, ay - 22.0);
+                // From the reader to the edge of a carrier on the point.
+                let len = ((ax - rx).powi(2) + (ay - ry).powi(2)).sqrt().max(1.0);
+                let (ux, uy) = ((ax - rx) / len, (ay - ry) / len);
+                if len > 30.0 {
+                    let (line, width, dash) = if reading { ("#2563EB", 2.0, "3 4") } else { ("#CBD5E1", 1.5, "2 4") };
+                    let _ = write!(
+                        o,
+                        r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{line}" stroke-width="{width}" stroke-dasharray="{dash}"/>"##,
+                        rx + ux * 6.0, ry + uy * 6.0, ax - ux * 22.0, ay - uy * 22.0
+                    );
                 }
                 let col = if glow.is_some() { ACCENT } else { "#475569" };
                 let _ = write!(
                     o,
-                    r##"<circle cx="{ax}" cy="{by}" r="5" fill="#334155"/><text x="{ax}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}">{}</text>"##,
-                    by - 28.0, esc(&d.label)
+                    r##"<circle cx="{rx}" cy="{ry}" r="5" fill="#334155"/><text x="{rx}" y="{}" font-size="14" font-weight="700" text-anchor="middle" fill="{col}" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
+                    ry - 28.0, esc(&d.label)
                 );
             }
             DeviceKind::Zone => {}
@@ -597,6 +606,14 @@ fn carrier_stopped_at(sc: &Scene, tl: &Timeline, p: (f64, f64), t: f64) -> bool 
     (0..sc.carriers.len()).any(|ci| {
         let (x, y) = tl.carrier_pos(ci, t);
         tl.carriers[ci].physical(t) && !tl.carriers[ci].moving(t) && ((x - p.0).powi(2) + (y - p.1).powi(2)).sqrt() < 3.0
+    })
+}
+
+/// A carrier, stopped or passing, is over point p.
+fn carrier_over(sc: &Scene, tl: &Timeline, p: (f64, f64), t: f64) -> bool {
+    (0..sc.carriers.len()).any(|ci| {
+        let (x, y) = tl.carrier_pos(ci, t);
+        tl.carriers[ci].physical(t) && ((x - p.0).powi(2) + (y - p.1).powi(2)).sqrt() < 10.0
     })
 }
 

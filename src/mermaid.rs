@@ -63,7 +63,7 @@ pub struct MsgType {
     pub text: String,
     pub params: String,
     pub reply: bool,
-    pub colored: bool,
+    pub color: Option<String>,
 }
 
 impl MsgType {
@@ -75,49 +75,15 @@ impl MsgType {
             text: t.str_req("text")?,
             params: t.str_opt("params")?.unwrap_or_default(),
             reply: t.bool_opt("reply")?.unwrap_or(false),
-            colored: t.str_opt("color")?.is_some(),
+            color: t.str_opt("color")?,
         })
     }
 }
 
-/// What the keyword directives need to know of a geometry.
-#[derive(Default)]
-pub struct Geometry {
-    /// Points where a carrier is diverted or read, in file order: NSD, antenna, diverts.
-    pub diverts: Vec<String>,
-    /// Sampling devices in file order: (device id, point; None for a turnstile).
-    pub samplers: Vec<(String, Option<String>)>,
-    /// Where a carrier has left the interface module.
-    pub exit: String,
-}
-
-impl Geometry {
-    pub fn from_doc(doc: &Doc) -> Result<Geometry, String> {
-        let mut g = Geometry::default();
-        let mut points = Vec::new();
-        for t in doc.arrays.get("point").map(|v| v.as_slice()).unwrap_or(&[]) {
-            points.push(t.str_req("id")?);
-        }
-        for t in doc.arrays.get("device").map(|v| v.as_slice()).unwrap_or(&[]) {
-            match t.str_req("kind")?.as_str() {
-                "nsd" | "antenna" | "divert" => g.diverts.push(t.str_req("at")?),
-                "sampling" => g.samplers.push((t.str_req("id")?, Some(t.str_req("at")?))),
-                "turnstile" => g.samplers.push((t.str_req("id")?, None)),
-                _ => {}
-            }
-        }
-        g.exit = if points.iter().any(|p| p == "iface_out") { "iface_out" } else { "main_out" }.to_string();
-        Ok(g)
-    }
-}
-
-/// Keyword directives: the next message is sent at a moment the program knows.
-const KEYWORDS: [&str; 8] = ["Prepare", "OK", "Query", "Tests", "Sample Acquisition", "Sample Complete", "Release", "Results"];
-
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 24] = [
-    "title", "subtitle", "geometry", "carrier", "include", "when", "at", "delay", "with", "after_end", "after_start", "for", "duration", "move", "pipette", "rotate", "highlight",
-    "operator", "needle", "status", "show", "hide", "wait", "caption",
+const DIRECTIVES: [&str; 27] = [
+    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "color", "when", "at", "delay", "with", "after_end", "after_start", "for", "duration", "move", "pipette",
+    "rotate", "highlight", "operator", "needle", "status", "show", "hide", "wait", "caption",
 ];
 
 fn distance(a: &str, b: &str) -> usize {
@@ -135,15 +101,12 @@ fn distance(a: &str, b: &str) -> usize {
     row[b.len()]
 }
 
-/// The closest keyword or directive to a mistyped one.
+/// The closest directive to a mistyped one.
 fn suggest(d: &str) -> Option<&'static str> {
-    let names = KEYWORDS.iter().chain(DIRECTIVES.iter());
-    names
-        .map(|&n| {
-            let words = n.split(' ').count();
-            let head: Vec<&str> = d.split_whitespace().take(words).collect();
-            (distance(&head.join(" "), n), n)
-        })
+    let head = d.split_whitespace().next().unwrap_or_default();
+    DIRECTIVES
+        .iter()
+        .map(|&n| (distance(head, n), n))
         .filter(|&(dist, n)| dist > 0 && dist <= 2.max(n.len() / 4))
         .min()
         .map(|x| x.1)
@@ -212,7 +175,6 @@ struct Importer {
     actors: Vec<(String, String)>,
     /// (carrier id, sample id)
     samples: Vec<(String, String)>,
-    prepared: Vec<String>,
     /// Timing keys for the next step.
     timing: Keys,
     last_pipette: bool,
@@ -221,15 +183,14 @@ struct Importer {
     line: usize,
     /// `%% for`: the carrier of the next message, when its text doesn't say it.
     next_carrier: Option<String>,
-    /// A keyword directive waiting for its message: (keyword, number).
-    keyword: Option<(&'static str, Option<usize>)>,
-    /// The carrier of the latest message, and its event name.
-    last_message: Option<(Option<String>, String)>,
-    /// The sampling device each carrier was last at.
-    sampled_at: HashMap<String, String>,
-    queried: bool,
-    /// The event name of the latest OK to each carrier.
-    ok_of: HashMap<String, String>,
+    /// `%% on`: the next step starts when a carrier is over this antenna:
+    /// (point, antenna, carrier if written).
+    on: Option<(String, String, Option<String>)>,
+    /// `%% color`: the color of the next message.
+    color: Option<String>,
+    /// The messages so far, for `%% after <seconds> <message> <carrier>`:
+    /// (text, carrier, event name).
+    sent: Vec<(String, Option<String>, String)>,
 }
 
 impl Importer {
@@ -244,17 +205,14 @@ impl Importer {
             geometry: None,
             actors: Vec::new(),
             samples: Vec::new(),
-            prepared: Vec::new(),
             timing: Vec::new(),
             last_pipette: false,
             file: String::new(),
             line: 0,
             next_carrier: None,
-            keyword: None,
-            last_message: None,
-            sampled_at: HashMap::new(),
-            queried: false,
-            ok_of: HashMap::new(),
+            on: None,
+            color: None,
+            sent: Vec::new(),
         }
     }
 
@@ -264,18 +222,37 @@ impl Importer {
         self.doc.add(t);
     }
 
-    fn step(&mut self, action: &str, keys: Keys) {
+    fn step(&mut self, action: &str, keys: Keys) -> Result<(), String> {
+        if self.color.is_some() && action != "message" {
+            return Err(format!("'color' applies to the next message, not to a {action}"));
+        }
+        if let Some((point, antenna, who)) = self.on.take() {
+            let own = keys.iter().find_map(|(k, v)| match (*k, v) {
+                ("carrier", Value::Str(c)) => Some(c.clone()),
+                _ => None,
+            });
+            let c = who.or(own).ok_or_else(|| format!("'on {antenna}' before a {action}: write the carrier, on {antenna} <carrier>"))?;
+            self.timing.push(("when", text(&format!("{c} at {point}"))));
+        }
         let mut all: Keys = vec![("action", text(action))];
         all.append(&mut self.timing);
         all.extend(keys);
         self.add("step", all);
         self.last_pipette = action == "pipette";
+        Ok(())
+    }
+
+    /// A step has one starting rule: only `delay` is added to another.
+    fn no_start_yet(&self) -> Result<(), String> {
+        if self.on.is_some() || self.timing.iter().any(|(k, _)| ["when", "at", "start", "after_start", "after_end"].contains(k)) {
+            return Err("only one of on, after, at, when, with, after_start, after_end for a step".into());
+        }
+        Ok(())
     }
 
     fn timing_key(&mut self, key: &'static str, value: Value) -> Result<(), String> {
-        let chosen = self.timing.iter().any(|(k, _)| ["when", "at", "start", "after_start", "after_end"].contains(k));
-        if chosen && key != "delay" {
-            return Err("only one of when, at, with, after_start, after_end for a step".into());
+        if key != "delay" {
+            self.no_start_yet()?;
         }
         self.timing.push((key, value));
         Ok(())
@@ -283,10 +260,6 @@ impl Importer {
 
     fn list(&self, section: &str) -> &[Table] {
         self.doc.arrays.get(section).map_or(&[], |v| v.as_slice())
-    }
-
-    fn geo(&self) -> Result<Geometry, String> {
-        Geometry::from_doc(&self.doc)
     }
 
     /// Reads the directives of a shared file here.
@@ -356,32 +329,10 @@ impl Importer {
     }
 
     fn directive(&mut self, d: &str) -> Result<(), String> {
-        if self.keyword.is_some() {
-            return Err("a keyword directive must be followed by its message".into());
-        }
         if let Some(raw) = d.strip_prefix('@') {
             let (name, entries) = parse_line(raw)?;
             let t = Table { name, line: self.line, file: self.file.clone(), entries };
             self.doc.add(t);
-            return Ok(());
-        }
-        if let Some(kw) = KEYWORDS.iter().find(|k| d == **k || d.starts_with(&format!("{k} "))) {
-            let rest = d[kw.len()..].trim();
-            let n = if rest.is_empty() {
-                None
-            } else {
-                Some(rest.parse::<usize>().ok().filter(|&n| n > 0).ok_or_else(|| format!("'{kw}' takes a number from 1, not '{rest}'"))?)
-            };
-            match *kw {
-                "Prepare" if n.is_none() => return Err("'Prepare' needs the number of the divert point: Prepare 1 is the first".into()),
-                "Prepare" | "Sample Acquisition" => {}
-                _ if n.is_some() => return Err(format!("'{kw}' takes no number")),
-                _ => {}
-            }
-            if !self.timing.is_empty() {
-                return Err(format!("'{kw}' sets the moment itself: no when, at, with or delay before it"));
-            }
-            self.keyword = Some((kw, n));
             return Ok(());
         }
         let words: Vec<&str> = d.split_whitespace().collect();
@@ -408,6 +359,22 @@ impl Importer {
             "carrier" => {
                 need(2, "carrier <id> <sample id> [needle=1|2|both] [route=a,b,c] [color=#hex] [speed=n] [ghost] [hidden]")?;
                 self.carrier(&plain, &o)?;
+            }
+            "on" => {
+                need(1, "on <antenna> [<carrier>]")?;
+                self.on_antenna(plain[0], plain.get(1).copied())?;
+            }
+            "after" => {
+                need(1, "after <seconds> [<message> <carrier>]")?;
+                self.after(seconds("after", plain[0])?, &plain[1..])?;
+            }
+            "color" => {
+                need(1, "color #RRGGBB")?;
+                let c = plain[0];
+                if !(c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|h| h.is_ascii_hexdigit())) {
+                    return Err(format!("'color' needs a color like #9333EA, not '{c}'"));
+                }
+                self.color = Some(c.to_string());
             }
             "when" => self.timing_key("when", text(tail))?,
             "with" => self.timing_key("start", text("with"))?,
@@ -444,37 +411,37 @@ impl Importer {
                 if plain.contains(&"runaway") {
                     k.push(("runaway", Value::Bool(true)));
                 }
-                self.step("move", k);
+                self.step("move", k)?;
             }
             "pipette" | "rotate" | "highlight" | "operator" => {
                 need(1, &format!("{cmd} <device> [duration=s]"))?;
                 let mut k: Keys = vec![("device", text(plain[0]))];
                 k.extend(duration(&o)?);
-                self.step(cmd, k);
+                self.step(cmd, k)?;
             }
             "needle" => {
                 need(2, "needle <device> down|up [duration=s]")?;
                 let mut k: Keys = vec![("device", text(plain[0])), ("to", text(plain[1]))];
                 k.extend(duration(&o)?);
-                self.step("needle", k);
+                self.step("needle", k)?;
             }
             "status" => {
                 need(2, "status <device> error|ready|normal")?;
-                self.step("status", vec![("device", text(plain[0])), ("state", text(plain[1]))]);
+                self.step("status", vec![("device", text(plain[0])), ("state", text(plain[1]))])?;
             }
             "show" | "hide" => {
                 need(1, &format!("{cmd} <carrier>"))?;
                 let mut k: Keys = vec![("carrier", text(plain[0]))];
                 k.extend(duration(&o)?);
-                self.step(cmd, k);
+                self.step(cmd, k)?;
             }
             "wait" => {
                 need(1, "wait <seconds>")?;
-                self.step("wait", vec![("duration", seconds("wait", plain[0])?)]);
+                self.step("wait", vec![("duration", seconds("wait", plain[0])?)])?;
             }
             "caption" => {
                 let (title, body) = tail.split_once('|').ok_or("'caption' is written: caption <title> | <text>")?;
-                self.step("caption", vec![("title", text(title.trim())), ("text", text(body.trim()))]);
+                self.step("caption", vec![("title", text(title.trim())), ("text", text(body.trim()))])?;
             }
             o => {
                 let hint = suggest(d).map_or(String::new(), |s| format!(": did you mean '{s}'?"));
@@ -482,6 +449,50 @@ impl Importer {
             }
         }
         Ok(())
+    }
+
+    /// `%% on <antenna> [<carrier>]`: the next step starts when the carrier is over
+    /// the antenna; without a carrier, the one of the step (its SampleId, or the
+    /// carrier it moves or shows).
+    fn on_antenna(&mut self, antenna: &str, carrier: Option<&str>) -> Result<(), String> {
+        let field = |t: &Table, k: &str| t.str_opt(k).ok().flatten().unwrap_or_default();
+        let antennas: Vec<(String, String)> = self.list("device").iter().filter(|t| field(t, "kind") == "antenna").map(|t| (field(t, "id"), field(t, "at"))).collect();
+        let point = antennas.iter().find(|a| a.0 == antenna).map(|a| a.1.clone()).ok_or_else(|| {
+            let names: Vec<&str> = antennas.iter().map(|a| a.0.as_str()).collect();
+            format!("'{antenna}' is not an antenna of this scene (antennas: {})", if names.is_empty() { "none".to_string() } else { names.join(", ") })
+        })?;
+        if let Some(c) = carrier {
+            if !self.samples.iter().any(|s| s.0 == c) {
+                return Err(format!("'on {antenna} {c}': no carrier '{c}'"));
+            }
+        }
+        self.no_start_yet()?;
+        self.on = Some((point, antenna.to_string(), carrier.map(String::from)));
+        Ok(())
+    }
+
+    /// `%% after <seconds>`: after the end of the step before; `%% after <seconds>
+    /// <message> [<carrier>]`: after that message has arrived (the latest with
+    /// that text, for that carrier).
+    fn after(&mut self, secs: Value, refer: &[&str]) -> Result<(), String> {
+        if refer.is_empty() {
+            return self.timing_key("after_end", secs);
+        }
+        let mut name = refer.to_vec();
+        let carrier = name.last().filter(|w| self.samples.iter().any(|s| s.0 == **w)).map(|w| w.to_string());
+        if carrier.is_some() {
+            name.pop();
+        }
+        let name = name.join(" ");
+        let (_, c, event) = self
+            .sent
+            .iter()
+            .rev()
+            .find(|m| m.0.eq_ignore_ascii_case(&name) && (carrier.is_none() || m.1 == carrier))
+            .ok_or_else(|| format!("'after': no message '{name}'{} before this line", carrier.as_ref().map_or(String::new(), |c| format!(" for {c}"))))?;
+        let when = c.as_ref().map_or_else(|| format!("{event} arrived"), |c| format!("{event} {c} arrived"));
+        self.timing_key("when", text(&when))?;
+        self.timing_key("delay", secs)
     }
 
     fn carrier(&mut self, plain: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
@@ -565,15 +576,9 @@ impl Importer {
             })
             .collect();
         let shape = shape.join(" ");
-        let again = body == "Prepare" && sample.is_some_and(|s| self.prepared.iter().any(|p| p == s));
-        if body == "Prepare" {
-            self.prepared.push(sample.unwrap_or_default().to_string());
-        }
-        if let Some((kw, n)) = self.keyword.take() {
-            return self.keyword_message(kw, n, &from, &to, &body, &params.join(" "), reply, carrier);
-        }
+        let color = self.color.take();
         let types: Vec<MsgType> = self.list("message").iter().map(MsgType::from_table).collect::<Result<_, _>>()?;
-        let found = types.iter().find(|m| m.from == from && m.to == to && m.text == body && m.params == shape && m.reply == reply && m.colored == again);
+        let found = types.iter().find(|m| m.from == from && m.to == to && m.text == body && m.params == shape && m.reply == reply && m.color == color);
         let mut k: Keys = Vec::new();
         match found {
             Some(m) => k.push(("type", text(&m.id))),
@@ -584,6 +589,9 @@ impl Importer {
                 }
                 if reply {
                     k.push(("reply", Value::Bool(true)));
+                }
+                if let Some(c) = &color {
+                    k.push(("color", text(c)));
                 }
             }
         }
@@ -601,106 +609,11 @@ impl Importer {
         if found.is_none() {
             k.push(("event", text(&event)));
         }
-        self.remember(&body, needle_n.map(|n| n as usize), &carrier, &event)?;
-        self.last_message = Some((carrier, event));
-        self.step("message", k);
-        Ok(())
-    }
-
-    /// What the keyword directives after this message need to know. `role` is
-    /// the keyword, or the text of a message written without one.
-    fn remember(&mut self, role: &str, needle: Option<usize>, carrier: &Option<String>, event: &str) -> Result<(), String> {
-        match (role, carrier) {
-            ("OK", Some(c)) => {
-                self.ok_of.insert(c.clone(), event.to_string());
-            }
-            ("Query", _) => self.queried = true,
-            ("Sample Acquisition", Some(c)) => {
-                if let Some((dev, _)) = self.geo()?.samplers.get(needle.unwrap_or(1).saturating_sub(1)) {
-                    self.sampled_at.insert(c.clone(), dev.clone());
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    /// A message after a keyword directive: its text as written, at the moment
-    /// the keyword stands for.
-    #[allow(clippy::too_many_arguments)]
-    fn keyword_message(&mut self, kw: &str, n: Option<usize>, from: &str, to: &str, body: &str, params: &str, reply: bool, carrier: Option<String>) -> Result<(), String> {
-        let carrier = carrier.or_else(|| self.last_message.as_ref().and_then(|m| m.0.clone()));
-        let need_carrier = || carrier.clone().ok_or_else(|| format!("'{kw}': no SampleId in the message and no carrier in the message before"));
-        let event = kw.to_lowercase().replace(' ', "_");
-        let geo = self.geo()?;
-        let mut purple = false;
-        let (key, when) = match kw {
-            "Prepare" => {
-                let n = n.unwrap();
-                let point = geo.diverts.get(n - 1).ok_or_else(|| format!("'Prepare {n}': this geometry has {} divert point(s)", geo.diverts.len()))?;
-                purple = n > 1;
-                ("when", format!("{} at {point}", need_carrier()?))
-            }
-            "OK" => {
-                let (c, e) = self.last_message.clone().ok_or("'OK' answers a message: there is none before it")?;
-                ("when", c.map_or_else(|| format!("{e} arrived"), |c| format!("{e} {c} arrived")))
-            }
-            "Query" => {
-                let c = need_carrier()?;
-                let ok = self.ok_of.get(&c).ok_or_else(|| format!("'Query': no OK to carrier '{c}' before it"))?;
-                let mut w = format!("{ok} {c} arrived");
-                if self.queried {
-                    w.push_str(" and tests arrived");
-                }
-                ("when", w)
-            }
-            "Tests" => ("when", format!("query {} arrived", need_carrier()?)),
-            "Sample Acquisition" => {
-                let count = geo.samplers.len();
-                let n = match n {
-                    Some(n) => n,
-                    None if count == 1 => 1,
-                    None => return Err(format!("'Sample Acquisition' needs the number of the sampling point: this geometry has {count}")),
-                };
-                let (dev, point) = geo.samplers.get(n - 1).cloned().ok_or_else(|| format!("'Sample Acquisition {n}': this geometry has {count} sampling point(s)"))?;
-                let c = need_carrier()?;
-                self.sampled_at.insert(c.clone(), dev.clone());
-                // In a turnstile the carrier reaches the needle with a rotation.
-                ("when", point.map_or_else(|| format!("rotate {dev} done"), |p| format!("{c} at {p}")))
-            }
-            "Sample Complete" => {
-                let c = need_carrier()?;
-                let dev = self.sampled_at.get(&c).ok_or_else(|| format!("'Sample Complete': no Sample Acquisition for carrier '{c}' before it"))?;
-                ("when", format!("pipette {dev} done"))
-            }
-            "Release" => ("when", format!("{} at {}", need_carrier()?, geo.exit)),
-            _ => ("start", "after_all".to_string()), // Results: at the end of the scene
-        };
-        self.timing = vec![(key, text(&when))];
-        let mut k: Keys = vec![("from", text(from)), ("to", text(to)), ("text", text(body))];
-        if !params.is_empty() {
-            k.push(("params", text(params)));
-        }
-        if reply {
-            k.push(("reply", Value::Bool(true)));
-        }
-        if purple {
-            k.push(("color", text("#9333EA")));
-        }
-        if let Some(c) = &carrier {
-            k.push(("carrier", text(c)));
-        }
-        k.push(("event", text(&event)));
-        self.remember(kw, n, &carrier, &event)?;
-        self.last_message = Some((carrier, event));
-        self.step("message", k);
-        Ok(())
+        self.sent.push((body, carrier, event));
+        self.step("message", k)
     }
 
     fn note(&mut self, line: &str) -> Result<(), String> {
-        if self.keyword.is_some() {
-            return Err("a keyword directive must be followed by its message, not a note".into());
-        }
         let (place, body) = line.split_once(':').ok_or("a note needs ': text'")?;
         let who = place.split_whitespace().last().unwrap_or_default().split(',').next().unwrap_or_default().to_string();
         self.participant(&who, &who);
@@ -709,13 +622,15 @@ impl Importer {
             return Ok(());
         }
         let actor = self.actor(&who);
-        self.step("note", vec![("actor", text(&actor)), ("text", text(body.trim()))]);
-        Ok(())
+        self.step("note", vec![("actor", text(&actor)), ("text", text(body.trim()))])
     }
 
     fn finish(mut self, name: &str) -> Result<Doc, String> {
-        if let Some((kw, _)) = self.keyword {
-            return Err(format!("'{kw}' at the end of the diagram: its message is missing"));
+        if let Some((_, antenna, _)) = &self.on {
+            return Err(format!("'on {antenna}' at the end of the diagram: its step is missing"));
+        }
+        if self.color.is_some() {
+            return Err("'color' at the end of the diagram: its message is missing".into());
         }
         let video = self.doc.tables.get("video");
         if !video.is_some_and(|v| v.entries.contains_key("subtitle")) {
@@ -836,13 +751,15 @@ mod tests {
     const HEAD: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n";
 
     #[test]
-    fn messages_use_the_library_and_a_second_prepare_is_the_purple_one() {
-        let src = format!("{HEAD}IF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nIF->>AN: Prepare SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1 Needle=2\n");
+    fn messages_use_the_library_and_color_picks_the_purple_prepare() {
+        let src = format!("{HEAD}IF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\n%% color #9333EA\nIF->>AN: Prepare SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1 Needle=2\n%% color #DC2626\nIF->>AN: Prepare SampleId=SID-1\n");
         let d = doc(&src).unwrap();
         for ty in ["prepare", "sample_ok", "prepare_again"] {
             assert!(has(&d, "step", &[("type", ty), ("carrier", "C1")]), "{ty}");
         }
         assert!(has(&d, "step", &[("type", "sample_acquisition_needle"), ("needle", "2")]));
+        // Another color is not a library message: the text with that color.
+        assert!(has(&d, "step", &[("text", "Prepare"), ("color", "#DC2626")]));
     }
 
     #[test]
@@ -869,49 +786,47 @@ mod tests {
         assert!(has(&d, "step", &[("action", "note"), ("duration", "6"), ("actor", "AN")]));
     }
 
-    const KW: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1 needle=both\n%% carrier C2 SID-2 needle=2\n\
-        %% move C1 to d1\n%% move C1 to s1\n%% move C2 to w1\n\
-        %% Prepare 1\nIF->>AN: Prepare it now SampleId=SID-1\n%% OK\nAN-->>IF: Fine\n%% Query\nAN->>DMX: Which tests? SampleId=SID-1\n%% Tests\nDMX-->>AN: These\n\
-        %% Prepare 2\nIF->>AN: Prepare SampleId=SID-1\n%% Prepare 1\nIF->>AN: Prepare SampleId=SID-2\n%% OK\nAN-->>IF: OK\n%% Query\nAN->>DMX: Query SampleId=SID-2\n\
-        %% Sample Acquisition 1\nIF->>AN: Go SampleId=SID-1\n%% pipette sp1 duration=3\n%% Sample Complete\nAN->>IF: Done SampleId=SID-1\n%% Results\nAN->>DMX: Results SampleId=SID-1\n";
+    const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1 needle=both\n%% carrier C2 SID-2 needle=2\n\
+        %% move C1 to d1\n%% move C1 to s1\n%% with\n%% move C2 to w1\n\
+        %% on antenna1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
+        %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 Add Tube C1\nAN-->>IF: Late\n\
+        %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n";
 
     #[test]
-    fn keywords_send_the_message_written_by_the_user_at_its_moment() {
-        let d = doc(KW).unwrap();
-        // The text as written, not a library message; the second divert point is purple.
-        assert!(has(&d, "step", &[("text", "Prepare it now"), ("params", "SampleId=SID-1"), ("when", "C1 at nsd")]));
-        assert!(has(&d, "step", &[("when", "C1 at d1"), ("color", "#9333EA")]));
-        assert!(has(&d, "step", &[("when", "C2 at nsd")]));
-        assert!(has(&d, "step", &[("when", "ok C1 arrived")]) && has(&d, "step", &[("when", "ok C2 arrived and tests arrived")]));
-        assert!(has(&d, "step", &[("when", "C1 at s1")]) && has(&d, "step", &[("when", "pipette sp1 done")]) && has(&d, "step", &[("start", "after_all")]));
+    fn on_after_and_color_set_the_moment_and_the_look() {
+        let d = doc(ON).unwrap();
+        // The text as written, at the antenna of its carrier.
+        assert!(has(&d, "step", &[("text", "Add Tube"), ("params", "SampleId={SampleId}"), ("carrier", "C1"), ("when", "C1 at nsd")]));
+        assert!(has(&d, "step", &[("action", "caption"), ("when", "C2 at nsd")]) && has(&d, "step", &[("carrier", "C2"), ("when", "C2 at nsd")]));
+        assert!(has(&d, "step", &[("text", "Again"), ("when", "C1 at d1"), ("color", "#9333EA")]));
+        assert!(has(&d, "step", &[("text", "Late"), ("when", "add_tube C1 arrived"), ("delay", "0.2")]));
+        assert!(has(&d, "step", &[("text", "Go"), ("after_end", "1")]));
         let (_, tl) = build(&d);
         let at = |name: &str| tl.events.iter().find(|e| matches!(&e.ev, Ev::Message { text, .. } if text == name)).unwrap().t0;
         let same = |a: f64, b: f64| assert!((a - b).abs() < 0.011, "{a} != {b}");
-        // OK as soon as the Prepare has arrived, Tests as soon as the Query has.
-        same(at("Fine"), at("Prepare it now") + 1.5);
-        same(at("These"), at("Which tests?") + 1.5);
-        // The second Query waits for the reply to the first one.
-        assert!(at("Query") >= at("These") + 1.49);
-        // The pipette starts when the message has arrived and lasts 3 s.
-        same(at("Done"), at("Go") + 1.5 + 3.0);
+        // Without a directive a message starts when the one before has arrived.
+        same(at("Fine"), at("Add Tube") + 1.5);
+        same(at("Late"), at("Add Tube") + 1.5 + 0.2);
+        same(at("Go"), at("Again") + 1.5 + 1.0);
     }
 
-    const KW_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1\n";
+    const ON_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1\n";
 
     #[test]
-    fn keyword_errors() {
-        let k = |body: &str| format!("{KW_HEAD}{body}");
-        fails(&k("%% Sanple Acquistion 1\nIF->>AN: X SampleId=SID-1\n"), "did you mean 'Sample Acquisition'");
-        fails(&k("%% Prepare\nIF->>AN: X SampleId=SID-1\n"), "needs the number of the divert point");
-        fails(&k("%% Prepare 4\nIF->>AN: X SampleId=SID-1\n"), "has 3 divert point(s)");
-        fails(&k("%% Prepare 1\n%% move C1 to d1\n"), "must be followed by its message");
-        fails(&k("%% Prepare 1\nNote over AN: x\n"), "not a note");
-        fails(&k("%% Prepare 1\n"), "its message is missing");
-        fails(&k("%% Sample Acquisition\nIF->>AN: X SampleId=SID-1\n"), "this geometry has 2");
-        fails(&k("%% OK\nAN-->>IF: OK\n"), "there is none before it");
-        fails(&k("%% Query\nAN->>DMX: Q SampleId=SID-1\n"), "no OK to carrier 'C1'");
-        fails(&k("%% when C1 at d1\n%% Prepare 1\nIF->>AN: X SampleId=SID-1\n"), "sets the moment itself");
-        fails(&k("%% Release 2\nIF->>AN: X SampleId=SID-1\n"), "takes no number");
+    fn on_after_and_color_errors() {
+        let k = |body: &str| format!("{ON_HEAD}{body}");
+        fails(&k("%% on antena1\nIF->>AN: X SampleId=SID-1\n"), "not an antenna of this scene (antennas: antenna1, antenna2");
+        fails(&k("%% on antenna1 C9\n%% caption a | b\n"), "no carrier 'C9'");
+        fails(&k("%% on antenna1\n%% caption a | b\n"), "write the carrier, on antenna1 <carrier>");
+        fails(&k("%% on antenna1\n%% at 3\nIF->>AN: X SampleId=SID-1\n"), "only one of");
+        fails(&k("%% when C1 at d1\n%% on antenna1\nIF->>AN: X SampleId=SID-1\n"), "only one of");
+        fails(&k("%% on antenna1\n"), "its step is missing");
+        fails(&k("%% after 1 Nothing C1\nIF->>AN: X\n"), "no message 'Nothing' for C1");
+        fails(&k("%% color blue\nIF->>AN: X\n"), "like #9333EA");
+        fails(&k("%% color #9333EA\n%% caption a | b\n"), "applies to the next message");
+        fails(&k("%% color #9333EA\n"), "its message is missing");
+        fails(&k("%% Prepare 1\nIF->>AN: X SampleId=SID-1\n"), "unknown directive 'Prepare'");
+        fails(&k("%% onn antenna1\nIF->>AN: X SampleId=SID-1\n"), "did you mean 'on'");
     }
 
     #[test]

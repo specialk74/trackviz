@@ -65,25 +65,40 @@ to the including file, nested includes allowed, circular ones refused). An inclu
 file can only hold `%%` lines: a message there would be missing from the diagram that
 Mermaid shows, so messages stay in the main file.
 
-**Keywords.** Written right before a message, they send it at its moment, with the
-text written in the diagram exactly as it is (it doesn't have to match a named
-message). The carrier is the one of the `SampleId` in the message, or the one of the
-message before. Keywords are case-sensitive; a typo is an error that suggests the
-right one.
+**When a step starts.** Every step (message, note, move, caption, ...) starts when the
+one before it ends, unless a directive right before it says otherwise:
 
-| Keyword | The message starts |
+| Directive | The next step starts |
 |---|---|
-| `Prepare n` | when the carrier is at divert point n: the points where a carrier is diverted or read, in the order of the geometry (sampling, spur: 1 = NSD; turnstile: 1 = NSD, 2 = antenna; spur2: 1 = NSD, 2 = Divert 1, 3 = Divert 2). From 2 on it is the purple Prepare |
-| `OK` | as soon as the message before has arrived |
-| `Query` | after the OK to the carrier and the reply to the Query before |
-| `Tests` | as soon as the Query has arrived |
-| `Sample Acquisition n` | when the carrier is at sampling point n (n can be left out if there is only one); in a turnstile, after the rotation |
-| `Sample Complete` | at the end of the pipette |
-| `Release` | when the carrier has left the interface module |
-| `Results` | at the end of the scene |
+| `on <antenna>` | when its carrier is over that antenna: the carrier of the `SampleId` in the message, or the one it moves or shows |
+| `on <antenna> <carrier>` | when that carrier is over the antenna (for captions, highlights, pipettes, notes, ...) |
+| `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives) |
+| `after <seconds> <message> [<carrier>]` | that many seconds after the latest message with that text (for that carrier) has arrived |
+| `at <seconds>` | at that second of the video |
 
-Other messages, and actions such as `move` or `pipette`, are timed with the
-directives below. `when` takes several causes joined by `and`: the step starts at the
+Every geometry has its antennas, numbered in the direction of the carriers:
+
+| Geometry | Antennas |
+|---|---|
+| `sampling`, `spur` | 1 NSD, 2 sampling point, 3 exit from the interface module |
+| `turnstile` | 1 NSD, 2 in front of the gate, 3 exit from the interface module |
+| `spur2` | 1 NSD, 2 Divert 1, 3 sampling point 1, 4 Divert 2, 5 sampling point 2, 6 exit from the interface module |
+
+The message keeps the text written in the diagram exactly as it is:
+
+```
+%% on antenna1
+IF->>AN: Add Tube SampleId=SID-000123
+%% after 0.1
+AN-->>IF: OK SampleId=SID-000123
+%% color #9333EA
+%% on antenna2
+IF->>AN: Add Tube SampleId=SID-000123
+```
+
+`color #RRGGBB` colors the next message (the purple Prepare is `#9333EA`). The older
+directives `when`, `with`, `after_start`, `after_end` and `delay` still work (scenes
+01–16 use them); `when` takes several causes joined by `and`, the step starts at the
 last one.
 
 | Directive | Meaning |
@@ -98,7 +113,8 @@ last one.
 | `needle <device> down\|up`, `status <device> <state>` | as the steps |
 | `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
 | `caption <title> \| <text>` | a caption |
-| `when ...`, `at`, `with`, `after_start`, `after_end`, `delay` | timing of the **next** step; without them a step starts when the previous one ends |
+| `on`, `after`, `at`, `color` | see above |
+| `when ...`, `with`, `after_start`, `after_end`, `delay` | older timing of the **next** step |
 | `include <file>` | the directives of another file |
 | `@<section> key=value ...` | a table of data (see Scene format) |
 | `# text` | a plain comment |
@@ -106,8 +122,7 @@ last one.
 An unknown directive is an error, so that typos don't get lost, and errors name the
 line of the diagram. Participants are
 matched with the shared actors by id or label. Messages become named messages when
-they match `common/messages.mmd`, and the second Prepare of a sample is the purple
-one. `SampleId=` must name a declared carrier. `alt`, `loop`, `opt` and `par` are
+they match `common/messages.mmd` (with the same color). `SampleId=` must name a declared carrier. `alt`, `loop`, `opt` and `par` are
 refused: a scene is one path, so write one diagram for each case.
 
 To look at a scene quickly while writing it:
@@ -177,9 +192,9 @@ A geometry that differs needs its own common file.
 | `actors.mmd` | Interface, Analyzer, DMX |
 | `messages.mmd` | the named messages (below) |
 | `sampling.mmd` | Pit-Lane with a simple sampling point |
-| `turnstile.mmd` | Pit-Lane with turnstile, gate and antenna |
+| `turnstile.mmd` | Pit-Lane with turnstile, gate and antennas |
 | `sampling_queue.mmd`, `sampling_queue2.mmd` | the same with one or two queue positions |
-| `turnstile_queue.mmd` | turnstile with a queue position behind the antenna |
+| `turnstile_queue.mmd` | turnstile with a queue position behind antenna 2 |
 | `spur.mmd` | spur with one sampling point |
 | `spur2.mmd` | spur with two sampling points |
 | `spur_one_carrier.mmd` | directives: one carrier arriving at the sampling point of a spur |
@@ -200,8 +215,8 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 
 ### Steps
 
-Each step's `start` decides when it begins, in file order (the directives `when`, `at`,
-`with`, `delay`, ... and the keywords set these keys). Rows of the sequence
+Each step's `start` decides when it begins, in file order (the directives `on`, `after`, `at`,
+`when`, `with`, `delay`, ... set these keys). Rows of the sequence
 diagram always follow time, whatever the order in the file.
 
 
@@ -266,8 +281,7 @@ IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
 
 As a table, the message is `%% @step action=message type=sample_acquisition_needle
 carrier=C1 needle=1`: a step with `type` can't redefine the message, only `carrier`
-and `needle`, plus the timing keys, are allowed. A message that matches no type, or
-one after a keyword, keeps its own text.
+and `needle`, plus the timing keys, are allowed. A message that matches no type keeps its own text.
 
 ### Turnstile
 
@@ -359,9 +373,10 @@ work by themselves, without steps:
 - **gate**: a barrier across the lane that opens while a carrier drives through
   its point and closes after it. The gate point doesn't need to be in the routes,
   only on their path.
-- **antenna**: a reader above the lane. It shows a reading animation while a
-  carrier stands still on its point (put that point in the routes, as the stop
-  before the gate).
+- **antenna**: a reader above the lane (`label_x`, `label_y` move it elsewhere, with
+  a dashed line to its point). It shows a reading animation while a carrier is over
+  its point, and `%% on <antenna>` starts a step at that moment (put the point in
+  the routes). In front of a gate it is where carriers stop to be read.
 
 `--check` also refuses a carrier that drives into a turnstile while the analyzer
 is pipetting there: it has to wait at the gate until the sampling is over.

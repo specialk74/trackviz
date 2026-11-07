@@ -1,9 +1,9 @@
 %% # Scene 17, written in Mermaid: trackviz scenes/17_mermaid_spur_happy_path.mmd
 %% # The %% comments describe the physical side and don't appear in the diagram.
-%% # A keyword before a message (Prepare 1, OK, Query, Tests, Sample Acquisition,
-%% # Sample Complete, Release, Results) sends it at its moment, with the text written
-%% # here. Other steps start when the previous one ends, unless when, with or delay
-%% # comes before them.
+%% # Every step starts when the one before it ends, unless a directive before it
+%% # says otherwise: "on antennaN" when its carrier is over that antenna, "after N"
+%% # N seconds after the step before, "after N <message> <carrier>" N seconds after
+%% # that message has arrived, "at N" at second N of the video.
 %% include common/spur_one_carrier.mmd
 %% subtitle Spur — happy path, written in Mermaid
 sequenceDiagram
@@ -11,36 +11,29 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% when C1 at nsd
+    %% on antenna1 C1
     %% caption 2 · Diverted — Prepare | The carrier is diverted without stopping: Prepare.
-    %% when C1 at nsd
+    %% on antenna1 C1
     %% highlight nsd duration=2
-    %% Prepare 1
+    %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
-    %% OK
     AN-->>IF: OK SampleId=SID-000123
-    %% Query
     AN->>DMX: Query SampleId=SID-000123
-    %% Tests
     DMX-->>AN: Tests to perform SampleId=SID-000123
 
-    %% when C1 at sampling
+    %% on antenna2 C1
     %% caption 3 · Sample Acquisition | The carrier stops at the sampling point.
-    %% Sample Acquisition
+    %% on antenna2
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% OK
     AN-->>IF: OK
     %% pipette sp duration=4
-    %% Sample Complete
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% OK
     IF-->>AN: OK
 
     %% move C1 to iface_out ease=in
+    %% on antenna3 C1
     %% caption 4 · Release | The carrier leaves the module: Release.
-    %% Release
+    %% on antenna3
     IF->>AN: Release SampleId=SID-000123
-    %% OK
     AN-->>IF: OK
-    %% Results
     AN->>DMX: Results SampleId=SID-000123

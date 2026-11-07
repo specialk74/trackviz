@@ -3,6 +3,20 @@
 Promemoria di ciò che resta da fare o da decidere. Le funzioni già realizzate sono
 descritte in `README.md` e `PROJECT.md`; qui sono solo riassunte in fondo.
 
+## 0. In corso: tempi a posizione e fisica dei carrier
+
+Deciso con l'utente, a tappe:
+
+1. **Fatto:** antenne in tutte le geometrie; direttive `on <antenna> [carrier]`,
+   `after <secondi> [<messaggio> <carrier>]`, `at`, `color`; tolte le parole chiave
+   (`Prepare 1`, `OK`, ...) e il Prepare viola automatico.
+2. **Da fare — fisica dei carrier:** due carrier non occupano mai lo stesso spazio.
+   Chi raggiunge un carrier fermo si avvicina fino a toccarlo e si ferma; riparte quando
+   l'altro si muove. I carrier vanno solo avanti. `move C2 to <punto>` vuol dire "parte
+   verso il punto": soste in coda e ripartenze le calcola il programma.
+3. **Da fare — conversione delle scene 01–16** a `on`/`after`/`at`, togliendo `when`,
+   `with`, `delay`, `after_start`, `after_end` dai file.
+
 ## 1. Miglioramenti proposti, non ancora fatti
 
 Le voci 1.1–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e

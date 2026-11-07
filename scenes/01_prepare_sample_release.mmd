@@ -21,10 +21,9 @@ sequenceDiagram
     %% highlight nsd duration=2
     %% when C1 at nsd
     %% move C1 to sampling ease=out
-    %% when C1 at nsd
-    IF->>AN: Prepare SampleId=SID-000123
-    %% when prepare C1 sent
-    %% delay 2
+    %% on antenna1
+    IF->>AN: Add Tube SampleId=SID-000123
+    %% after 0.5 Add Tube C1
     AN-->>IF: OK SampleId=SID-000123
     %% when sample_ok C1 arrived
     %% delay 1.8

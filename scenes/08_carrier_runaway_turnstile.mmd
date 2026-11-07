@@ -47,9 +47,10 @@ sequenceDiagram
     %% at 10.07
     %% move C3 to nsd ease=linear
     %% when C1 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C1 at pit_wait
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% when prepare_again C1 arrived
     %% delay 0.1
@@ -83,12 +84,13 @@ sequenceDiagram
     %% delay 1.597
     AN-->>IF: OK SampleId=SID-000125
     %% when C2 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when tests C2 arrived
     %% delay 0.1
     AN->>DMX: Query SampleId=SID-000125
     %% when C2 at pit_wait
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
     %% when prepare_again C2 arrived
     %% delay 0.1

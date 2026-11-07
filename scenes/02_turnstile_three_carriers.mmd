@@ -43,9 +43,10 @@ sequenceDiagram
     %% when C1 at pit_wait
     %% caption 3 · Antenna — Prepare again | The carrier stops at the antenna in front of the gate: it is read and the interface sends Prepare again (later with an extra piece of information). Nothing is being sampled, so the gate opens.
     %% when C1 at pit_wait
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C1 at pit_wait
     %% delay 0.2
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% when prepare_again C1 arrived
     %% delay 0.1
@@ -89,9 +90,10 @@ sequenceDiagram
     AN->>DMX: Query SampleId=SID-000124
     %% when C2 at pit_wait
     %% delay 0.032
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C2 at pit_wait
     %% delay 0.18
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000124
     %% when prepare_again C2 arrived
     %% delay 0.1
@@ -151,9 +153,10 @@ sequenceDiagram
     %% caption 8 · The third carrier waits at the gate | The third carrier is read at the antenna (Prepare again) and waits at the closed gate while the second sample is aspirated.
     %% when C3 at pit_wait
     %% delay 0.032
-    %% highlight antenna duration=1.5
+    %% highlight antenna2 duration=1.5
     %% when C3 at pit_wait
     %% delay 0.18
+    %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000125
     %% when prepare_again C3 arrived
     %% delay 0.1
