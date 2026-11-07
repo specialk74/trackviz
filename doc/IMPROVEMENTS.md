@@ -5,7 +5,7 @@ descritte in `README.md` e `PROJECT.md`; qui sono solo riassunte in fondo.
 
 ## 1. Miglioramenti proposti, non ancora fatti
 
-Le voci 1.1–1.4 servono a scrivere le scene più in fretta, le 1.5–1.8 a controllarle e
+Le voci 1.1–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
 consegnarle. Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
 ### 1.1 Highlight agganciato all'evento
@@ -40,18 +40,12 @@ a catena, ma il conflitto va risolto a mano con un `delay`.
 Un'immagine con un fotogramma per ogni didascalia, per controllare una scena in pochi
 secondi senza guardare il video.
 
-### 1.6 Esportare il sequence diagram come immagine o PDF
-
-Il diagramma come file Mermaid c'è già (`trackviz export`). Manca l'immagine o il PDF,
-da allegare alla documentazione per i produttori di analizzatori, senza dipendere da
-un visualizzatore Mermaid.
-
-### 1.7 Indice dei video
+### 1.6 Indice dei video
 
 Una pagina HTML o un README con l'elenco degli scenari, per consegnarli come pacchetto
 unico.
 
-### 1.8 Didascalie in più lingue
+### 1.7 Didascalie in più lingue
 
 La stessa scena con didascalie in inglese e in italiano o altre lingue, se i destinatari
 lo richiedono. Oggi tutti i testi dei video sono in inglese.
@@ -67,8 +61,8 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 
 ## 3. Limiti noti
 
-- `trackviz export` non è stato provato con un visualizzatore Mermaid reale: il formato è
-  verificato solo dall'import del tool.
+- I file `.mmd` delle scene non sono stati provati in un visualizzatore Mermaid reale
+  (GitHub, VS Code): sono verificati solo dal tool.
 - Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.mmd` resta testo
   libero, senza avvisi: rinominare un tipo non aggiorna i diagrammi.
 - `when` si riferisce all'ultimo step corrispondente già scritto nel file: gli step vanno
@@ -90,4 +84,4 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
 Parti comuni con `include`, messaggi con nome e `{Needle}`, nota "Pipetting" automatica,
 tempi legati agli eventi con `when`, scene come catena di cause, righe del diagramma in
 ordine di tempo, avvisi in `--check`, più scene in parallelo con i caratteri jolly,
-anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), scene scritte in Mermaid con parti comuni, export e import.
+anteprima veloce (`--preview`, `--from`, `--to`, `--watch`), scene scritte in Mermaid con parti comuni.

@@ -65,10 +65,6 @@ to the including file, nested includes allowed, circular ones refused). An inclu
 file can only hold `%%` lines: a message there would be missing from the diagram that
 Mermaid shows, so messages stay in the main file.
 
-`trackviz export a.mmd` writes the message sequence of any scene as a plain diagram,
-`out/a.mmd` (`-o` for another file; wildcards work), with purple messages framed in a
-colored `rect`. It has no directives, so it isn't a scene until they are added.
-
 **Keywords.** Written right before a message, they send it at its moment, with the
 text written in the diagram exactly as it is (it doesn't have to match a named
 message). The carrier is the one of the `SampleId` in the message, or the one of the

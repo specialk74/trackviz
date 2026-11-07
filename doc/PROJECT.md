@@ -119,7 +119,7 @@ trackviz/
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
-    ├── mermaid.rs        # lettura delle scene Mermaid ed export del diagramma
+    ├── mermaid.rs        # lettura delle scene Mermaid
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
@@ -150,7 +150,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Parti comuni:** `common/` è cercata accanto al diagramma e poi in `scenes/`. Ogni scena legge prima `common/video.mmd`, `common/actors.mmd` e `common/messages.mmd`; `%% geometry <nome>` legge `common/<nome>.mmd`. `%% include <file>` inserisce altre direttive (percorso relativo, annidabile, niente inclusioni circolari). Un file incluso può contenere solo righe `%%`: un messaggio incluso mancherebbe dal diagramma mostrato da Mermaid. `--watch` controlla anche i file inclusi e quelli comuni.
 
-**Export:** `trackviz export <scene>...` scrive il sequence diagram semplice in `out/<nome>.mmd`, senza direttive. Le route di default per geometria (carrier senza `route=`) sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate (lo verifica un test).
+**Route di default:** le route di default per geometria (carrier senza `route=`) sono in `mermaid.rs`: se cambiano i punti di una geometria vanno aggiornate (lo verifica un test).
 
 **Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 

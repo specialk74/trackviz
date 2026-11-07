@@ -1,61 +1,9 @@
-//! Mermaid sequence diagrams: `export` writes the messages of a scene, `import`
-//! builds a scene from a diagram whose `%%` comments describe the physical side.
+//! Scenes are Mermaid sequence diagrams: this reads one, with its `%%` comments
+//! that describe the physical side, into the data of a scene.
 
 use crate::doc::{parse_line, Doc, Table, Value};
-use crate::scene::{Ev, Scene, Timeline};
 use std::collections::HashMap;
-use std::fmt::Write;
 use std::path::{Path, PathBuf};
-
-// ---------------------------------------------------------------- export
-
-/// A hex color as Mermaid wants it in `rect`, faded to stay readable.
-fn rect_color(hex: &str) -> String {
-    let c = |i: usize| u8::from_str_radix(hex.get(i..i + 2).unwrap_or("00"), 16).unwrap_or(0);
-    format!("rgba({}, {}, {}, 0.15)", c(1), c(3), c(5))
-}
-
-/// The sequence diagram of a scene, in row order.
-pub fn export(sc: &Scene, tl: &Timeline) -> String {
-    let mut o = String::from("sequenceDiagram\n");
-    for a in &sc.actors {
-        let _ = writeln!(o, "    participant {} as {}", a.id, a.label);
-    }
-    let clean = |s: &str| s.replace(';', ",");
-    let mut rows: Vec<_> = tl
-        .events
-        .iter()
-        .filter_map(|e| match &e.ev {
-            Ev::Message { row, .. } | Ev::Note { row, .. } => Some((*row, &e.ev)),
-            _ => None,
-        })
-        .collect();
-    rows.sort_by_key(|r| r.0);
-    for (_, ev) in rows {
-        match ev {
-            Ev::Message { from, to, text, params, reply, color, .. } => {
-                let arrow = if *reply { "-->>" } else { "->>" };
-                let label = if params.is_empty() { text.clone() } else { format!("{text} {params}") };
-                let line = format!("{}{arrow}{}: {}", sc.actors[*from].id, sc.actors[*to].id, clean(&label));
-                match color {
-                    Some(c) => {
-                        let _ = writeln!(o, "    rect {}\n        {line}\n    end", rect_color(c));
-                    }
-                    None => {
-                        let _ = writeln!(o, "    {line}");
-                    }
-                }
-            }
-            Ev::Note { actor, text, .. } => {
-                let _ = writeln!(o, "    Note over {}: {}", sc.actors[*actor].id, clean(text));
-            }
-            _ => {}
-        }
-    }
-    o
-}
-
-// ---------------------------------------------------------------- import
 
 /// A line of a diagram, with where it comes from (empty file: the text given).
 pub struct Line {
@@ -813,6 +761,27 @@ pub fn parse_text(src: &str) -> Result<Doc, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::{Ev, Scene, Timeline};
+
+    /// The messages and notes of a timeline as Mermaid arrows, in the order of the
+    /// sequence diagram rows.
+    fn arrows(sc: &Scene, tl: &Timeline) -> Vec<String> {
+        let mut rows: Vec<(usize, String)> = tl
+            .events
+            .iter()
+            .filter_map(|e| match &e.ev {
+                Ev::Message { from, to, text, params, reply, row, .. } => {
+                    let arrow = if *reply { "-->>" } else { "->>" };
+                    let label = if params.is_empty() { text.clone() } else { format!("{text} {params}") };
+                    Some((*row, format!("{}{arrow}{}: {label}", sc.actors[*from].id, sc.actors[*to].id)))
+                }
+                Ev::Note { actor, text, row } => Some((*row, format!("Note over {}: {text}", sc.actors[*actor].id))),
+                _ => None,
+            })
+            .collect();
+        rows.sort_by_key(|r| r.0);
+        rows.into_iter().map(|r| r.1).collect()
+    }
 
     const SCENES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes");
 
@@ -858,10 +827,10 @@ mod tests {
     const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete SampleId=SID-1\nIF-->>AN: OK\n";
 
     #[test]
-    fn a_diagram_builds_a_valid_scene_and_exports_the_same_messages() {
+    fn a_diagram_builds_a_valid_scene_with_the_messages_written() {
         let (sc, tl) = build(&doc(EX).unwrap());
         assert!(crate::lint::warnings(&sc, &tl).is_empty(), "{:?}", crate::lint::warnings(&sc, &tl));
-        assert_eq!(lines(&export(&sc, &tl)), lines(EX));
+        assert_eq!(arrows(&sc, &tl), lines(EX));
     }
 
     const HEAD: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n";
@@ -1040,10 +1009,5 @@ mod tests {
         assert!(e("loop.mmd").contains("circular include"));
         assert!(e("no.mmd").contains("missing.mmd"));
         std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn colored_messages_are_framed_in_the_export() {
-        assert_eq!(rect_color("#9333EA"), "rgba(147, 51, 234, 0.15)");
     }
 }

@@ -6,7 +6,6 @@
 //!   trackviz <scene.mmd>... --check         (validate + print the timeline)
 //!   trackviz <scene.mmd> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
 //!   trackviz <scene.mmd> --preview --watch  (regenerate when the scene or a file it uses changes)
-//!   trackviz export <scene.mmd>...          (the messages as a plain Mermaid diagram)
 //!
 //! A scene is a Mermaid sequence diagram with `%%` directives for the physical side.
 //! Scene arguments may contain the wildcards `*` and `?` in the file name: several
@@ -40,14 +39,12 @@ fn usage() -> String {
          {REPOSITORY}\n\
          usage: trackviz <scene.mmd>... [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
          \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch]\n\
-         \x20      trackviz export <scene.mmd>... [-o out.mmd]\n\
          \x20 a scene is a Mermaid diagram with %% directives; its common/ folder is next to it or in scenes/\n\
          \x20 scene files may use the wildcards * and ? (e.g. \"scenes/*.mmd\"): they are rendered in parallel\n\
          \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)\n\
          \x20 --from/--to render only that part, --preview at half size and 15 fps: both write\n\
          \x20 out/<scene name>_preview.mp4, so the full video is kept\n\
-         \x20 --watch repeats the command when the scene or a file it uses changes (one scene)\n\
-         \x20 export writes the messages as a plain Mermaid diagram, by default out/<scene name>.mmd"
+         \x20 --watch repeats the command when the scene or a file it uses changes (one scene)"
     )
 }
 
@@ -326,9 +323,6 @@ fn report_failures(failures: Vec<String>, total: usize) -> Result<(), String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.first().is_some_and(|a| a == "export") {
-        return export_cmd(&args[1..]);
-    }
     let mut scene_args = Vec::new();
     let mut out = None;
     let mut still: Option<f64> = None;
@@ -395,48 +389,6 @@ fn run() -> Result<(), String> {
         watch_scene(&files[0], &job);
     }
     job.run(&files)
-}
-
-/// `trackviz export`: the message sequence of scenes as Mermaid diagrams.
-fn export_cmd(args: &[String]) -> Result<(), String> {
-    let (mut out, mut patterns) = (None, Vec::new());
-    let mut it = args.iter();
-    while let Some(a) = it.next() {
-        match a.as_str() {
-            "-o" => out = Some(it.next().ok_or("-o needs a file")?.clone()),
-            a if !a.starts_with('-') => patterns.push(a.to_string()),
-            a => return Err(format!("unexpected argument '{a}'")),
-        }
-    }
-    let mut files = Vec::new();
-    for p in &patterns {
-        files.extend(expand(p)?);
-    }
-    if files.is_empty() {
-        return Err(format!("missing scene file\n{}", usage()));
-    }
-    if out.is_some() && files.len() > 1 {
-        return Err(format!("-o takes a single scene, but {} were given", files.len()));
-    }
-    let mut failures = Vec::new();
-    for f in &files {
-        let r = load(f).and_then(|(sc, tl)| {
-            let path = match &out {
-                Some(o) => o.clone(),
-                None => {
-                    std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
-                    default_out(f, VideoOpts::default()).replace(".mp4", ".mmd")
-                }
-            };
-            std::fs::write(&path, mermaid::export(&sc, &tl)).map_err(|e| format!("{path}: {e}"))?;
-            eprintln!("wrote {path}");
-            Ok(())
-        });
-        if let Err(e) = r {
-            failures.push(e);
-        }
-    }
-    report_failures(failures, files.len())
 }
 
 /// What the command line asks for.
@@ -641,7 +593,6 @@ mod tests {
             let (sc, tl) = load(&p.to_string_lossy()).unwrap();
             let w = lint::warnings(&sc, &tl);
             assert!(w.is_empty(), "{}: {w:?}", p.display());
-            assert!(mermaid::export(&sc, &tl).contains("sequenceDiagram"));
         }
     }
 
