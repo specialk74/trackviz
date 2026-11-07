@@ -16,12 +16,12 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier C2 SID-000124 route=spawn,main_in,nsd,merge,main_out,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,merge,main_out,gone color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the Pit-Lane, up to the antenna.
-    %% carrier C2L SID-000124 route=nsd,pit_in,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 route=nsd,pit_in,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,pit_wait,ts.in,ts.out,pit_out,merge,main_out,gone color=#DB2777
 
     %% caption 1 · Turnstile with gate and antenna | Three carriers holding sample tubes travel towards the interface. Every carrier diverted into the Pit-Lane stops at the antenna in front of the gate and the turnstile.
     %% at 2.6
@@ -71,7 +71,7 @@ sequenceDiagram
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.1 OK C1
-    %% pipette ts duration=10
+    %% pipette ts duration=10 sid=SID-000124
     %% after 0.1 Prepare C2
     AN-->>IF: OK SampleId=SID-000124
 
@@ -132,7 +132,7 @@ sequenceDiagram
     %% for C1
     AN-->>IF: OK
     %% after 0.1 OK C3
-    %% pipette ts duration=4.5
+    %% pipette ts duration=4.5 sid=SID-000123
     %% after 0.2
     %% caption 8 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
     %% after 0.2 pipette ts

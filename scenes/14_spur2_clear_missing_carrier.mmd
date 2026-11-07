@@ -12,12 +12,12 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
     %% # The real C2: it is not diverted.
-    %% carrier C2 SID-000124 route=spawn,main_in,nsd,merge,iface_out,main_out,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,merge,iface_out,main_out,gone color=#0EA5E9
     %% # Where the interface believes C2 is.
-    %% carrier C2L SID-000124 route=nsd,pit_in,w1c,w1b,spur_in,w1,d1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier C3 SID-000125 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 route=nsd,pit_in,w1c,w1b,spur_in,w1,d1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers meant for needle 1 of the analyzer travel on the Main-Lane towards the spur.
     %% at 2.5
@@ -78,7 +78,7 @@ sequenceDiagram
     %% after 0.1 Tests to perform C1
     AN->>DMX: Query SampleId=SID-000124
     %% after 0.1 OK C1
-    %% pipette sp1 duration=6.6
+    %% pipette sp1 duration=6.6 sid=SID-000123
     %% on antenna2 C3
     %% caption 4 · Read at the divert — Clear | The third carrier stops at the divert on top of the second one, which is not there. It reads the third sample instead of the second: the interface sends Clear for the second.
     %% on antenna2 C3
@@ -124,7 +124,7 @@ sequenceDiagram
     %% for C3
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp1 duration=4
+    %% pipette sp1 duration=4 sid=SID-000125
     %% on antenna6
     IF->>AN: Release SampleId=SID-000123
     %% after 0.2 pipette sp1

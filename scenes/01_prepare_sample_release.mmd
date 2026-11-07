@@ -9,7 +9,7 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,sampling,pit_out,merge,main_out
+    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,sampling,pit_out,merge,main_out
 
     %% caption 1 · Main-Lane | A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface.
     %% at 2.2
@@ -34,7 +34,7 @@ sequenceDiagram
     %% after 0.1 OK C1
     %% caption 3 · Test query — Pipetting | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now it aspirates the biological material from the tube, while the gate holds the carrier at the sampling point.
     %% after 0.1 OK C1
-    %% pipette sp duration=4.5
+    %% pipette sp duration=4.5 sid=SID-000123
     %% after 0.3
     %% caption 4 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only after receiving it does the interface release the carrier.
     %% after 0.3 pipette sp

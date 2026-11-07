@@ -123,9 +123,9 @@ has to wait. `when`, `with`, `delay`, `after_start` and `after_end` no longer ex
 | `title`, `subtitle` | the video texts |
 | `for <carrier>` | the carrier of the next message, when its text doesn't say it (e.g. `OK`) |
 | `duration <seconds>` | duration of the next message or note |
-| `carrier <id> <sample id>` | options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
+| `carrier id=<id> [sid=<sample id>]` | without `sid=` the carrier is empty (no tube, its tag reads `<id> (empty)`); options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
 | `move <carrier> to <point>` | options: `ease=`, `speed=`, `duration=`, `runaway` |
-| `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=` |
+| `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=`; `pipette` also `sid=` (the sample it aspirates, shown in its note) |
 | `needle <device> down\|up`, `status <device> <state>` | as the steps |
 | `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
 | `caption <title> \| <text>` | a caption |
@@ -137,7 +137,7 @@ has to wait. `when`, `with`, `delay`, `after_start` and `after_end` no longer ex
 An unknown directive is an error, so that typos don't get lost, and errors name the
 line of the diagram. Participants are
 matched with the shared actors by id or label. Messages become named messages when
-they match `common/messages.mmd` (with the same color). `SampleId=` must name a declared carrier. `alt`, `loop`, `opt` and `par` are
+they match `common/messages.mmd` (with the same color). `SampleId=` in a message must be the `sid=` of a declared carrier. `alt`, `loop`, `opt` and `par` are
 refused: a scene is one path, so write one diagram for each case.
 
 To look at a scene quickly while writing it:
@@ -301,7 +301,7 @@ step of the file starts at 0 s. To start a step together with the previous one u
 | `move` | `carrier`, `to` (a point ahead on its route), `ease` = `linear`\|`in`\|`out`\|`inout`, `speed`, `runaway` (bool: the carrier escapes by itself; red pulsing ring and tag "… · RUN-AWAY" while it moves) | computed from length and speed |
 | `message` | `type` (a named message), `carrier`, `needle`; or, without `type`: `from`, `to` (actor ids), `text`, `params`, `reply` (dashed), `carrier`, `needle`, `color` (overrides the sender's color) | 1.5 s (arrow travel time) |
 | `note` | `actor`, `text` (box on the lifeline) | 1.5 s |
-| `pipette` | `device` (a `sampling` or `turnstile` device), `note`. Also adds a note on the `analyzer` actor, with the same timing: "Pipetting Analyzer - SampleId=SID-000123" ("· Needle n" when there are several sampling points), with the SampleId of the latest message sent to the analyzer for that needle (the Sample Acquisition). A `Note over AN: ...` written right after the `pipette` in the diagram replaces this text | 3 s |
+| `pipette` | `device` (a `sampling` or `turnstile` device), `sample_id`, `note`. Also adds a note on the `analyzer` actor, with the same timing: "Pipetting Analyzer - SampleId=SID-000123" ("· Needle n" when there are several sampling points). The SampleId is the one written on the directive, `%% pipette sp duration=4.5 sid=SID-000123`; without it the note has none. A `Note over AN: ...` written right after the `pipette` in the diagram replaces this text | 3 s |
 | `highlight` | `device` | 1.5 s |
 | `rotate` | `device` (a `turnstile`) | 2 s |
 | `show` / `hide` | `carrier` (fades it in / out) | 0.5 s |

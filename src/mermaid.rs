@@ -173,7 +173,7 @@ struct Importer {
     geometry: Option<String>,
     /// Mermaid participant id -> actor id.
     actors: Vec<(String, String)>,
-    /// (carrier id, sample id)
+    /// (carrier id, sample id; empty for an empty carrier)
     samples: Vec<(String, String)>,
     /// Timing keys for the next step.
     timing: Keys,
@@ -357,7 +357,9 @@ impl Importer {
                 self.include(&path)?;
             }
             "carrier" => {
-                need(2, "carrier <id> <sample id> [needle=1|2|both] [route=a,b,c] [color=#hex] [speed=n] [ghost] [hidden]")?;
+                if !o.contains_key("id") {
+                    return Err("'carrier' is written: carrier id=<id> [sid=<sample id>] [needle=1|2|both] [route=a,b,c] [color=#hex] [speed=n] [tag=text] [ghost] [hidden]".into());
+                }
                 self.carrier(&plain, &o)?;
             }
             "on" => {
@@ -409,6 +411,12 @@ impl Importer {
                 need(1, &format!("{cmd} <device> [duration=s]"))?;
                 let mut k: Keys = vec![("device", text(plain[0]))];
                 k.extend(duration(&o)?);
+                // The sample the analyzer aspirates, for its note: sid=.
+                match (cmd, o.get("sid")) {
+                    ("pipette", Some(v)) => k.push(("sample_id", text(v))),
+                    (_, Some(_)) => return Err(format!("'{cmd}' takes no sid: only pipette does")),
+                    _ => {}
+                }
                 self.step(cmd, k)?;
             }
             "needle" => {
@@ -529,7 +537,8 @@ impl Importer {
     }
 
     fn carrier(&mut self, plain: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
-        let (id, sample) = (plain[0], plain[1]);
+        // Without sid= the carrier is empty: no tube, no sample.
+        let (id, sample) = (o["id"], o.get("sid").copied());
         let route: Vec<String> = match o.get("route") {
             Some(r) => r.split(',').map(String::from).collect(),
             None => {
@@ -547,12 +556,10 @@ impl Importer {
                 r
             }
         };
-        let mut k: Keys = vec![
-            ("id", text(id)),
-            ("tube", Value::Bool(true)),
-            ("sample_id", text(sample)),
-            ("route", Value::Arr(route.iter().map(|p| text(p)).collect())),
-        ];
+        let mut k: Keys = vec![("id", text(id)), ("tube", Value::Bool(sample.is_some())), ("route", Value::Arr(route.iter().map(|p| text(p)).collect()))];
+        if let Some(sid) = sample {
+            k.push(("sample_id", text(sid)));
+        }
         // Without speed= the carrier goes with the belt.
         if let Some(s) = o.get("speed") {
             k.push(("speed", seconds("speed", s)?));
@@ -570,7 +577,7 @@ impl Importer {
             k.push(("tag", text(&t.replace('_', " "))));
         }
         self.add("carrier", k);
-        self.samples.push((id.to_string(), sample.to_string()));
+        self.samples.push((id.to_string(), sample.unwrap_or_default().to_string()));
         Ok(())
     }
 
@@ -774,7 +781,7 @@ mod tests {
         s.lines().map(str::trim).filter(|l| l.contains("->>") || l.starts_with("Note")).filter(|l| !l.starts_with("%%")).map(String::from).collect()
     }
 
-    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete SampleId=SID-1\nIF-->>AN: OK\n";
+    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete sid=SID-1\nIF-->>AN: OK\n";
 
     #[test]
     fn a_diagram_builds_a_valid_scene_with_the_messages_written() {
@@ -783,7 +790,7 @@ mod tests {
         assert_eq!(arrows(&sc, &tl), lines(EX));
     }
 
-    const HEAD: &str = "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n";
+    const HEAD: &str = "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
 
     #[test]
     fn messages_use_the_library_and_color_picks_the_purple_prepare() {
@@ -799,7 +806,7 @@ mod tests {
 
     #[test]
     fn participants_are_found_by_label_and_new_ones_are_added() {
-        let d = doc("%% geometry spur\nsequenceDiagram\nparticipant I as Interface\nparticipant L as Lab\n%% carrier C1 SID-1\nI->>AN: Prepare SampleId=SID-1\nI->>L: Hello\n").unwrap();
+        let d = doc("%% geometry spur\nsequenceDiagram\nparticipant I as Interface\nparticipant L as Lab\n%% carrier id=C1 sid=SID-1\nI->>AN: Prepare SampleId=SID-1\nI->>L: Hello\n").unwrap();
         assert!(has(&d, "step", &[("type", "prepare")]));
         assert!(has(&d, "actor", &[("id", "L"), ("label", "Lab")]));
         assert!(has(&d, "step", &[("from", "IF"), ("to", "L"), ("text", "Hello")]));
@@ -822,12 +829,12 @@ mod tests {
         assert!(has(&d, "step", &[("action", "note"), ("duration", "6"), ("actor", "AN")]));
     }
 
-    const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1 needle=both\n%% carrier C2 SID-2 needle=2\n\
+    const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle=both\n%% carrier id=C2 sid=SID-2 needle=2\n\
         %% move C1 to d1\n%% move C1 to s1\n%% at 0\n%% move C2 to w1\n\
         %% on antenna1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
         %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 Add Tube C1\nAN-->>IF: Late\n\
         %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
-        %% after 0.5 antenna2 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done SampleId=SID-1\n";
+        %% after 0.5 antenna2 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done sid=SID-1\n";
 
     #[test]
     fn on_after_and_color_set_the_moment_and_the_look() {
@@ -849,7 +856,7 @@ mod tests {
         same(at("Go"), at("Again") + 1.5 + 1.0);
     }
 
-    const ON_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier C1 SID-1\n";
+    const ON_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
 
     #[test]
     fn on_after_and_color_errors() {
@@ -875,12 +882,19 @@ mod tests {
         let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
         assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
         assert!(has(&d, "step", &[("action", "pipette"), ("note", "Aspirating SID-1")]));
+        let d = doc(&format!("{HEAD}%% pipette sp duration=4 sid=SID-1\n%% pipette sp sid=SID-2\n")).unwrap();
+        assert!(has(&d, "step", &[("action", "pipette"), ("sample_id", "SID-1"), ("duration", "4")]) && has(&d, "step", &[("sample_id", "SID-2")]));
+        fails(&format!("{HEAD}%% rotate sp sid=SID-1\n"), "only pipette does");
+        fails("%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n", "carrier id=<id> [sid=<sample id>]");
+        // Without sid= the carrier is empty.
+        let d = doc("%% geometry spur\nsequenceDiagram\n%% carrier id=E\n%% move E to nsd\n").unwrap();
+        assert!(has(&d, "carrier", &[("id", "E"), ("tube", "false")]) && !d.arrays["carrier"][0].entries.contains_key("sample_id"));
     }
 
     #[test]
     fn every_default_route_exists() {
         for (g, needle) in [("sampling", "1"), ("turnstile", "1"), ("spur", "1"), ("spur2", "1"), ("spur2", "2"), ("spur2", "both")] {
-            let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier C1 SID-1 needle={needle}\n%% carrier C2 SID-2 needle={needle}\n%% move C1 to merge\n");
+            let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle={needle}\n%% carrier id=C2 sid=SID-2 needle={needle}\n%% move C1 to merge\n");
             let d = doc(&src).unwrap_or_else(|e| panic!("{g}: {e}"));
             if g != "turnstile" {
                 build(&d); // a move through the wheel needs rotations
@@ -895,7 +909,7 @@ mod tests {
         fails(&format!("{HEAD}%% move C1 nsd\n"), "'move' is written");
         fails(&format!("{HEAD}alt ok\nIF->>AN: A\nend\n"), "'alt' is not supported");
         fails(&format!("{HEAD}IF->>AN: Prepare SampleId=SID-9\n"), "no carrier has sample id 'SID-9'");
-        fails("sequenceDiagram\n%% carrier C1 SID-1\n", "geometry must be given before");
+        fails("sequenceDiagram\n%% carrier id=C1 sid=SID-1\n", "geometry must be given before");
         fails(&format!("{HEAD}%% on antenna1\n%% at 3\nIF->>AN: A SampleId=SID-1\n"), "only one of");
         fails(&format!("{HEAD}%% at soon\nIF->>AN: A\n"), "needs seconds");
         fails(&format!("{HEAD}%% when C1 at nsd\nIF->>AN: A\n"), "'when' no longer exists");
@@ -935,7 +949,7 @@ mod tests {
             &[
                 ("a.mmd", "%% include common/b.mmd\nsequenceDiagram\nIF->>AN: Prepare SampleId=SID-1\n"),
                 ("common/b.mmd", "%% @point id=p x=1 y=1\n%% include c.mmd\n\n%% caption T | x\n"),
-                ("common/c.mmd", "%% carrier C1 SID-1 route=p,p\n"),
+                ("common/c.mmd", "%% carrier id=C1 sid=SID-1 route=p,p\n"),
                 ("common/messages.mmd", "%% @message id=prepare from=IF to=AN text=Prepare params=\"SampleId={SampleId}\"\n"),
             ],
         );

@@ -157,8 +157,9 @@ pub enum Action {
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
     Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
-    /// `note`: the text of the note on the analyzer, if the diagram gives it.
-    Pipette { device: String, note: Option<String> },
+    /// `note`: the text of the note on the analyzer, if the diagram gives it;
+    /// `sample`: the SampleId the analyzer aspirates, shown in that note.
+    Pipette { device: String, note: Option<String>, sample: Option<String> },
     Highlight { device: String },
     Rotate { device: String },
     /// Fades a carrier in (`show`) or out (`hide`).
@@ -495,7 +496,7 @@ impl Scene {
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
-                "pipette" => &["device", "note"],
+                "pipette" => &["device", "note", "sample_id"],
                 "highlight" => &["device"],
                 "rotate" => &["device"],
                 "show" | "hide" => &["carrier"],
@@ -542,7 +543,7 @@ impl Scene {
                     }
                 }
                 "note" => Action::Note { actor: t.str_req("actor")?, text: t.str_req("text")? },
-                "pipette" => Action::Pipette { device: t.str_req("device")?, note: t.str_opt("note")? },
+                "pipette" => Action::Pipette { device: t.str_req("device")?, note: t.str_opt("note")?, sample: t.str_opt("sample_id")? },
                 "highlight" => Action::Highlight { device: t.str_req("device")? },
                 "rotate" => Action::Rotate { device: t.str_req("device")? },
                 "show" | "hide" => Action::Visibility { carrier: t.str_req("carrier")?, show: action_name == "show" },
@@ -669,30 +670,17 @@ impl Scene {
     /// Note shown while pipetting at device `di`, on the analyzer's actor. With
     /// several sampling points it names the needle (needle 1 = first in the file).
     /// The note of a `pipette` on the analyzer lifeline: the text written in the
-    /// diagram, or "Pipetting <analyzer>[ · Needle n] - SampleId=..." with the
-    /// SampleId of the latest message to the analyzer for that needle.
-    fn pipetting_note(&self, di: usize, written: Option<&str>, before: &[Timed], t0: f64) -> Option<(usize, String)> {
+    /// diagram, or "Pipetting <analyzer>[ · Needle n][ - SampleId=...]" with the
+    /// SampleId given to the pipette.
+    fn pipetting_note(&self, di: usize, written: Option<&str>, sample: Option<&str>) -> Option<(usize, String)> {
         let ai = self.actors.iter().position(|a| a.analyzer)?;
         if let Some(w) = written {
             return Some((ai, w.to_string()));
         }
         let needles: Vec<usize> = (0..self.devices.len()).filter(|&i| self.devices[i].kind == DeviceKind::Sampling).collect();
-        let needle = needles.iter().position(|&i| i == di).filter(|_| needles.len() > 1).map(|n| n + 1);
-        let sample = before
-            .iter()
-            .rev()
-            .filter(|e| e.t0 <= t0 + 1e-9)
-            .find_map(|e| match &e.ev {
-                Ev::Message { to, params, .. } if *to == ai => {
-                    let value = |k: &str| params.split_whitespace().find_map(|p| p.strip_prefix(k)?.strip_prefix('=').map(String::from));
-                    let same_needle = needle.is_none_or(|n| value("Needle").as_deref() == Some(n.to_string().as_str()));
-                    value("SampleId").filter(|_| same_needle)
-                }
-                _ => None,
-            });
         let mut text = format!("Pipetting {}", self.actors[ai].label);
-        if let Some(n) = needle {
-            text.push_str(&format!(" · Needle {n}"));
+        if let Some(n) = needles.iter().position(|&i| i == di).filter(|_| needles.len() > 1) {
+            text.push_str(&format!(" · Needle {}", n + 1));
         }
         if let Some(s) = sample {
             text.push_str(&format!(" - SampleId={s}"));
@@ -1266,7 +1254,7 @@ impl Timeline {
             log.push(format!("{t0:7.2}s - {t1:7.2}s  {desc}"));
             // The analyzer shows what it is doing on its lifeline.
             let note = match (&ev, &st.action) {
-                (Ev::Pipette { device }, Action::Pipette { note, .. }) => sc.pipetting_note(*device, note.as_deref(), &events, t0),
+                (Ev::Pipette { device }, Action::Pipette { note, sample, .. }) => sc.pipetting_note(*device, note.as_deref(), sample.as_deref()),
                 _ => None,
             };
             events.push(Timed { t0, t1, ev });

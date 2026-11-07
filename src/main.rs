@@ -657,7 +657,7 @@ mod tests {
             std::fs::copy(&p, dir.join("common").join(p.file_name().unwrap())).unwrap();
         }
         let f = dir.join("a.mmd");
-        std::fs::write(&f, "%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n\n%% move C9 to nsd\n").unwrap();
+        std::fs::write(&f, "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n\n%% move C9 to nsd\n").unwrap();
         let e = load(&f.to_string_lossy()).err().unwrap();
         assert!(e.contains("line 5") && e.contains("unknown carrier 'C9'"), "{e}");
         std::fs::remove_dir_all(dir).unwrap();

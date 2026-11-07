@@ -10,7 +10,7 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone
+    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,spur_in,queue2,queue,sampling,spur_top_in,spur_top_out,spur_out,pit_out,merge,iface_out,main_out,gone
 
     %% caption 1 · Spur | The spur is a U-shaped branch perpendicular to the Main-Lane: the carrier goes up one branch, past the sampling point (analyzer on its right), and comes back down the other.
     %% at 2.2
@@ -35,7 +35,7 @@ sequenceDiagram
     %% after 0.1 OK C1
     %% caption 3 · Test query — Pipetting | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now it aspirates the tube, while the gate holds the carrier at the sampling point.
     %% after 0.1 OK C1
-    %% pipette sp duration=4.5
+    %% pipette sp duration=4.5 sid=SID-000123
     %% after 0.2
     %% caption 4 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
     %% after 0.3 pipette sp

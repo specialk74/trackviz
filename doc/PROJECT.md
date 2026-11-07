@@ -264,7 +264,7 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse tabelle. Sono errori gli id duplicati (point, lane, device, actor, carrier, message) e le inclusioni circolari. Le parti comuni stanno in `scenes/common/`, così `"scenes/*.mmd"` prende solo le scene. Le geometrie delle scene 03, 07 e 08 stanno in `sampling_queue.mmd`, `sampling_queue2.mmd` e `turnstile_queue.mmd`.
 
-**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.mmd` (`@message`); un messaggio del diagramma che corrisponde a un tipo diventa quello, con `carrier` e, se il tipo contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo, con gli stessi tempi e sull'attore con `analyzer=true`, la nota "Pipetting Analyzer - SampleId=…" ("· Needle n" con più punti di campionamento; il numero dell'analizzatore non compare perché ce n'è uno solo). Il SampleId è quello dell'ultimo messaggio mandato all'analizzatore per quell'ago, cioè la Sample Acquisition. Una `Note over AN: ...` scritta subito dopo il `pipette` nel diagramma ne sostituisce il testo (chiave `note` dello step). Nel diagramma le note occupano lo stesso spazio della scritta di un messaggio, sopra la riga, così la riga successiva non le copre.
+**Messaggi con nome:** i tipi di messaggio sono definiti una sola volta in `scenes/common/messages.mmd` (`@message`); un messaggio del diagramma che corrisponde a un tipo diventa quello, con `carrier` e, se il tipo contiene `{Needle}`, `needle`. Uno step con `type` non può ridefinire il messaggio. **Nota automatica:** `pipette` aggiunge da solo, con gli stessi tempi e sull'attore con `analyzer=true`, la nota "Pipetting Analyzer - SampleId=…" ("· Needle n" con più punti di campionamento; il numero dell'analizzatore non compare perché ce n'è uno solo). Il SampleId è quello scritto sulla direttiva, `%% pipette sp duration=4.5 sid=SID-000123`; senza, la nota non lo riporta. Il programma non lo ricava da solo. Una `Note over AN: ...` scritta subito dopo il `pipette` nel diagramma ne sostituisce il testo (chiave `note` dello step). Nel diagramma le note occupano lo stesso spazio della scritta di un messaggio, sopra la riga, così la riga successiva non le copre.
 
 | Sezione | Chiavi |
 |---|---|
@@ -283,7 +283,7 @@ Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse ta
 | `move` | `carrier`, `to`, `ease` = linear\|in\|out\|inout (inout), `speed`, `runaway` (false: carrier che scappa, anello rosso pulsante e cartellino "… · RUN-AWAY" dal primo all'ultimo movimento di fuga, soste comprese) |
 | `message` | `type`, `carrier`, `needle`; oppure, senza `type`: `from`, `to`, `text`, `params`, `reply` (false), `carrier`, `needle`, `color` (colore del mittente) |
 | `note` | `actor`, `text` |
-| `pipette` | `device` sampling o turnstile, `note` (aggiunge la nota "Pipetting Analyzer - SampleId=…") |
+| `pipette` | `device` sampling o turnstile, `sample_id`, `note` (aggiunge la nota "Pipetting Analyzer - SampleId=…") |
 | `highlight` | `device` |
 | `rotate` | `device` (turnstile) |
 | `show` / `hide` | `carrier` (dissolvenza, default 0,5 s) |

@@ -510,14 +510,12 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
     let (_, tl) = ok(&with_actor, steps);
     assert_eq!(notes(&tl), vec![("Pipetting Analyzer".to_string(), 1.0, 5.0)]);
     assert_eq!(tl.rows, 1);
-    // The SampleId of the latest message to the analyzer.
-    let sa = "\n%% @step action=message at=0 from=IF to=AN text=\"Sample Acquisition\" params=\"SampleId=SID-7\" ";
-    let (_, tl) = ok(&with_actor, &format!("{sa}{steps}"));
+    // The SampleId given to the pipette.
+    let (_, tl) = ok(&with_actor, "\n%% @step action=pipette at=1 device=sp sample_id=SID-7 ");
     assert_eq!(notes(&tl)[0].0, "Pipetting Analyzer - SampleId=SID-7");
-    // Several sampling points: it names the needle, and takes the SampleId sent for it.
+    // Several sampling points: it names the needle.
     let two = with_actor.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp1 kind=sampling at=c\n%% @device id=sp kind=sampling at=s\n");
-    let sa2 = "\n%% @step action=message at=0 from=IF to=AN text=\"Sample Acquisition\" params=\"SampleId=SID-8 Needle=2\" ";
-    let (_, tl) = ok(&two, &format!("{sa2}{sa}{steps}"));
+    let (_, tl) = ok(&two, "\n%% @step action=pipette at=1 device=sp sample_id=SID-8 ");
     assert_eq!(notes(&tl)[0].0, "Pipetting Analyzer · Needle 2 - SampleId=SID-8");
     // The text written in the diagram wins.
     let (_, tl) = ok(&with_actor, "\n%% @step action=pipette at=1 device=sp note=\"Aspirating SID-7\" ");

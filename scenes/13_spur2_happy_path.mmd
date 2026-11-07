@@ -11,8 +11,8 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier C1 SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
-    %% carrier C2 SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#0EA5E9
+    %% carrier id=C1 sid=SID-000123 route=main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,q2,pc1,q1,s1,pt1u,rj1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,main_in,nsd,pit_in,w1c,w1b,spur_in,w1,d1,w2,d2,qb2,pc2,qb1,s2,pt2u,rj2,top_r,top_l,back,po,merge,iface_out,main_out,gone color=#0EA5E9
 
     %% caption 1 · One analyzer, two sampling points | The spur serves one analyzer with two needles, each on its own pit-lane. Which needles a sample needs depends on its tests: one of them, or both.
     %% at 2.5
@@ -75,7 +75,7 @@ sequenceDiagram
     %% after 0.2 antenna5 C2
     IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
     %% after 0.1 OK C1
-    %% pipette sp1 duration=4
+    %% pipette sp1 duration=4 sid=SID-000123
     %% after 0.2 Query C2
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0 Sample Acquisition C2
@@ -84,7 +84,7 @@ sequenceDiagram
     %% for C2
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp2 duration=4
+    %% pipette sp2 duration=4 sid=SID-000124
     %% after 0.2 pipette sp1
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
     %% after 0.1
@@ -117,7 +117,7 @@ sequenceDiagram
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp2 duration=4
+    %% pipette sp2 duration=4 sid=SID-000123
     %% on antenna6 C2
     %% caption 5 · Release | Leaving the interface module each carrier gets one Release, however many needles sampled it.
     %% on antenna6
