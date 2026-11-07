@@ -1,0 +1,403 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "trackviz: check this scene",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "${file}",
+        "--check"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "trackviz: preview this scene",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "${file}",
+        "--preview"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    },
+    {
+      "label": "trackviz: video of this scene",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "${file}"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    },
+    {
+      "label": "trackviz: layout of this scene",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "${file}",
+        "--layout"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    },
+    {
+      "label": "trackviz: check all scenes",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "scenes/*.mmd",
+        "--check"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    }
+  ]
+}

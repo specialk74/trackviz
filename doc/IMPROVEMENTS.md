@@ -24,18 +24,12 @@ Deciso con l'utente, a tappe:
 ## 1. Miglioramenti proposti, non ancora fatti
 
 Le voci 1.2–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
-consegnarle (la 1.1, highlight automatico, è fatta). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
+consegnarle (la 1.1, highlight automatico, e la 1.3, snippet e controllo in VS Code, sono fatte). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
 ### 1.2 Scheletro di una nuova scena
 
 `trackviz new mia_scena --geometry spur2` crea il file con gli `include`, i carrier
 e una prima didascalia.
-
-### 1.3 Autocompletamento nell'editor
-
-Schema per le direttive dei file `.mmd` e snippet che suggeriscono azioni, chiavi e i 20 tipi di
-messaggio, segnalando gli errori di battitura mentre si scrive. Utile solo con un
-editor compatibile, come VS Code.
 
 ### 1.4 Risolvere i conflitti che la catena segnala
 
@@ -102,7 +96,7 @@ Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi co
 `{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
 carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass`,
 route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
-accensione automatica dei device letti dalle antenne, immagine di layout (`--layout`),
+accensione automatica dei device letti dalle antenne, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
 ordine, Query), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).

@@ -145,13 +145,15 @@ fn load(path: &str) -> Result<(scene::Scene, scene::Timeline), String> {
     Ok((sc, tl))
 }
 
-fn timeline_text(sc: &scene::Scene, tl: &scene::Timeline) -> String {
+/// The timeline as `--check` prints it; warnings name the scene, so that an editor
+/// can show them on its file.
+fn timeline_text(path: &str, sc: &scene::Scene, tl: &scene::Timeline) -> String {
     let mut t = format!("Timeline ({:.1} s total):\n", tl.duration);
     for l in &tl.log {
         t.push_str(&format!("  {l}\n"));
     }
     for w in lint::warnings(sc, tl) {
-        t.push_str(&format!("warning: {w}\n"));
+        t.push_str(&format!("warning: {path}: {w}\n"));
     }
     t
 }
@@ -425,7 +427,7 @@ impl Job {
                     eprintln!("== {f}");
                 }
                 match load(f) {
-                    Ok((sc, tl)) => eprint!("{}", timeline_text(&sc, &tl)),
+                    Ok((sc, tl)) => eprint!("{}", timeline_text(f, &sc, &tl)),
                     Err(e) if files.len() == 1 => return Err(e),
                     Err(e) => failures.push(e),
                 }
@@ -459,7 +461,7 @@ impl Job {
 
         let scene_path = &files[0];
         let (sc, tl) = load(scene_path)?;
-        eprint!("{}", timeline_text(&sc, &tl));
+        eprint!("{}", timeline_text(scene_path, &sc, &tl));
         if let Some(t) = self.still {
             let (w, h) = (sc.video.width, sc.video.height);
             let svg = render::frame(&sc, &tl, t);

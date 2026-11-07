@@ -239,6 +239,19 @@ antennaN`, `when C2 at ...`) moves with it. `--check` shows the waits:
 - Ghosts, hidden carriers and carriers in a turnstile pocket don't take space;
   outside the panel carriers don't stop.
 
+## Editor (VS Code)
+
+The `.vscode` folder of the project adds, when the project is open in VS Code:
+
+- **Snippets:** type `tv-` (or press Ctrl+Space) for every directive with its fields
+  (`tv-on`, `tv-after-message`, `tv-pass`, `tv-pipette`, `tv-carrier`, ...), the
+  messages of `common/messages.mmd` (`tv-msg-prepare`, `tv-msg-sample_complete_needle`,
+  ...) and a new scene (`tv-scene`). The message snippets are generated from the
+  library: regenerate them if the library changes.
+- **Tasks:** Ctrl+Shift+B runs `--check` on the open scene; its errors and warnings go
+  to the Problems panel, on their line. Other tasks (Terminal > Run Task): preview,
+  video, layout of the open scene, check of all the scenes.
+
 ## Scene format
 
 A scene is a Mermaid sequence diagram (`.mmd`). Besides the directives above, a
