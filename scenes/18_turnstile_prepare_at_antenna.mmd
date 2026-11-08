@@ -1,0 +1,143 @@
+%% # Scene 18 — like scene 02 (turnstile with gate and antenna, three carriers with
+%% # tubes, happy path), but Prepare is sent only at the antenna in front of the gate:
+%% # at the NSD the carrier is diverted without any message.
+%% # Each carrier stops at the antenna and is read: Prepare. It enters the wheel only
+%% # if nothing is being sampled under the needle; otherwise it waits for Sample
+%% # Complete. The wheel rotates only after the waiting carrier has entered.
+%% geometry turnstile
+%% subtitle Turnstile with gate and antenna, Prepare only at the antenna — three carriers, happy path
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
+    %% carrier id=C2 sid=SID-000124 route=spawn,pit_entry,pit_exit,gone color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 route=spawn,pit_entry,pit_exit,gone color=#DB2777
+
+    %% caption 1 · Turnstile with gate and antenna | The Pit-Lane ends in a turnstile, a wheel with three positions: entry, under the analyzer needle, exit. In front of it, an antenna and a gate: every carrier stops there first.
+    %% at 2.6
+    %% move C1 to pit_wait
+
+    %% on antenna2 C1
+    %% caption 2 · Diverted — antenna — Prepare | The first carrier is diverted into the Pit-Lane without stopping and without any message. The gate stops it on the antenna, which reads it: only now the interface sends Prepare.
+    %% after 0.5 antenna2 C1
+    IF->>AN: Prepare SampleId=SID-000123
+    %% after 0.1
+    AN-->>IF: OK SampleId=SID-000123
+    %% after 0.1 OK C1
+    AN->>DMX: Query SampleId=SID-000123
+    %% after 0.1 OK C1
+    %% pass antenna2
+    %% after 0.15
+    %% caption 3 · Rotation — Sample Acquisition | Nothing is being sampled: the gate opens and the wheel rotates the carrier under the needle: Sample Acquisition and aspiration. Meanwhile the second carrier is read at the antenna (Prepare) and held by the gate.
+    %% rotate ts
+    %% after 0.1 Query C1
+    DMX-->>AN: Tests to perform SampleId=SID-000123
+
+    %% at 8.4
+    %% move C2 to pit_wait
+    %% after 0.5 antenna2 C2
+    IF->>AN: Prepare SampleId=SID-000124
+    %% after 0.25 rotate ts
+    IF->>AN: Sample Acquisition SampleId=SID-000123
+    %% after 0.1 Prepare C2
+    AN-->>IF: OK SampleId=SID-000124
+    %% after 0.1 Sample Acquisition C1
+    %% for C1
+    AN-->>IF: OK
+    %% after 0.1 OK C2
+    AN->>DMX: Query SampleId=SID-000124
+    %% after 0.1 OK C1
+    %% pipette ts duration=5 sid=SID-000123
+    %% after 0.1 Query C2
+    DMX-->>AN: Tests to perform SampleId=SID-000124
+
+    %% after 0.3 pipette ts
+    %% caption 4 · Sample Complete — the waiting carrier enters | Sampling is finished: Sample Complete. Before the wheel rotates, the gate opens and the waiting carrier enters the entry position.
+    %% after 0.3 pipette ts
+    AN->>IF: Sample Complete SampleId=SID-000123
+    %% at 20.3
+    %% move C3 to pit_wait
+    %% after 0.1 Sample Complete C1
+    %% for C1
+    IF-->>AN: OK
+    %% after 0.1 OK C1
+    %% pass antenna2
+    %% after 0.15
+    %% caption 5 · Rotation — Sample Acquisition | Now the wheel rotates: the new carrier goes under the needle, the processed one to the exit and back to the Main-Lane (Release once it has left). The third carrier is read at the antenna (Prepare) and held by the closed gate.
+    %% rotate ts
+    %% after 0.5 antenna2 C3
+    IF->>AN: Prepare SampleId=SID-000125
+    %% after 0.1 rotate ts
+    %% move C1 to gone
+    %% after 0.1 Prepare C3
+    AN-->>IF: OK SampleId=SID-000125
+    %% after 0.25 rotate ts
+    IF->>AN: Sample Acquisition SampleId=SID-000124
+    %% after 0.1 OK C3
+    AN->>DMX: Query SampleId=SID-000125
+    %% on antenna3
+    IF->>AN: Release SampleId=SID-000123
+    %% after 0.1 Sample Acquisition C2
+    %% for C2
+    AN-->>IF: OK
+    %% after 0.1 Query C3
+    DMX-->>AN: Tests to perform SampleId=SID-000125
+    %% after 0.1 Release C1
+    %% for C1
+    AN-->>IF: OK
+    %% after 0.1 OK C2
+    %% pipette ts duration=4.5 sid=SID-000124
+
+    %% after 0.3 pipette ts
+    %% caption 6 · Sample Complete — enter — rotate | Sample Complete for the second sample. The third carrier enters the wheel, then the wheel rotates: the third sample under the needle, the second one to the exit.
+    %% after 0.3 pipette ts
+    AN->>IF: Sample Complete SampleId=SID-000124
+    %% after 0.1
+    %% for C2
+    IF-->>AN: OK
+    %% after 0.1
+    %% pass antenna2
+    %% after 0.15
+    %% rotate ts
+    %% after 0.1
+    %% move C2 to gone
+    %% after 0.25 rotate ts
+    IF->>AN: Sample Acquisition SampleId=SID-000125
+    %% on antenna3
+    IF->>AN: Release SampleId=SID-000124
+    %% after 0.1 Sample Acquisition C3
+    %% for C3
+    AN-->>IF: OK
+    %% after 0.1 Release C2
+    %% for C2
+    AN-->>IF: OK
+    %% after 0.1 OK C3
+    %% pipette ts duration=4.5 sid=SID-000125
+
+    %% after 0.3 pipette ts
+    %% caption 7 · Last carrier | Sample Complete for the third sample. No carrier is waiting at the gate: the wheel rotates the third carrier to the exit and it leaves the module (Release).
+    %% after 0.3 pipette ts
+    AN->>IF: Sample Complete SampleId=SID-000125
+    %% after 0.1
+    %% for C3
+    IF-->>AN: OK
+    %% after 0.1
+    %% rotate ts
+    %% after 0.1
+    %% move C3 to gone
+    %% on antenna3
+    IF->>AN: Release SampleId=SID-000125
+    %% after 0.1
+    %% for C3
+    AN-->>IF: OK
+
+    %% after 1
+    %% caption 8 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
+    %% after 0.3
+    AN->>DMX: Results SampleId=SID-000123
+    %% after 0.2
+    AN->>DMX: Results SampleId=SID-000124
+    %% after 0.2
+    AN->>DMX: Results SampleId=SID-000125
