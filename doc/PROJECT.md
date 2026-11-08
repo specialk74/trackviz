@@ -135,6 +135,7 @@ trackviz "scenes/*.mmd"                          # più scene in parallelo (* e 
 trackviz <scene.mmd> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.mmd> --still <sec> --svg -o f.svg
 trackviz <scene.mmd>... --layout                 # solo out/<nome>_layout.png: punti e device con i nomi
+trackviz new <scena> [--geometry spur2] [--carriers 3]   # scheletro di una scena nuova (src/template.rs)
 trackviz <scene.mmd>... --check                  # valida e stampa la timeline
 trackviz <scene.mmd> --preview [--from S] [--to S] [--watch]   # anteprima veloce
 trackviz <flusso.mmd>                             # le scene possono essere diagrammi Mermaid

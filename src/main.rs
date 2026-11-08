@@ -4,6 +4,7 @@
 //!   trackviz <scene.mmd>... [-o out.mp4] [-j jobs]   (default: out/<scene name>.mp4)
 //!   trackviz <scene.mmd> --still <seconds> [-o frame.png]
 //!   trackviz <scene.mmd>... --layout      (only out/<scene name>_layout.png: points and devices)
+//!   trackviz new <scene> [--geometry spur2] [--carriers 3]   (the skeleton of a new scene)
 //!   trackviz <scene.mmd>... --check         (validate + print the timeline)
 //!   trackviz <scene.mmd> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
 //!   trackviz <scene.mmd> --preview --watch  (regenerate when the scene or a file it uses changes)
@@ -21,6 +22,7 @@ mod lint;
 mod mermaid;
 mod render;
 mod scene;
+mod template;
 
 use resvg::{tiny_skia, usvg};
 use std::collections::BTreeMap;
@@ -48,7 +50,8 @@ fn usage() -> String {
          \x20 out/<scene name>_preview.mp4, so the full video is kept\n\
          \x20 --watch repeats the command when the scene or a file it uses changes (one scene)\n\
          \x20 a full video also writes out/<scene name>_layout.png: the names of the points and devices\n\
-         \x20 --layout writes only that image, without the video"
+         \x20 --layout writes only that image, without the video\n\
+         \x20 trackviz new <scene> [--geometry name] [--carriers n] writes the skeleton of a new scene"
     )
 }
 
@@ -333,6 +336,9 @@ fn report_failures(failures: Vec<String>, total: usize) -> Result<(), String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "new") {
+        return new_cmd(&args[1..]);
+    }
     let mut scene_args = Vec::new();
     let mut out = None;
     let mut still: Option<f64> = None;
@@ -486,6 +492,48 @@ impl Job {
         eprintln!("wrote {out}");
         Ok(())
     }
+}
+
+/// `trackviz new <file> [--geometry name] [--carriers n]`: writes the skeleton of a
+/// new scene. A bare name goes to scenes/<name>.mmd; an existing file is never
+/// overwritten.
+fn new_cmd(args: &[String]) -> Result<(), String> {
+    let usage = || format!("usage: trackviz new <scene> [--geometry {}] [--carriers n]", template::geometry_names().join("|"));
+    let (mut file, mut geometry, mut carriers) = (None, "sampling".to_string(), 1usize);
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--geometry" => {
+                i += 1;
+                geometry = args.get(i).ok_or_else(usage)?.clone();
+            }
+            "--carriers" => {
+                i += 1;
+                carriers = args.get(i).and_then(|n| n.parse().ok()).ok_or_else(usage)?;
+            }
+            a if a.starts_with('-') => return Err(format!("unknown option '{a}'\n{}", usage())),
+            a if file.is_none() => file = Some(a.to_string()),
+            _ => return Err(usage()),
+        }
+        i += 1;
+    }
+    let file = file.ok_or_else(usage)?;
+    let mut path = PathBuf::from(&file);
+    if path.extension().is_none() {
+        path.set_extension("mmd");
+    }
+    if path.parent().is_none_or(|p| p.as_os_str().is_empty()) {
+        path = Path::new("scenes").join(path);
+    }
+    if path.exists() {
+        return Err(format!("{} already exists: choose another name", path.display()));
+    }
+    let name = path.file_stem().map(|s| s.to_string_lossy().replace('_', " ")).unwrap_or_default();
+    let text = template::scene(&name, &geometry, carriers)?;
+    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+    eprintln!("wrote {} (geometry {geometry}, {carriers} carrier{})", path.display(), if carriers == 1 { "" } else { "s" });
+    eprintln!("check it with: trackviz {} --check", path.display());
+    Ok(())
 }
 
 /// The layout image next to a video: out/a.mp4 -> out/a_layout.png.

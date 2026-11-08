@@ -239,6 +239,20 @@ antennaN`, `when C2 at ...`) moves with it. `--check` shows the waits:
 - Ghosts, hidden carriers and carriers in a turnstile pocket don't take space;
   outside the panel carriers don't stop.
 
+## A new scene
+
+```sh
+trackviz new my_scene --geometry spur2 --carriers 3
+```
+
+writes `scenes/my_scene.mmd` (a path can be given too; an existing file is never
+overwritten): the geometry, the participants, the carriers with a route for that
+geometry, and carrier C1 going the whole way (Prepare, Sample Acquisition, pipetting,
+Sample Complete, `pass`, Release). The other carriers are declared and wait to be used.
+Geometries: `sampling`, `sampling_queue`, `sampling_queue2`, `turnstile`,
+`turnstile_queue`, `spur`, `spur2` (default `sampling`). The new scene is valid as it
+is: `trackviz my_scene.mmd --check`.
+
 ## Editor (VS Code)
 
 The `.vscode` folder of the project adds, when the project is open in VS Code:
