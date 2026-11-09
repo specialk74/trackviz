@@ -1168,6 +1168,43 @@ fn simulate_wheels(sc: &Scene, wheels: &[Wheel], carriers: &mut [CarrierPath], m
     Ok(())
 }
 
+/// The first instant from `t` at which wheel `wi` can make a rotation of `d`
+/// seconds: its previous rotation is over, no carrier is on its way into the
+/// entry pocket, and every carrier outside the pockets stays clear of the wheel
+/// for the whole rotation. Only the moves laid out so far are known; if the
+/// wheel never gets free, `t` (the final checks then say why).
+fn wheel_free_at(w: &Wheel, wi: usize, carriers: &[CarrierPath], t: f64, d: f64) -> f64 {
+    const STEP: f64 = 0.02;
+    let clear = w.r + TS_RIM + CARRIER_R;
+    let mut s = w.rots.last().map_or(t, |r| t.max(r.1));
+    let limit = s + 120.0;
+    'search: while s < limit {
+        for c in carriers {
+            if let Some(a) = c.attach.iter().find(|a| a.wheel == wi && s >= a.t_move - 1e-9 && s < a.t0 - 1e-9) {
+                s = a.t0;
+                continue 'search;
+            }
+        }
+        let n = (d / STEP).ceil().max(1.0) as usize;
+        for k in 0..=n {
+            let u = s + d * k as f64 / n as f64;
+            for c in carriers {
+                let on_wheel = c.attach.iter().any(|a| u >= a.t0 && u <= a.t1);
+                if on_wheel || c.ghost || c.opacity(u) <= 0.0 {
+                    continue;
+                }
+                let (x, y) = c.pos(u);
+                if ((x - w.cx).powi(2) + (y - w.cy).powi(2)).sqrt() < clear - 1e-6 {
+                    s = u + STEP;
+                    continue 'search;
+                }
+            }
+        }
+        return s;
+    }
+    t
+}
+
 impl CarrierPath {
     pub fn s_at(&self, t: f64) -> f64 {
         let mut s = self.start_s;
@@ -1456,7 +1493,7 @@ impl Timeline {
                 StartMode::AfterAll => max_end,
             };
             first = false;
-            let t0 = base + st.delay;
+            let mut t0 = base + st.delay;
             // `pass`: a move of the carrier stopped on the device, to its next stop.
             let passed;
             let action = match &st.action {
@@ -1559,9 +1596,14 @@ impl Timeline {
                     let di = sc.need_device(device, &st.loc, "rotate", &[(DeviceKind::Turnstile, "turnstile")])?;
                     let wi = wheels.iter().position(|w| w.device == di).unwrap();
                     let d = st.duration.unwrap_or(2.0);
+                    // The wheel waits until it is free: the previous rotation over, the
+                    // carrier driving into the entry in its pocket, the others clear.
+                    let asked = t0;
+                    t0 = wheel_free_at(&wheels[wi], wi, &carriers, t0, d);
+                    let tag = if t0 > asked + 1e-6 { format!("  (waits {:.1}s for the wheel to be clear)", t0 - asked) } else { String::new() };
                     wheels[wi].rots.push((t0, t0 + d));
                     wheel_recs.push(WheelRec { t: t0, wheel: wi, ev: WheelEv::Rotate(t0 + d), loc: st.loc.clone() });
-                    (d, Ev::Wait, format!("rotate    {device}"))
+                    (d, Ev::Wait, format!("rotate    {device}{tag}"))
                 }
                 Action::Visibility { carrier, show } => {
                     let ci = sc.need_carrier(carrier, &st.loc)?;

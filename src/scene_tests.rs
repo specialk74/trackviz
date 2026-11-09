@@ -503,8 +503,30 @@ fn the_wheel_waits_until_a_leaving_carrier_is_clear() {
          \n%% @step action=move carrier=C1 to=out ease=linear "
     );
     // ts.out is 70 px from the center; clear means r + rim + carrier = 124 px.
-    err(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=0.2 device=ts "), "not yet clear of the wheel");
-    ok(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=1.0 device=ts "));
+    // Asked 0.2 s after C1 starts to leave, the rotation waits until C1 is clear.
+    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=0.2 device=ts "));
+    let w = &tl.wheels[0];
+    let (r0, _) = *w.rots.last().unwrap();
+    let left = tl.carriers[0].moves.last().unwrap().t0;
+    assert!(r0 > left + 0.2 + 0.1, "the wheel did not wait: {r0} vs {left}");
+    let dist = |t: f64| {
+        let (x, y) = tl.carriers[0].pos(t);
+        ((x - w.cx).powi(2) + (y - w.cy).powi(2)).sqrt()
+    };
+    let clear = w.r + TS_RIM + CARRIER_R;
+    assert!(dist(r0) >= clear - 1e-6 && dist(r0 - 0.05) < clear, "{} {}", dist(r0), dist(r0 - 0.05));
+    // Asked late enough, it starts when asked.
+    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=1.5 device=ts "));
+    let left = tl.carriers[0].moves.last().unwrap().t0;
+    assert!((tl.wheels[0].rots.last().unwrap().0 - (left + 1.5)).abs() < 1e-9);
+}
+
+#[test]
+fn the_wheel_waits_for_a_carrier_driving_into_the_entry() {
+    // The rotation is asked while C1 is still on its way into the entry pocket.
+    let (_, tl) = ok(TURNSTILE, &format!("{C1_IN}\n%% @step action=rotate start=with delay=0.1 device=ts "));
+    let a = &tl.carriers[0].attach[0];
+    assert!((tl.wheels[0].rots[0].0 - a.t0).abs() < 1e-9);
 }
 
 #[test]

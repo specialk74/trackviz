@@ -413,9 +413,14 @@ needle position.
 Checked by `--check` (in time order, whatever the order of the steps in the file):
 the entry pocket must be free when a carrier arrives, a carrier can leave only
 from the exit position, a rotation can't start while a carrier is still in the
-exit position, nothing arrives or leaves while the wheel is turning, and the wheel
-doesn't turn until a carrier that has left (or is arriving) is completely outside
-the wheel's circle.
+exit position, and nothing arrives or leaves while the wheel is turning.
+
+A `rotate` waits by itself until the wheel is free: the previous rotation is over,
+a carrier driving into the entry is in its pocket, and a carrier that has just left
+is completely outside the wheel's circle. The log of `--check` shows the wait
+("waits 0.5s for the wheel to be clear"), so a rotation can follow the departure of
+the carrier at any belt speed. A carrier moved later in the file that would still
+touch the turning wheel is an error.
 See `scenes/02_turnstile_three_carriers.mmd`.
 
 ### Analyzer error and needle

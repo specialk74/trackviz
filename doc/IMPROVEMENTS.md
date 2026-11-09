@@ -24,16 +24,14 @@ Deciso con l'utente, a tappe:
 ## 1. Miglioramenti proposti, non ancora fatti
 
 Le voci 1.2–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
-consegnarle (fatte: 1.1 highlight automatico, 1.2 `trackviz new`, 1.3 snippet e controllo in VS Code). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
+consegnarle (fatte: 1.1 highlight automatico, 1.2 `trackviz new`, 1.3 snippet e controllo in VS Code, 1.4 la ruota aspetta di essere libera). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
-### 1.4 Risolvere i conflitti che la catena segnala
+### 1.4 Fatto — la ruota aspetta di essere libera
 
-Rallentando i carrier del 25% la scena 08 dava un conflitto fisico (quello della 07,
-carrier che si toccano in coda, ora lo risolve la fisica). Da riverificare dopo la
-conversione.
-
-- Scena 08: la ruota partirebbe prima che C2 sia fuori dal cerchio. Si potrebbe
-  agganciare la rotazione al punto in cui il carrier è fuori dalla ruota.
+`rotate` parte quando la ruota è libera: rotazione precedente finita, carrier in arrivo
+già nella tasca d'ingresso, nessun carrier fuori dalle tasche dentro il cerchio della
+ruota per tutta la rotazione. Nel log di `--check`: "(waits N s for the wheel to be
+clear)". Nella scena 08 l'ultima rotazione non è più legata a `on antenna3 C2`.
 
 ### 1.5 Foglio riassuntivo di una scena
 
@@ -91,7 +89,7 @@ Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi co
 `{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
 carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass`,
 route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
-accensione automatica dei device letti dalle antenne, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
+accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
 ordine), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).
