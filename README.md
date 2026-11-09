@@ -117,23 +117,61 @@ with that text written before it, so keep the diagram in time order. With the ca
 physics (below) a step tied to an antenna or to a message moves with it when a carrier
 has to wait. `when`, `with`, `delay`, `after_start` and `after_end` no longer exist.
 
-| Directive | Meaning |
-|---|---|
-| `geometry <name>` | reads `common/<name>.mmd`: `sampling`, `turnstile`, `spur`, `spur2`, ... |
-| `title`, `subtitle` | the video texts |
-| `for <carrier>` | the carrier of the next message, when its text doesn't say it (e.g. `OK`) |
-| `duration <seconds>` | duration of the next message or note |
-| `carrier id=<id> [sid=<sample id>]` | without `sid=` the carrier is empty (no tube, its tag reads `<id> (empty)`); options: `needle=1\|2\|both` (spur2), `route=a,b,c`, `color=`, `speed=`, `tag=`, `ghost`, `hidden` |
-| `move <carrier> to <point>` | options: `ease=`, `speed=`, `duration=`, `runaway` |
-| `pass <device>` | the carrier stopped on the device (`sp`, `div1`, `antenna2`, ...) sets off and rides the belt to the next stop of its route (an antenna with a gate, a turnstile entry) or to its end. No carrier stopped there is an error |
-| `pipette`, `rotate`, `highlight`, `operator <device>` | option: `duration=`; `pipette` also `sid=` (the sample it aspirates, shown in its note) |
-| `needle <device> down\|up`, `status <device> <state>` | as the steps |
-| `show`, `hide <carrier>`, `wait <seconds>` | as the steps; `show` and `hide` take `duration=` |
-| `caption <title> \| <text>` | a caption |
-| `on`, `after`, `at`, `color` | see above |
-| `include <file>` | the directives of another file |
-| `@<section> key=value ...` | a table of data (see Scene format) |
-| `# text` | a plain comment |
+#### All the directives
+
+Each one is written `%% <directive> ...` on a line of its own. In the forms below the
+words in `<...>` are **required**; the `key=value` options and the plain words in the
+last column are **optional**, in any order, and the column says what happens without
+them. A missing required word is an error that shows the right form.
+
+The directives in **Steps** become something that happens in the video: each one starts
+when the step before ends, or as `on`, `after`, `at` say (see the table above). A
+message (`IF->>AN: ...`) and a note (`Note over AN: ...`) of the diagram are steps too:
+1.5 s each.
+
+**Scene and carriers.** These set up the scene and take no time.
+
+| Directive | What it does | Optional |
+|---|---|---|
+| `geometry <name>` | Loads the track from `common/<name>.mmd`: points, lanes, devices, antennas, gates. One of `sampling`, `sampling_queue`, `sampling_queue2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`. Write it before the carriers | — |
+| `title <text>` | The title at the top of the video | without it: the title in `common/video.mmd` |
+| `subtitle <text>` | The line under the title | without it: no subtitle |
+| `carrier id=<id>` | Declares a carrier. Declare all of them before the steps; the order counts when two start on the same spot (the first one goes first) | `sid=<sample id>`: the sample in its tube, used by `SampleId=` in the messages; without it the carrier is empty (no tube, tag `<id> (empty)`).<br>`route=a,b,c`: its way, as points and lane ids (see Routes); without it the default route of the geometry (the first carrier starts on the Main-Lane, the others off the panel).<br>`needle=1\|2\|both` (`spur2` only, for the default route): which sampling points it visits; default `1`.<br>`color=#RRGGBB`: color of its cap; default purple `#7C3AED`.<br>`speed=<px/s>`: its own speed; default the belt's.<br>`tag=<text>`: the text of its label, `_` for spaces; default the sample id (`<id> (empty)` without a tube).<br>`ghost`: drawn dashed, where the interface *believes* it is (see Ghost carriers).<br>`hidden`: not shown until a `show` |
+| `include <file>` | Puts here the `%%` lines of another file (path relative to this one) | — |
+| `@<section> key=value ...` | A row of a data table (see Scene format) | — |
+| `# <text>` | A comment, ignored | — |
+
+**Before a step.** These change the next step only.
+
+| Directive | What it does | Optional |
+|---|---|---|
+| `on <antenna>` | The next step starts when its carrier is over the antenna | `<carrier>` after the antenna: which carrier. Without it, the carrier of the step (the `SampleId` of the message, the one it moves or shows); for captions, highlights, pipettes and notes it is required |
+| `after <seconds>` | The next step starts that many seconds after the step before ends | what to wait for: `<message> [<carrier>]` (the arrival of the latest message with that text), `<antenna> <carrier>` (the carrier over the antenna), `pipette\|rotate\|needle <device>` (the end of that action) |
+| `at <seconds>` | The next step starts at that second of the video | — |
+| `color #RRGGBB` | Colors the next message (the purple Prepare is `#9333EA`) | without it: the color of the named message or of the sender |
+| `for <carrier>` | The carrier of the next message, when its text has no `SampleId=` (e.g. `OK`): `after <message> <carrier>`, `on` and the pit-lane capacity use it | without it: the message has no carrier |
+| `duration <seconds>` | How long the next step lasts | without it: the step's default |
+
+Only one of `on`, `after`, `at` per step.
+
+**Steps.**
+
+| Directive | What it does | Optional |
+|---|---|---|
+| `move <carrier> to <point>` | The carrier sets off along its route towards the point, which must be ahead of it. It rides the belt at constant speed, queues behind other carriers and stops at the point. The step ends when it arrives | `duration=<s>`: the time of the trip; without it, from length and speed.<br>`speed=<px/s>`: only for this move; default the carrier's.<br>`ease=linear\|in\|out\|inout`: default `linear` (the belt starts and stops at once).<br>`runaway`: the carrier escapes by itself (red pulsing ring, tag "… · RUN-AWAY") |
+| `pass <device>` | The gate of the device opens: the carrier stopped there (`sp`, `div1`, `antenna2`, ...) sets off to the next stop of its route (an antenna with a gate, a turnstile entry) or to its end. Ghosts and carriers in a turnstile are not counted. No carrier stopped there is an error, unless a carrier went straight on because the pit-lane was full | — |
+| `pipette <device>` | Sampling: the analyzer's arm goes to the tube on the device, the needle goes down, aspirates and comes back up (20% down, 60% aspiration, 20% up). It also adds the note "Pipetting Analyzer" on the analyzer's lifeline, for the same time. It only draws the sampling: it sends no message and does not check that a carrier is under the needle (in scene 08 it samples an empty pocket). The device must be a sampling point or a turnstile, and the scene must have an analyzer. Lasts 3 s | `duration=<s>`: how long it lasts.<br>`sid=<sample id>`: the sample the analyzer believes it is aspirating (the one of its Sample Acquisition), added to the note: "Pipetting Analyzer - SampleId=SID-000123". Without it the note has no SampleId; and if that carrier goes straight on because the pit-lane is full, this pipette is not skipped.<br>A `Note over AN: ...` right after it replaces the text of the note |
+| `rotate <device>` | The turnstile turns by one position: entry → needle → exit. It waits by itself until the wheel is free (see Turnstile). Lasts 2 s | `duration=<s>` |
+| `highlight <device>` | The device lights up. Not needed when an antenna reads a carrier: the NSD, a divert or an antenna on its own light up by themselves. Lasts 1.5 s | `duration=<s>` |
+| `needle <device> down\|up` | Moves the needle by hand: down it stays there until `up`. Meanwhile the wheel can't turn and the carrier can't leave. The device must be a sampling point or a turnstile. Lasts 0.9 s | `duration=<s>` |
+| `status <device> error\|ready\|normal` | The color of an analyzer, a zone or a sampling point (one needle): red, green, grey, until the next `status`. Takes no time | — |
+| `operator <device>` | An operator walks in, works on the analyzer and walks away. Lasts 7 s | `duration=<s>`, at least 2 |
+| `show <carrier>` / `hide <carrier>` | The carrier fades in / out. Lasts 0.5 s | `duration=<s>` |
+| `wait <seconds>` | Nothing happens for that time | — |
+| `caption <title> \| <text>` | A caption in the band, until the next caption. Takes no time | — |
+
+An unknown directive is an error (with a suggestion when it looks like a known one),
+and so are `when`, `with`, `delay`, `after_start`, `after_end`, which no longer exist.
 
 An unknown directive is an error, so that typos don't get lost, and errors name the
 line of the diagram. Participants are
