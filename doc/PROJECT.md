@@ -136,6 +136,7 @@ trackviz "scenes/*.mmd"                          # più scene in parallelo (* e 
 trackviz <scene.mmd> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.mmd> --still <sec> --svg -o f.svg
 trackviz <scene.mmd>... --layout                 # solo out/<nome>_layout.png: punti e device con i nomi
+trackviz <scene.mmd>... --sheet                  # out/<nome>_sheet.png: un fotogramma per didascalia
 trackviz new <scena> [--geometry spur2] [--carriers 3]   # scheletro di una scena nuova (src/template.rs)
 trackviz <scene.mmd>... --check                  # valida e stampa la timeline
 trackviz <scene.mmd> --preview [--from S] [--to S] [--watch]   # anteprima veloce
@@ -167,6 +168,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 **Nastro:** 17,5 cm/s, impostato in `common/video.mmd` con `belt=` (cm/s; una scena può avere il suo con `%% @video belt=...`; senza, vale `BELT_SPEED`). Un carrier largo 4 cm è disegnato largo 44 px (11 px/cm, `PX_PER_CM`), quindi 192,5 px/s. `speed=` (px/s) su un carrier o su un move lo sostituisce. Tutti i move sono lineari a quella velocità; nelle scene non ci sono più `speed=`, `ease=` né `duration=` sui move. Le scene sono state riscritte per questa velocità: didascalie unite dove gli eventi erano troppo vicini, partenze dei carrier riposizionate, step riordinati per tempo. Durate: 01 29 s, 02 69 s, 03 45 s, 04 57 s, 05 34 s, 06 42 s, 07 26 s, 08 42 s, 09 30 s, 10 47 s, 11 36 s, 12 29 s, 13 49 s, 14 50 s, 15 43 s, 16 38 s, 17 29 s.
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
+
+**Foglio riassuntivo:** `--sheet` scrive `out/<nome>_sheet.png` (`write_sheet` in `main.rs`): per ogni didascalia il fotogramma subito prima della successiva (0,1 s prima; l'ultima alla fine della scena; mai prima che la didascalia sia comparsa), a metà dimensione, due per riga, resi in parallelo. Una scena senza didascalie è un errore.
 
 **Avvisi in più di `--check`:** didascalie visibili meno di 2,5 s o scritte in un ordine diverso da quello in cui compaiono; messaggi scritti in un ordine diverso da quello di invio (il video segue il tempo, il diagramma Mermaid l'ordine del file). Il test sulle scene li vieta.
 

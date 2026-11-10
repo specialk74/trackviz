@@ -321,6 +321,85 @@
       ]
     },
     {
+      "label": "trackviz: contact sheet of this scene",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "${file}",
+        "--sheet"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    },
+    {
       "label": "trackviz: check all scenes",
       "type": "shell",
       "command": "cargo",

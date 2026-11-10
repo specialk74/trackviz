@@ -26,6 +26,7 @@ $B scenes/a.mmd                  # the video: out/a.mp4 (and out/a_layout.png)
 $B scenes/a.mmd -o other.mp4     # the video, chosen file name
 $B scenes/a.mmd --check          # validate and print the timeline, no video
 $B scenes/a.mmd --layout         # only out/a_layout.png: names of points and devices
+$B scenes/a.mmd --sheet          # out/a_sheet.png: one frame per caption, at its end
 $B scenes/a.mmd --still 17 -o f.png   # one frame at 17 s
 $B scenes/a.mmd --preview        # half size, 15 fps: out/a_preview.mp4
 $B scenes/a.mmd --from 15 --to 25     # only that part (also out/a_preview.mp4)
@@ -35,6 +36,8 @@ $B new my_scene --geometry spur2 --carriers 3   # a new scene: scenes/my_scene.m
 cargo test --release             # the tests, all the scenes included
 ```
 
+- `--sheet` is for checking a scene without watching the video: a frame for every
+  caption, taken just before the next caption appears, two per row.
 - `--watch` takes one scene and also works with `--check` and `--still`.
 - With several scenes a failure doesn't stop the others; they are listed at the end and
   the exit code is 1. `-o` and `--still` take one scene.
@@ -52,7 +55,7 @@ up to that point.
 **VS Code.** With the project open: type `tv-` for a snippet of every directive and
 message (`tv-on`, `tv-pipette`, `tv-msg-prepare`, `tv-scene`, ...); Ctrl+Shift+B runs
 `--check` on the open scene and puts errors and warnings on their lines. More tasks
-(preview, video, layout, check all) in Terminal > Run Task.
+(preview, video, layout, contact sheet, check all) in Terminal > Run Task.
 
 ## Writing a scene
 

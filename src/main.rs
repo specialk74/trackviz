@@ -4,6 +4,7 @@
 //!   trackviz <scene.mmd>... [-o out.mp4] [-j jobs]   (default: out/<scene name>.mp4)
 //!   trackviz <scene.mmd> --still <seconds> [-o frame.png]
 //!   trackviz <scene.mmd>... --layout      (only out/<scene name>_layout.png: points and devices)
+//!   trackviz <scene.mmd>... --sheet       (out/<scene name>_sheet.png: one frame per caption)
 //!   trackviz new <scene> [--geometry spur2] [--carriers 3]   (the skeleton of a new scene)
 //!   trackviz <scene.mmd>... --check         (validate + print the timeline)
 //!   trackviz <scene.mmd> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
@@ -42,7 +43,7 @@ fn usage() -> String {
         "trackviz {VERSION}\n\
          {REPOSITORY}\n\
          usage: trackviz <scene.mmd>... [-o out.mp4] [-j jobs] [--still SECONDS [--svg]] [--check]\n\
-         \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch] [--layout]\n\
+         \x20                [--from SECONDS] [--to SECONDS] [--preview] [--watch] [--layout] [--sheet]\n\
          \x20 a scene is a Mermaid diagram with %% directives; its common/ folder is next to it or in scenes/\n\
          \x20 scene files may use the wildcards * and ? (e.g. \"scenes/*.mmd\"): they are rendered in parallel\n\
          \x20 without -o the video is written to out/<scene name>.mp4 (-o and --still take a single scene)\n\
@@ -51,6 +52,7 @@ fn usage() -> String {
          \x20 --watch repeats the command when the scene or a file it uses changes (one scene)\n\
          \x20 a full video also writes out/<scene name>_layout.png: the names of the points and devices\n\
          \x20 --layout writes only that image, without the video\n\
+         \x20 --sheet writes out/<scene name>_sheet.png: one frame per caption, at its end, to check a scene at a glance\n\
          \x20 trackviz new <scene> [--geometry name] [--carriers n] writes the skeleton of a new scene"
     )
 }
@@ -344,6 +346,7 @@ fn run() -> Result<(), String> {
     let mut still: Option<f64> = None;
     let mut svg_out = false;
     let mut layout = false;
+    let mut sheet = false;
     let mut check = false;
     let mut watch = false;
     let mut opts = VideoOpts::default();
@@ -376,6 +379,7 @@ fn run() -> Result<(), String> {
             "--svg" => svg_out = true,
             "--check" => check = true,
             "--layout" => layout = true,
+            "--sheet" => sheet = true,
             "-h" | "--help" => {
                 println!("{}", usage());
                 return Ok(());
@@ -396,8 +400,11 @@ fn run() -> Result<(), String> {
             }
         }
     }
-    if layout && (check || still.is_some() || opts.partial()) {
-        return Err("--layout writes only the layout image: not with --check, --still, --from, --to or --preview".into());
+    if layout && (check || still.is_some() || opts.partial() || sheet) {
+        return Err("--layout writes only the layout image: not with --check, --still, --from, --to, --preview or --sheet".into());
+    }
+    if sheet && (check || still.is_some() || opts.partial()) {
+        return Err("--sheet writes only the contact sheet: not with --check, --still, --from, --to or --preview".into());
     }
     if files.len() > 1 && (out.is_some() || still.is_some() || watch) {
         return Err(format!("-o, --still and --watch take a single scene, but {} were given", files.len()));
@@ -405,7 +412,7 @@ fn run() -> Result<(), String> {
     if opts.partial() && (check || still.is_some()) {
         return Err("--from, --to and --preview are for videos: not with --check or --still".into());
     }
-    let job = Job { out, still, layout, svg_out, check, jobs: jobs.max(1), opts };
+    let job = Job { out, still, layout, sheet, svg_out, check, jobs: jobs.max(1), opts };
     if watch {
         watch_scene(&files[0], &job);
     }
@@ -418,6 +425,8 @@ struct Job {
     still: Option<f64>,
     /// Only the layout image (`--layout`).
     layout: bool,
+    /// Only the contact sheet (`--sheet`).
+    sheet: bool,
     svg_out: bool,
     check: bool,
     jobs: usize,
@@ -440,7 +449,8 @@ impl Job {
             }
             return report_failures(failures, files.len());
         }
-        if self.layout {
+        if self.layout || self.sheet {
+            // One image per scene, next to where its video would go.
             let mut failures = Vec::new();
             for f in files {
                 let res = load(f).and_then(|(sc, tl)| {
@@ -448,10 +458,15 @@ impl Job {
                         Some(o) => o.clone(),
                         None => {
                             std::fs::create_dir_all("out").map_err(|e| format!("cannot create out/: {e}"))?;
-                            layout_path(&default_out(f, VideoOpts::default()))
+                            let video = default_out(f, VideoOpts::default());
+                            if self.sheet { sheet_path(&video) } else { layout_path(&video) }
                         }
                     };
-                    write_layout(&sc, &tl, &path)
+                    if self.sheet {
+                        write_sheet(&sc, &tl, &path, self.jobs)
+                    } else {
+                        write_layout(&sc, &tl, &path)
+                    }
                 });
                 match res {
                     Ok(()) => {}
@@ -551,6 +566,66 @@ fn write_layout(sc: &scene::Scene, tl: &scene::Timeline, path: &str) -> Result<(
     Ok(())
 }
 
+/// The contact sheet next to a video: out/a.mp4 -> out/a_sheet.png.
+fn sheet_path(video: &str) -> String {
+    let stem = video.strip_suffix(".mp4").unwrap_or(video);
+    format!("{stem}_sheet.png")
+}
+
+/// The instants of the contact sheet: for every caption, the last moment before
+/// the next one appears (the end of the scene for the last one), when what it
+/// describes has happened; never before the caption has faded in.
+fn sheet_times(tl: &scene::Timeline) -> Vec<f64> {
+    let mut starts: Vec<f64> = tl.events.iter().filter(|e| matches!(e.ev, scene::Ev::Caption { .. })).map(|e| e.t0).collect();
+    starts.sort_by(f64::total_cmp);
+    starts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    (0..starts.len())
+        .map(|i| {
+            let end = starts.get(i + 1).map_or(tl.duration, |&n| n - 0.1);
+            end.max(starts[i] + 0.5).min(tl.duration)
+        })
+        .collect()
+}
+
+/// Writes the contact sheet of a scene: one frame per caption, two per row, at
+/// half size.
+fn write_sheet(sc: &scene::Scene, tl: &scene::Timeline, path: &str, jobs: usize) -> Result<(), String> {
+    const COLS: u32 = 2;
+    const GAP: u32 = 16;
+    let times = sheet_times(tl);
+    if times.is_empty() {
+        return Err(format!("{path}: the scene has no captions, so there is no contact sheet"));
+    }
+    let (w, h) = ((sc.video.width / 2).max(2), (sc.video.height / 2).max(2));
+    let opt = raster_options();
+    // The frames, a few at a time.
+    let mut tiles: Vec<Option<Result<tiny_skia::Pixmap, String>>> = (0..times.len()).map(|_| None).collect();
+    for chunk in tiles.chunks_mut(jobs.max(1)).enumerate() {
+        let (ci, slots) = chunk;
+        std::thread::scope(|scope| {
+            for (k, slot) in slots.iter_mut().enumerate() {
+                let t = times[ci * jobs.max(1) + k];
+                let opt = &opt;
+                scope.spawn(move || *slot = Some(rasterize(opt, &render::frame(sc, tl, t), w, h)));
+            }
+        });
+    }
+    let rows = (times.len() as u32).div_ceil(COLS);
+    let (sw, sh) = (COLS * w + (COLS + 1) * GAP, rows * h + (rows + 1) * GAP);
+    let mut sheet = tiny_skia::Pixmap::new(sw, sh).ok_or_else(|| format!("invalid sheet size {sw}x{sh}"))?;
+    sheet.fill(tiny_skia::Color::from_rgba8(0xCB, 0xD5, 0xE1, 0xFF));
+    for (i, tile) in tiles.into_iter().enumerate() {
+        let tile = tile.expect("every tile is rendered")?;
+        let (c, r) = (i as u32 % COLS, i as u32 / COLS);
+        let (x, y) = (GAP + c * (w + GAP), GAP + r * (h + GAP));
+        sheet.draw_pixmap(x as i32, y as i32, tile.as_ref(), &tiny_skia::PixmapPaint::default(), tiny_skia::Transform::identity(), None);
+    }
+    let png = sheet.encode_png().map_err(|e| e.to_string())?;
+    std::fs::write(path, png).map_err(|e| format!("{path}: {e}"))?;
+    eprintln!("wrote {path} ({} frames)", times.len());
+    Ok(())
+}
+
 /// Modification times of the scene and of everything it includes.
 fn stamps(files: &[PathBuf]) -> Vec<Option<SystemTime>> {
     files.iter().map(|f| std::fs::metadata(f).and_then(|m| m.modified()).ok()).collect()
@@ -588,6 +663,31 @@ mod tests {
 
     fn m(p: &str, n: &str) -> bool {
         wildcard_match(&p.chars().collect::<Vec<_>>(), &n.chars().collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn the_contact_sheet_shows_every_caption_at_its_end() {
+        let (_, tl) = load(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/02_turnstile_three_carriers.mmd")).unwrap();
+        let mut caps: Vec<f64> = tl.events.iter().filter(|e| matches!(e.ev, scene::Ev::Caption { .. })).map(|e| e.t0).collect();
+        caps.sort_by(f64::total_cmp);
+        let times = sheet_times(&tl);
+        assert_eq!(times.len(), caps.len());
+        for (i, &t) in times.iter().enumerate() {
+            // The frame shows caption i: after it has faded in, before the next one.
+            assert!(t >= caps[i] + 0.4 && caps.get(i + 1).is_none_or(|&n| t < n), "caption {i}: {t}");
+        }
+        assert!((times.last().unwrap() - tl.duration).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_contact_sheet_is_a_grid_of_frames() {
+        let (sc, tl) = load(concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/01_prepare_sample_release.mmd")).unwrap();
+        let path = std::env::temp_dir().join("trackviz_sheet_test.png");
+        write_sheet(&sc, &tl, path.to_str().unwrap(), 4).unwrap();
+        let img = tiny_skia::Pixmap::load_png(&path).unwrap();
+        let rows = (sheet_times(&tl).len() as u32).div_ceil(2);
+        assert_eq!((img.width(), img.height()), (2 * 960 + 3 * 16, rows * 540 + (rows + 1) * 16));
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
