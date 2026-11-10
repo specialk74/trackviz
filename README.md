@@ -33,11 +33,17 @@ $B scenes/a.mmd --from 15 --to 25     # only that part (also out/a_preview.mp4)
 $B scenes/a.mmd --preview --watch     # again every time the scene is saved (Ctrl-C stops)
 $B "scenes/*.mmd"                # several scenes, in parallel
 $B new my_scene --geometry spur2 --carriers 3   # a new scene: scenes/my_scene.mmd
+$B index                         # out/index.html: the page that lists the videos
 cargo test --release             # the tests, all the scenes included
 ```
 
 - `--sheet` is for checking a scene without watching the video: a frame for every
   caption, taken just before the next caption appears, two per row.
+- `index` writes one page for handing the videos over: for every scene its subtitle,
+  length, the video with a cover frame and its captions as chapters (a click plays
+  the video from there). Default all of `scenes/`; give scenes or `-o` to change it.
+  The page needs no other file: hand over `out/index.html` with the `.mp4` files next
+  to it. It warns about videos that are not there yet.
 - `--watch` takes one scene and also works with `--check` and `--still`.
 - With several scenes a failure doesn't stop the others; they are listed at the end and
   the exit code is 1. `-o` and `--still` take one scene.

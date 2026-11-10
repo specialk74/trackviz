@@ -115,13 +115,16 @@ trackviz/
 │   ├── 15_spur2_analyzer_error_recovery.mmd
 │   ├── 16_spur2_carrier_runaway.mmd
 │   ├── 17_mermaid_spur_happy_path.mmd
+│   ├── 18_turnstile_prepare_at_antenna.mmd
 │   └── common/           # parti comuni .mmd: video, attori, messaggi, geometrie, direttive
-├── out/                  # video generati
+├── out/                  # video generati, immagini di layout e fogli riassuntivi, index.html
 └── src/
     ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
     ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
     ├── physics.rs        # fisica dei carrier: code a contatto, incroci, precedenze
     ├── mermaid.rs        # lettura delle scene Mermaid
+    ├── template.rs       # trackviz new: scheletro di una scena nuova
+    ├── index.rs          # trackviz index: pagina con l'elenco dei video
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
     ├── scene.rs          # modello della scena, validazione, calcolo timeline
     ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
@@ -137,6 +140,7 @@ trackviz <scene.mmd> --still <sec> [-o f.png]    # singolo fotogramma PNG
 trackviz <scene.mmd> --still <sec> --svg -o f.svg
 trackviz <scene.mmd>... --layout                 # solo out/<nome>_layout.png: punti e device con i nomi
 trackviz <scene.mmd>... --sheet                  # out/<nome>_sheet.png: un fotogramma per didascalia
+trackviz index [<scene.mmd>...] [-o out/index.html]   # pagina con l'elenco dei video
 trackviz new <scena> [--geometry spur2] [--carriers 3]   # scheletro di una scena nuova (src/template.rs)
 trackviz <scene.mmd>... --check                  # valida e stampa la timeline
 trackviz <scene.mmd> --preview [--from S] [--to S] [--watch]   # anteprima veloce
@@ -170,6 +174,8 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
 
 **Foglio riassuntivo:** `--sheet` scrive `out/<nome>_sheet.png` (`write_sheet` in `main.rs`): per ogni didascalia il fotogramma subito prima della successiva (0,1 s prima; l'ultima alla fine della scena; mai prima che la didascalia sia comparsa), a metà dimensione, due per riga, resi in parallelo. Una scena senza didascalie è un errore.
+
+**Indice dei video:** `trackviz index` (`src/index.rs`, `index_cmd` in `main.rs`) scrive una pagina HTML autonoma per consegnare i video: titolo comune, sommario con le durate, e per ogni scena sottotitolo, video (`<nome>.mp4` nella cartella della pagina, cioè il nome di un render completo), copertina (fotogramma alla fine della didascalia centrale, 960×540, PNG in base64 nella pagina) e didascalie come capitoli cliccabili. Se un video manca la scena mostra la copertina e un avviso, e il comando lo segnala. Scene con errori: saltate, elencate alla fine (codice di uscita 1).
 
 **Avvisi in più di `--check`:** didascalie visibili meno di 2,5 s o scritte in un ordine diverso da quello in cui compaiono; messaggi scritti in un ordine diverso da quello di invio (il video segue il tempo, il diagramma Mermaid l'ordine del file). Il test sulle scene li vieta.
 

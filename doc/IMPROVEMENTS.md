@@ -24,7 +24,7 @@ Deciso con l'utente, a tappe:
 ## 1. Miglioramenti proposti, non ancora fatti
 
 Le voci 1.2–1.4 servono a scrivere le scene più in fretta, le 1.5–1.7 a controllarle e
-consegnarle (fatte: 1.1 highlight automatico, 1.2 `trackviz new`, 1.3 snippet e controllo in VS Code, 1.4 la ruota aspetta di essere libera, 1.5 foglio riassuntivo). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
+consegnarle (fatte: 1.1 highlight automatico, 1.2 `trackviz new`, 1.3 snippet e controllo in VS Code, 1.4 la ruota aspetta di essere libera, 1.5 foglio riassuntivo, 1.6 indice dei video). Nuovi scenari e contenuti sono nella Roadmap di `PROJECT.md`, sezione 11.
 
 ### 1.4 Fatto — la ruota aspetta di essere libera
 
@@ -40,10 +40,13 @@ subito prima che compaia la successiva (l'ultimo alla fine della scena), due per
 metà dimensione. Va anche con più scene e con i caratteri jolly; in VS Code c'è il task
 "contact sheet of this scene".
 
-### 1.6 Indice dei video
+### 1.6 Fatto — indice dei video
 
-Una pagina HTML o un README con l'elenco degli scenari, per consegnarli come pacchetto
-unico.
+`trackviz index` scrive `out/index.html`: titolo comune, elenco delle scene con durata,
+poi per ogni scena il sottotitolo, il video con un fotogramma di copertina e le
+didascalie come capitoli che fanno partire il video da quel punto. La pagina non usa
+altri file (stili, script e copertine sono dentro): si consegna con gli `.mp4` accanto.
+Senza argomenti prende tutte le scene di `scenes/`; avvisa se manca un video.
 
 ### 1.7 Didascalie in più lingue
 
@@ -91,7 +94,7 @@ Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi co
 `{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
 carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass`,
 route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
-accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
+accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), indice dei video (`trackviz index`), immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
 ordine), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).
