@@ -219,26 +219,26 @@ impl AnalyzerState {
     }
 }
 
+/// When a step starts, as the directives say; `delay` is added on top.
 #[derive(Clone, PartialEq)]
 pub enum StartMode {
+    /// When the step before ends (`after <seconds>`, or nothing).
     After,
-    With,
-    AfterAll,
-    /// Absolute start time in seconds (`at = ...`); `delay` is added on top.
+    /// At that second of the video (`at <seconds>`).
     At(f64),
-    /// `when = ...`: when something earlier in the file happens; with several
-    /// causes joined by " and ", when the last of them happens.
-    When(Vec<Anchor>),
+    /// When something earlier in the file happens (`on <antenna>`,
+    /// `after <seconds> <what>`).
+    When(Anchor),
 }
 
-/// What a `when` refers to.
+/// What a step waits for.
 #[derive(Clone, PartialEq)]
 pub enum Anchor {
     /// "C1 at merge": the carrier reaches the point.
     Arrival { carrier: String, point: String },
-    /// "query C1 sent", "query C1 arrived", "pipette sp done": the latest matching
-    /// step before this one in the file, at its start or at its end.
-    Event { key: String, end: bool },
+    /// "query C1 arrived", "pipette sp done": the end of the latest matching step
+    /// before this one in the file.
+    Event { key: String },
 }
 
 impl Anchor {
@@ -246,9 +246,8 @@ impl Anchor {
         let t: Vec<&str> = w.split_whitespace().collect();
         match t[..] {
             [carrier, "at", point] => Some(Anchor::Arrival { carrier: carrier.into(), point: point.into() }),
-            [ref who @ .., "sent"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" "), end: false }),
-            [ref who @ .., "arrived"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" "), end: true }),
-            [kind @ ("pipette" | "rotate" | "needle"), device, "done"] => Some(Anchor::Event { key: format!("{kind} {device}"), end: true }),
+            [ref who @ .., "arrived"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" ") }),
+            [kind @ ("pipette" | "rotate" | "needle"), device, "done"] => Some(Anchor::Event { key: format!("{kind} {device}") }),
             _ => None,
         }
     }
@@ -633,7 +632,7 @@ impl Scene {
 
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
-            let common = ["action", "start", "at", "after_start", "after_end", "when", "delay", "duration"];
+            let common = ["action", "at", "after", "when", "delay", "duration"];
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
@@ -720,41 +719,22 @@ impl Scene {
                     Action::Wait
                 }
             };
-            // When the step starts: `at` (absolute), `after_start` / `after_end`
-            // (seconds after the start / end of the previous step) or `start`.
-            let (at, after_start, after_end) = (t.num_opt("at")?, t.num_opt("after_start")?, t.num_opt("after_end")?);
-            let start_key = t.str_opt("start")?;
-            let when = t.str_opt("when")?;
-            let given = [at.is_some(), after_start.is_some(), after_end.is_some(), start_key.is_some(), when.is_some()].iter().filter(|b| **b).count();
-            if given > 1 {
-                return Err(format!("{}: use only one of 'at', 'after_start', 'after_end', 'when', 'start'", t.location()));
+            // When the step starts: `at` (a second of the video), `after` (seconds
+            // after the step before ends) or `when` (something earlier happens).
+            let (at, after, when) = (t.num_opt("at")?, t.num_opt("after")?, t.str_opt("when")?);
+            if [at.is_some(), after.is_some(), when.is_some()].iter().filter(|b| **b).count() > 1 {
+                return Err(format!("{}: use only one of 'at', 'after', 'when'", t.location()));
             }
-            for (k, v) in [("after_start", after_start), ("after_end", after_end)] {
-                if v.is_some_and(|v| v < 0.0) {
-                    return Err(format!("{}: '{k}' must not be negative", t.location()));
-                }
+            if after.is_some_and(|v| v < 0.0) {
+                return Err(format!("{}: 'after' must not be negative", t.location()));
             }
-            let mut delay = t.num_opt("delay")?.unwrap_or(0.0);
-            let start = if let Some(w) = when {
-                let anchors = w.split(" and ").map(|p| Anchor::parse(p.trim())).collect::<Option<Vec<_>>>().ok_or_else(|| {
-                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] sent|arrived\" or \"pipette|rotate|needle <device> done\", joined by \" and \", not \"{w}\"", t.location())
-                })?;
-                StartMode::When(anchors)
-            } else if let Some(at) = at {
-                StartMode::At(at)
-            } else if let Some(d) = after_start {
-                delay += d;
-                StartMode::With
-            } else if let Some(d) = after_end {
-                delay += d;
-                StartMode::After
-            } else {
-                match start_key.as_deref().unwrap_or("after") {
-                    "after" => StartMode::After,
-                    "with" => StartMode::With,
-                    "after_all" => StartMode::AfterAll,
-                    o => return Err(format!("{}: unknown start '{o}' (after|with|after_all)", t.location())),
-                }
+            let delay = t.num_opt("delay")?.unwrap_or(0.0) + after.unwrap_or(0.0);
+            let start = match (when, at) {
+                (Some(w), _) => StartMode::When(Anchor::parse(&w).ok_or_else(|| {
+                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] arrived\" or \"pipette|rotate|needle <device> done\", not \"{w}\"", t.location())
+                })?),
+                (None, Some(at)) => StartMode::At(at),
+                (None, None) => StartMode::After,
             };
             steps.push(Step {
                 action,
@@ -875,8 +855,8 @@ impl Scene {
                 Action::Pipette { sample: Some(s), .. } if !sid.is_empty() && *s == sid => dropped[k] = true,
                 _ => {}
             }
-            if let StartMode::When(anchors) = &st.start {
-                if anchors.iter().any(|a| matches!(a, Anchor::Arrival { carrier, point } if *carrier == cid && after_diversion(point))) {
+            if let StartMode::When(Anchor::Arrival { carrier, point }) = &st.start {
+                if *carrier == cid && after_diversion(point) {
                     dropped[k] = true;
                 }
             }
@@ -901,11 +881,8 @@ impl Scene {
                 if dropped[k] {
                     continue;
                 }
-                if let StartMode::When(anchors) = &sc.steps[k].start {
-                    let lost = anchors.iter().any(|a| match a {
-                        Anchor::Event { key, .. } => sc.steps[..k].iter().enumerate().rev().find(|(_, s)| keys(s).contains(key)).is_some_and(|(j, _)| dropped[j]),
-                        _ => false,
-                    });
+                if let StartMode::When(Anchor::Event { key }) = &sc.steps[k].start {
+                    let lost = sc.steps[..k].iter().enumerate().rev().find(|(_, s)| keys(s).contains(key)).is_some_and(|(j, _)| dropped[j]);
                     if lost {
                         dropped[k] = true;
                         more = true;
@@ -1456,7 +1433,7 @@ impl Timeline {
         let mut wheel_recs: Vec<WheelRec> = Vec::new();
 
         let mut events = Vec::new();
-        let (mut prev_start, mut prev_end, mut max_end) = (0.0f64, 0.0f64, 0.0f64);
+        let (mut prev_end, mut max_end) = (0.0f64, 0.0f64);
         let mut first = true;
         // What a `when` can refer to: (key, start, end) of the steps so far.
         let mut history: Vec<(String, f64, f64)> = Vec::new();
@@ -1465,32 +1442,22 @@ impl Timeline {
         for (si, st) in sc.steps.iter().enumerate() {
             let base = match &st.start {
                 StartMode::At(at) => *at,
-                StartMode::When(anchors) => {
-                    let mut base = f64::NEG_INFINITY;
-                    for anchor in anchors {
-                        base = base.max(match anchor {
-                            Anchor::Event { key, end } => {
-                                let &(_, a, b) = history.iter().rev().find(|h| h.0 == *key)
-                                    .ok_or_else(|| format!("{}: no earlier step matches '{key}' (it must come before this step in the file)", st.loc))?;
-                                if *end { b } else { a }
-                            }
-                            Anchor::Arrival { carrier, point } => {
-                                let ci = sc.need_carrier(carrier, &st.loc)?;
-                                let i = sc.carriers[ci].route.iter().position(|p| p == point)
-                                    .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
-                                let path = &carriers[ci];
-                                path.reaches(path.cum[i]).ok_or_else(|| {
-                                    format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
-                                })?
-                            }
-                        });
-                    }
-                    base
+                StartMode::When(Anchor::Event { key }) => {
+                    history.iter().rev().find(|h| h.0 == *key).map(|h| h.2).ok_or_else(|| {
+                        format!("{}: no '{key}' before this step: 'after <seconds> {key}' refers to one written earlier in the file", st.loc)
+                    })?
+                }
+                StartMode::When(Anchor::Arrival { carrier, point }) => {
+                    let ci = sc.need_carrier(carrier, &st.loc)?;
+                    let i = sc.carriers[ci].route.iter().position(|p| p == point)
+                        .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
+                    let path = &carriers[ci];
+                    path.reaches(path.cum[i]).ok_or_else(|| {
+                        format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
+                    })?
                 }
                 _ if first => 0.0,
                 StartMode::After => prev_end,
-                StartMode::With => prev_start,
-                StartMode::AfterAll => max_end,
             };
             first = false;
             let mut t0 = base + st.delay;
@@ -1662,7 +1629,6 @@ impl Timeline {
                 log.push(format!("{t0:7.2}s - {t1:7.2}s  note      {}: {text}", sc.actors[ai].id));
                 events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row: 0 } });
             }
-            prev_start = t0;
             prev_end = t1;
             max_end = max_end.max(t1);
         }

@@ -79,11 +79,11 @@ fn steps_without_timing_keys_run_one_after_the_other() {
 }
 
 #[test]
-fn start_with_after_all_and_delay() {
-    let steps = [msg("duration=4 "), msg("start=with delay=1 "), msg("start=after_all ")].concat();
+fn after_waits_that_long_after_the_step_before() {
+    let steps = [msg("duration=4 "), msg("after=1 "), msg("after=0.5 delay=0.5 ")].concat();
     let (_, tl) = ok(SAMPLING, &steps);
-    // second: starts 1 s after the first (0 + 1) and ends at 2.5; after_all waits for 4.
-    assert_eq!(starts(&tl), vec![0.0, 1.0, 4.0]);
+    // 0 - 4; 4 + 1 = 5, it ends at 6.5; 6.5 + 0.5 + 0.5.
+    assert_eq!(starts(&tl), vec![0.0, 5.0, 7.5]);
 }
 
 #[test]
@@ -93,18 +93,13 @@ fn at_is_absolute_plus_delay() {
 }
 
 #[test]
-fn after_start_and_after_end_are_relative_to_the_previous_step() {
-    let steps = [msg("at=10 "), msg("after_start=3 "), msg("after_end=3 "), msg("after_end=1 delay=0.5 ")].concat();
-    let (_, tl) = ok(SAMPLING, &steps);
-    assert_eq!(starts(&tl), vec![10.0, 13.0, 17.5, 20.5]);
-}
-
-#[test]
 fn only_one_timing_key_per_step() {
-    err(SAMPLING, &msg("at=1 after_end=2 "), "use only one of");
-    err(SAMPLING, &msg("start=with after_start=2 "), "use only one of");
-    err(SAMPLING, &msg("after_end=-1 "), "must not be negative");
-    err(SAMPLING, &msg("start=later "), "unknown start");
+    err(SAMPLING, &msg("at=1 after=2 "), "use only one of");
+    err(SAMPLING, &msg("after=-1 "), "must not be negative");
+    // The keys of the old format are gone.
+    for old in ["start=with ", "after_start=1 ", "after_end=1 "] {
+        err(SAMPLING, &msg(old), "unknown key");
+    }
 }
 
 #[test]
@@ -178,7 +173,7 @@ fn move_errors() {
 
 #[test]
 fn a_move_asked_while_moving_starts_when_the_carrier_stops() {
-    let (_, tl) = ok(SAMPLING, "\n%% @step action=move ease=linear carrier=C1 to=s \n%% @step action=move ease=linear start=with carrier=C1 to=c ");
+    let (_, tl) = ok(SAMPLING, "\n%% @step action=move ease=linear carrier=C1 to=s \n%% @step action=move ease=linear at=0 carrier=C1 to=c ");
     // 300 px to s (4 s), then 150 px to c (2 s) right after.
     assert!((tl.events[1].t1 - 6.0).abs() < 1e-6, "{}", tl.events[1].t1);
     assert_eq!(tl.carrier_pos(0, 5.0), (525.0, 700.0));
@@ -414,7 +409,7 @@ fn turnstile_rules() {
         TURNSTILE,
         &format!(
             "{C1_IN}\n%% @step action=rotate device=ts \n%% @step action=pipette device=ts duration=10 \
-             \n%% @step action=move start=with carrier=C2 to=ts.in "
+             \n%% @step action=move when=\"rotate ts done\" carrier=C2 to=ts.in "
         ),
         "must wait at the gate",
     );
@@ -504,7 +499,7 @@ fn the_wheel_waits_until_a_leaving_carrier_is_clear() {
     );
     // ts.out is 70 px from the center; clear means r + rim + carrier = 124 px.
     // Asked 0.2 s after C1 starts to leave, the rotation waits until C1 is clear.
-    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=0.2 device=ts "));
+    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate when=\"C1 at ts.out\" delay=0.2 device=ts "));
     let w = &tl.wheels[0];
     let (r0, _) = *w.rots.last().unwrap();
     let left = tl.carriers[0].moves.last().unwrap().t0;
@@ -516,7 +511,7 @@ fn the_wheel_waits_until_a_leaving_carrier_is_clear() {
     let clear = w.r + TS_RIM + CARRIER_R;
     assert!(dist(r0) >= clear - 1e-6 && dist(r0 - 0.05) < clear, "{} {}", dist(r0), dist(r0 - 0.05));
     // Asked late enough, it starts when asked.
-    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate start=with delay=1.5 device=ts "));
+    let (_, tl) = ok(TURNSTILE, &format!("{base}\n%% @step action=rotate when=\"C1 at ts.out\" delay=1.5 device=ts "));
     let left = tl.carriers[0].moves.last().unwrap().t0;
     assert!((tl.wheels[0].rots.last().unwrap().0 - (left + 1.5)).abs() < 1e-9);
 }
@@ -524,7 +519,7 @@ fn the_wheel_waits_until_a_leaving_carrier_is_clear() {
 #[test]
 fn the_wheel_waits_for_a_carrier_driving_into_the_entry() {
     // The rotation is asked while C1 is still on its way into the entry pocket.
-    let (_, tl) = ok(TURNSTILE, &format!("{C1_IN}\n%% @step action=rotate start=with delay=0.1 device=ts "));
+    let (_, tl) = ok(TURNSTILE, &format!("{C1_IN}\n%% @step action=rotate at=0.1 device=ts "));
     let a = &tl.carriers[0].attach[0];
     assert!((tl.wheels[0].rots[0].0 - a.t0).abs() < 1e-9);
 }
@@ -650,18 +645,20 @@ fn when_follows_messages_and_actions() {
         "{TYPES}\n%% @step action=message type=acq at=2 carrier=C1 needle=1 \
          \n%% @step action=pipette when=\"acq C1 arrived\" device=sp duration=4 \
          \n%% @step action=message type=acq when=\"pipette sp done\" delay=0.5 carrier=G needle=2 \
-         \n%% @step action=wait when=\"acq sent\" duration=1 \n%% @step action=wait when=\"acq C1 sent\" duration=1 "
+         \n%% @step action=wait when=\"acq arrived\" duration=1 \n%% @step action=wait when=\"acq C1 arrived\" duration=1 "
     );
     let (_, tl) = ok(SAMPLING, &chain);
-    // 2 + 1.5 flight = 3.5; + 4 pipette + 0.5 = 8; the latest "acq"; C1's own.
-    assert_eq!(starts(&tl), vec![2.0, 3.5, 8.0, 8.0, 2.0]);
+    // 2 + 1.5 flight = 3.5; + 4 pipette + 0.5 = 8; the latest "acq" arrives at 9.5;
+    // C1's own at 3.5.
+    assert_eq!(starts(&tl), vec![2.0, 3.5, 8.0, 9.5, 3.5]);
 }
 
 #[test]
 fn when_errors() {
     err(SAMPLING, &[C1_MOVES, &msg("when=\"C1 near c\" ")].concat(), "'when' is");
-    err(SAMPLING, &msg("when=\"query C1 sent\" "), "no earlier step matches 'query C1'");
-    err(SAMPLING, &msg("when=\"pipette sp done\" "), "no earlier step matches 'pipette sp'");
+    err(SAMPLING, &msg("when=\"query C1 arrived\" "), "no 'query C1' before this step");
+    err(SAMPLING, &msg("when=\"pipette sp done\" "), "no 'pipette sp' before this step");
+    err(SAMPLING, &msg("when=\"query C1 sent\" "), "'when' is");
     err(SAMPLING, &[C1_MOVES, &msg("when=\"C9 at c\" ")].concat(), "unknown carrier 'C9'");
     err(SAMPLING, &[C1_MOVES, &msg("when=\"C1 at nowhere\" ")].concat(), "not on the route");
     err(SAMPLING, &[C1_MOVES, &msg("when=\"C1 at c\" at=2 ")].concat(), "use only one of");
@@ -708,7 +705,7 @@ const MERGE: &str = r#"
 
 #[test]
 fn at_a_merge_the_carrier_declared_first_goes_and_the_other_waits() {
-    let (_, tl) = ok(MERGE, "\n%% @step action=move ease=linear carrier=C1 to=z \n%% @step action=move ease=linear start=with carrier=C2 to=c ");
+    let (_, tl) = ok(MERGE, "\n%% @step action=move ease=linear carrier=C1 to=z \n%% @step action=move ease=linear at=0 carrier=C2 to=c ");
     // Both are 200 px from the merge: C1 passes without stopping, C2 waits and
     // follows it (without the wait it would reach c at 6 s).
     assert!((tl.events[0].t1 - 10.0).abs() < 1e-9, "{}", tl.events[0].t1);
@@ -726,7 +723,7 @@ fn at_a_merge_the_carrier_declared_first_goes_and_the_other_waits() {
 fn a_carrier_declared_first_but_behind_still_follows() {
     // C1 is declared first but starts behind C2: it must not drive through it.
     let lane = LANE.replace("route=a,s,c start=s speed=100", "route=a,s,c speed=100").replace("%% @carrier id=C2 route=a,s,c speed=100", "%% @carrier id=C2 route=a,s,c start=s speed=50");
-    let (_, tl) = ok(&lane, "\n%% @step action=move ease=linear carrier=C2 to=c \n%% @step action=move ease=linear start=with carrier=C1 to=c ");
+    let (_, tl) = ok(&lane, "\n%% @step action=move ease=linear carrier=C2 to=c \n%% @step action=move ease=linear at=0 carrier=C1 to=c ");
     let mut t = 0.0;
     while t < tl.duration {
         let (a, b) = (tl.carrier_pos(0, t), tl.carrier_pos(1, t));

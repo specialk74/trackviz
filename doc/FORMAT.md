@@ -54,45 +54,29 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 | `@actor` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (this actor gets the "Pipetting" note) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |
 | `@carrier` | `id`, `tube`, `sample_id`, `route` = list of points and lane ids (see Routes in `README.md`), `start`, `speed` (px/s), `cap_color`, `ghost` (see below), `visible` (default true), `tag` (tag text, default the SampleId) |
-| `@step` | `action`, one of `start` / `at` / `after_start` / `after_end` / `when`, `delay`, `duration` + action keys (below) |
+| `@step` | only inside the program (see Steps): `action`, one of `at` / `after` / `when`, `delay`, `duration` + action keys |
 
 ## Steps
 
-These are the keys of a `@step` table, what the directives produce: `on antenna1` gives
-`when="C1 at nsd"`, `after 0.2 pipette sp` gives `when="pipette sp done" delay=0.2`,
-`after 1` gives `after_end=1`. Written by hand in `@step` lines they still work. Rows of
-the sequence diagram always follow time, whatever the order in the file.
+A scene doesn't write steps as tables: `%% @step` in a scene file is an error. The
+directives and the messages of the diagram become `@step` tables inside the program
+(and the tests write them directly). These are their keys.
 
-`start`:
+When the step starts, one of:
 
-- `after` (default): when the previous step ends
-- `with`: at the same time as the previous step
-- `after_all`: when every previous step has ended
-
-Instead of `start` (only one of these keys per step):
-
-- `at=<seconds>`: absolute time
-- `after_start=<seconds>`: that many seconds after the **start** of the previous step
-- `after_end=<seconds>`: that many seconds after the **end** of the previous step
-- `when`: when something happens, so the step follows it if the timing changes:
-  - `when="C1 at merge"`: the carrier reaches the point, also in the middle of a move
-  - `when="query C1 sent"` / `"query C1 arrived"`: a message starts / ends (named, or by `event`);
-    the carrier is optional (`"status_error sent"`)
+- nothing: when the step before in the file ends (the first step at 0 s);
+- `after=<seconds>`: that many seconds after the step before ends (`%% after 1`);
+- `at=<seconds>`: at that second of the video (`%% at 2.5`);
+- `when`: when something earlier in the file happens, plus `delay`:
+  - `when="C1 at nsd"`: the carrier reaches the point, also in the middle of a move
+    (`%% on antenna1`, `%% after 0.5 antenna2 C1`);
+  - `when="query C1 arrived"`: the latest such message has arrived; the carrier is
+    optional (`%% after 0.1 Query C1`);
   - `when="pipette sp done"`: a `pipette`, `rotate` or `needle` on that device ends
+    (`%% after 0.3 pipette sp`).
 
-  It refers to the latest matching step **before** it in the file, so write steps in
-  time order. Add `delay` for a wait after the event. Several causes joined by `and`
-  start the step at the last one.
-
-`delay` adds seconds on top of any of them. The previous step is the one
-before in the file. Example: a message `at=10` (1.5 s long), then
-`after_start=3` starts at 13 s, while `after_end=3` would start at 14.5 s.
-
-**With none of these keys** (no `start`, `at`, `after_start`, `after_end`, `when`) a step
-starts when the previous step ends, i.e. steps run one after the other. The first
-step of the file starts at 0 s. To start a step together with the previous one use
-`start=with` (same as `after_start=0`). Note that `caption` and `status` last
-0 s, so a step right after them starts at the same instant.
+`caption` and `status` last 0 s, so a step right after them starts at the same instant.
+Rows of the sequence diagram always follow time, whatever the order in the file.
 
 | action | keys | default duration |
 |---|---|---|
@@ -124,9 +108,8 @@ every scene:
 IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
 ```
 
-As a table, the message is `%% @step action=message type=sample_acquisition_needle
-carrier=C1 needle=1`: a step with `type` can't redefine the message, only `carrier`
-and `needle`, plus the timing keys, are allowed. A message that matches no type keeps its own text.
+Inside the program the message becomes `@step action=message type=sample_acquisition_needle
+carrier=C1 needle=1`. A message that matches no type keeps its own text.
 
 ## Turnstile
 

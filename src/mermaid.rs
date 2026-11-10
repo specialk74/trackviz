@@ -244,7 +244,7 @@ impl Importer {
 
     /// A step has one starting rule: only `delay` is added to another.
     fn no_start_yet(&self) -> Result<(), String> {
-        if self.on.is_some() || self.timing.iter().any(|(k, _)| ["when", "at", "start", "after_start", "after_end"].contains(k)) {
+        if self.on.is_some() || self.timing.iter().any(|(k, _)| ["when", "at", "after"].contains(k)) {
             return Err("only one of on, after, at for a step".into());
         }
         Ok(())
@@ -331,6 +331,11 @@ impl Importer {
     fn directive(&mut self, d: &str) -> Result<(), String> {
         if let Some(raw) = d.strip_prefix('@') {
             let (name, entries) = parse_line(raw)?;
+            // The steps are written with the directives and the messages of the
+            // diagram; the tables of steps are only the program's own (and the tests').
+            if name == "step" && self.base.is_some() {
+                return Err("'@step' is not written in a scene: use the directives (move, pass, pipette, caption, ...) and the messages of the diagram".into());
+            }
             let t = Table { name, line: self.line, file: self.file.clone(), entries };
             self.doc.add(t);
             return Ok(());
@@ -508,7 +513,7 @@ impl Importer {
     /// the antenna; `pipette|rotate|needle <device>` when that action ends.
     fn after(&mut self, secs: Value, refer: &[&str]) -> Result<(), String> {
         if refer.is_empty() {
-            return self.timing_key("after_end", secs);
+            return self.timing_key("after", secs);
         }
         if self.antennas().iter().any(|a| a.0 == refer[0]) {
             let [antenna, c] = refer else {
@@ -711,6 +716,7 @@ pub fn load(path: &Path, base: &Path) -> Result<Doc, String> {
 
 /// The data of a scene given as text, without shared files (used by the tests).
 #[cfg(test)]
+#[cfg(test)]
 pub fn parse_text(src: &str) -> Result<Doc, String> {
     let mut im = Importer::new(None);
     for (i, t) in src.lines().enumerate() {
@@ -821,7 +827,7 @@ mod tests {
         let d = doc(&format!("{HEAD}%% move C1 to nsd ease=in\n%% on antenna1\nIF->>AN: Prepare SampleId=SID-1\n%% at 3\n%% highlight nsd duration=2\n%% after 0.5\n%% caption a | b\n")).unwrap();
         assert!(has(&d, "step", &[("when", "C1 at nsd"), ("type", "prepare")]));
         assert!(has(&d, "step", &[("at", "3"), ("device", "nsd"), ("duration", "2")]));
-        assert!(has(&d, "step", &[("after_end", "0.5"), ("action", "caption")]));
+        assert!(has(&d, "step", &[("after", "0.5"), ("action", "caption")]));
         assert!(has(&d, "step", &[("action", "move"), ("ease", "in")]) && !has(&d, "step", &[("action", "move"), ("when", "C1 at nsd")]));
     }
 
@@ -848,7 +854,7 @@ mod tests {
         assert!(has(&d, "step", &[("action", "caption"), ("when", "C2 at nsd")]) && has(&d, "step", &[("carrier", "C2"), ("when", "C2 at nsd")]));
         assert!(has(&d, "step", &[("text", "Again"), ("when", "C1 at d1"), ("color", "#9333EA")]));
         assert!(has(&d, "step", &[("text", "Late"), ("when", "add_tube C1 arrived"), ("delay", "0.2")]));
-        assert!(has(&d, "step", &[("text", "Go"), ("after_end", "1")]));
+        assert!(has(&d, "step", &[("text", "Go"), ("after", "1")]));
         assert!(has(&d, "step", &[("action", "caption"), ("when", "C1 at d1"), ("delay", "0.5")]));
         assert!(has(&d, "step", &[("text", "Done"), ("when", "pipette sp1 done"), ("delay", "0.2")]));
         let (_, tl) = build(&d);
@@ -994,6 +1000,14 @@ mod tests {
         assert!(c1.file.ends_with("c.mmd") && c1.line == 1, "{} {}", c1.file, c1.line);
         let prepare = d.arrays["step"].iter().find(|t| t.entries.contains_key("type")).unwrap();
         assert!(prepare.file.ends_with("a.mmd") && prepare.line == 3);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_scene_file_has_no_step_tables() {
+        let dir = temp("step", &[("a.mmd", "sequenceDiagram\n%% @step action=wait duration=1\n")]);
+        let e = load(&dir.join("a.mmd"), &dir).err().unwrap();
+        assert!(e.contains("'@step' is not written in a scene") && e.contains("line 2"), "{e}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
