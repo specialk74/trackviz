@@ -60,7 +60,8 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 
 A scene doesn't write steps as tables: `%% @step` in a scene file is an error. The
 directives and the messages of the diagram become `@step` tables inside the program
-(and the tests write them directly). These are their keys.
+(and the tests write them directly). These are their keys. `id=<name>` (from `%% id`)
+names a step for a later `when`.
 
 When the step starts, one of:
 
@@ -70,8 +71,10 @@ When the step starts, one of:
 - `when`: when something earlier in the file happens, plus `delay`:
   - `when="C1 at nsd"`: the carrier reaches the point, also in the middle of a move
     (`%% on antenna1`, `%% after 0.5 antenna2 C1`);
-  - `when="query C1 arrived"`: the latest such message has arrived; the carrier is
-    optional (`%% after 0.1 Query C1`);
+  - `when="step ack1 done"`: the step with `id=ack1` ends (`%% id ack1` above a line,
+    `%% after 0.1 ack1`);
+  - `when="query C1 arrived"`: the latest message of that type has arrived; the
+    carrier is optional (only in the tests: a scene uses ids);
   - `when="pipette sp done"`: a `pipette`, `rotate` or `needle` on that device ends
     (`%% after 0.3 pipette sp`).
 

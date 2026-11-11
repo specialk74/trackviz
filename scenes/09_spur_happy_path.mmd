@@ -20,19 +20,23 @@ sequenceDiagram
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
     %% on antenna2
+    %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0.1 Sample Acquisition C1
+    %% after 0.1 sample-acquisition-c1
     %% for C1
+    %% id ok-c1-2
     AN-->>IF: OK
-    %% after 0.1 Query C1
+    %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-2
     %% caption 3 · Test query — Pipetting | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now it aspirates the tube, while the gate holds the carrier at the sampling point.
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-2
     %% pipette sp duration=4.5 sid=SID-000123
     %% after 0.2
     %% caption 4 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
@@ -48,8 +52,9 @@ sequenceDiagram
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1
+    %% id ok-c1-3
     AN-->>IF: OK
     %% after 0.5
     %% caption 6 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% after 0.5 OK C1
+    %% after 0.5 ok-c1-3
     AN->>DMX: Results SampleId=SID-000123

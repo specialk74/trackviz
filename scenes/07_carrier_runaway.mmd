@@ -27,66 +27,77 @@ sequenceDiagram
     %% at 3
     %% move C3 to queue
     %% on antenna1
+    %% id prepare-c1
     IF->>AN: Prepare SampleId=SID-000123
     %% on antenna1
+    %% id prepare-c2
     IF->>AN: Prepare SampleId=SID-000124
     %% on antenna1
+    %% id prepare-c3
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.1 Prepare C1
+    %% after 0.1 prepare-c1
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
     %% on antenna2 C1
     %% caption 2 · Sample Acquisition | The first carrier is at the sampling point, the other two queue up behind it. The interface sends Sample Acquisition for the first sample.
     %% on antenna2
+    %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% after 0.1 Prepare C2
+    %% after 0.1 prepare-c2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.1 Prepare C3
+    %% after 0.1 prepare-c3
     AN-->>IF: OK SampleId=SID-000125
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0.1 Sample Acquisition C1
+    %% after 0.1 sample-acquisition-c1
     %% for C1
     AN-->>IF: OK
-    %% after 0.1 Query C1
+    %% after 0.1 query-c1
+    %% id tests-to-perform-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
 
-    %% after 1.5 Sample Acquisition C1
+    %% after 1.5 sample-acquisition-c1
     %% move C1 to gone runaway
-    %% after 1.5 Sample Acquisition C1
+    %% after 1.5 sample-acquisition-c1
     %% caption 3 · Carrier run-away — the wrong sample is aspirated | Before the needle goes down the first carrier runs away and the second one slides under the needle: the interface turns red. The analyzer aspirates the second sample, believing it is the first.
-    %% after 1.5 Sample Acquisition C1
+    %% after 1.5 sample-acquisition-c1
     %% status interface error
     %% after 0.5 antenna2 C2
     %% pipette sp duration=4.5 sid=SID-000123
-    %% after 0.1 Tests to perform C1
+    %% after 0.1 tests-to-perform-c1
     AN->>DMX: Query SampleId=SID-000124
     %% after 0.1
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0.1
+    %% id query-c3
     AN->>DMX: Query SampleId=SID-000125
 
     %% after 0.3 pipette sp
     %% caption 4 · Sample Complete — Cancel | The analyzer sends Sample Complete for the first sample. The interface knows the first carrier is gone: it sends Cancel for the first sample, and the analyzer replies OK.
     %% after 0.3 pipette sp
+    %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% after 0.1 Query C3
+    %% after 0.1 query-c3
     DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% after 0.1 Sample Complete C1
+    %% after 0.1 sample-complete-c1
     %% for C1
     IF-->>AN: OK
-    %% after 0.2 Sample Complete C1
+    %% after 0.2 sample-complete-c1
     IF->>AN: Cancel SampleId=SID-000123
     %% after 0.1
+    %% id ok-c1-2
     AN-->>IF: OK SampleId=SID-000123
     %% after 0.1
+    %% id clear-all
     IF->>AN: Clear All
-    %% after 0.2 OK C1
+    %% after 0.2 ok-c1-2
     %% caption 5 · All carriers sent away — Clear All | Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away, without sampling. Once they have left the interface, it turns grey again.
-    %% after 0.2 OK C1
+    %% after 0.2 ok-c1-2
     %% pass sp
-    %% after 0.2 OK C1
+    %% after 0.2 ok-c1-2
     %% move C3 to gone
-    %% after 0.1 Clear All
+    %% after 0.1 clear-all
     AN-->>IF: OK
     %% on antenna3 C3
     %% status interface normal

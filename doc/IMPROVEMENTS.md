@@ -68,11 +68,9 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
   (GitHub, VS Code): sono verificati solo dal tool.
 - Un messaggio scritto nel `.mmd` che non corrisponde a un tipo di `messages.mmd` resta testo
   libero, senza avvisi: rinominare un tipo non aggiorna i diagrammi.
-- `after <secondi> <messaggio>` si riferisce all'ultimo messaggio con quel testo già
-  scritto nel file: i messaggi vanno tenuti in ordine di tempo.
 - La fisica non conosce gate e ruota: un carrier che deve aspettare al gate va mandato
   fino al punto dell'antenna, e l'ingresso nella ruota resta un `move` esplicito.
-- Alcuni ritardi hanno ancora decimali poco "umani" (`after 0.972 OK C1`): il riordino
+- Alcuni ritardi hanno ancora decimali poco "umani" (`after 0.972 ok-c1`): il riordino
   per tempo esprime una causa lontana sommando le durate degli step in mezzo.
 - Un tool per riordinare una scena per tempo (`trackviz sort`) sarebbe utile: oggi è
   uno script esterno usato durante la riscrittura.
@@ -94,7 +92,7 @@ Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi co
 `{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
 carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass`,
 route con nomi di corsia, capienza della pit-lane, nota di pipettatura con `sid=`,
-accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), indice dei video (`trackviz index`), formato `@step` solo interno (le scene usano solo le direttive), immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
+accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), indice dei video (`trackviz index`), formato `@step` solo interno (le scene usano solo le direttive), `%% id` per legare uno step alla fine di una riga qualsiasi (al posto del riconoscimento per testo del messaggio), immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
 ordine), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).

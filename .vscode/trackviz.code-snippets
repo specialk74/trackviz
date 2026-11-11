@@ -93,12 +93,19 @@
     ],
     "description": "The next step starts that many seconds after the step before has ended"
   },
-  "after message": {
-    "prefix": "tv-after-message",
+  "id": {
+    "prefix": "tv-id",
     "body": [
-      "%% after ${1:0.1} ${2:OK} ${3:C1}"
+      "%% id ${1:ack1}"
     ],
-    "description": "N seconds after the latest message with that text (for that carrier) has arrived"
+    "description": "Names the next line, for a later 'after <seconds> <id>'"
+  },
+  "after id": {
+    "prefix": "tv-after-id",
+    "body": [
+      "%% after ${1:0.1} ${2:ack1}"
+    ],
+    "description": "N seconds after the line marked with that id has ended"
   },
   "after antenna": {
     "prefix": "tv-after-antenna",

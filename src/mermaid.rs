@@ -81,8 +81,8 @@ impl MsgType {
 }
 
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 23] = [
-    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
+const DIRECTIVES: [&str; 24] = [
+    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "id", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
     "show", "hide", "wait", "caption", "pass",
 ];
 
@@ -188,9 +188,10 @@ struct Importer {
     on: Option<(String, String, Option<String>)>,
     /// `%% color`: the color of the next message.
     color: Option<String>,
-    /// The messages so far, for `%% after <seconds> <message> <carrier>`:
-    /// (text, carrier, event name).
-    sent: Vec<(String, Option<String>, String)>,
+    /// `%% id`: the name of the next step, for `%% after <seconds> <id>`.
+    next_id: Option<String>,
+    /// The names given so far.
+    ids: Vec<String>,
 }
 
 impl Importer {
@@ -212,7 +213,8 @@ impl Importer {
             next_carrier: None,
             on: None,
             color: None,
-            sent: Vec::new(),
+            next_id: None,
+            ids: Vec::new(),
         }
     }
 
@@ -235,6 +237,9 @@ impl Importer {
             self.timing.push(("when", text(&format!("{c} at {point}"))));
         }
         let mut all: Keys = vec![("action", text(action))];
+        if let Some(id) = self.next_id.take() {
+            all.push(("id", text(&id)));
+        }
         all.append(&mut self.timing);
         all.extend(keys);
         self.add("step", all);
@@ -372,7 +377,7 @@ impl Importer {
                 self.on_antenna(plain[0], plain.get(1).copied())?;
             }
             "after" => {
-                need(1, "after <seconds> [<message> [<carrier>] | <antenna> <carrier> | pipette|rotate|needle <device>]")?;
+                need(1, "after <seconds> [<id> | <antenna> <carrier> | pipette|rotate|needle <device>]")?;
                 self.after(seconds("after", plain[0])?, &plain[1..])?;
             }
             "color" => {
@@ -386,6 +391,12 @@ impl Importer {
             "at" => {
                 need(1, "at <seconds>")?;
                 self.timing_key("at", seconds(cmd, plain[0])?)?;
+            }
+            "id" => {
+                if plain.len() != 1 {
+                    return Err("'id' is written: id <name>".into());
+                }
+                self.name_next(plain[0])?;
             }
             "for" => {
                 need(1, "for <carrier>")?;
@@ -508,9 +519,9 @@ impl Importer {
     }
 
     /// `%% after <seconds>`: after the end of the step before. With what it waits
-    /// for: `<message> [<carrier>]` when that message has arrived (the latest with
-    /// that text, for that carrier); `<antenna> <carrier>` when the carrier is over
-    /// the antenna; `pipette|rotate|needle <device>` when that action ends.
+    /// for: `<id>` when the step named so with `%% id` ends; `<antenna> <carrier>`
+    /// when the carrier is over the antenna; `pipette|rotate|needle <device>` when
+    /// that action ends.
     fn after(&mut self, secs: Value, refer: &[&str]) -> Result<(), String> {
         if refer.is_empty() {
             return self.timing_key("after", secs);
@@ -528,21 +539,36 @@ impl Importer {
             self.timing_key("when", text(&format!("{kind} {device} done")))?;
             return self.timing_key("delay", secs);
         }
-        let mut name = refer.to_vec();
-        let carrier = name.last().filter(|w| self.samples.iter().any(|s| s.0 == **w)).map(|w| w.to_string());
-        if carrier.is_some() {
-            name.pop();
+        let [id] = refer else {
+            return Err(format!(
+                "'after <seconds> {}': write the id of a line (after <seconds> <id>, with %% id <id> above that line), an antenna and a carrier, or pipette|rotate|needle <device>",
+                refer.join(" ")
+            ));
+        };
+        if !self.ids.iter().any(|i| i == id) {
+            return Err(format!("'after': no line with id '{id}' before this one (write %% id {id} above the line to wait for)"));
         }
-        let name = name.join(" ");
-        let (_, c, event) = self
-            .sent
-            .iter()
-            .rev()
-            .find(|m| m.0.eq_ignore_ascii_case(&name) && (carrier.is_none() || m.1 == carrier))
-            .ok_or_else(|| format!("'after': no message '{name}'{} before this line", carrier.as_ref().map_or(String::new(), |c| format!(" for {c}"))))?;
-        let when = c.as_ref().map_or_else(|| format!("{event} arrived"), |c| format!("{event} {c} arrived"));
-        self.timing_key("when", text(&when))?;
+        self.timing_key("when", text(&format!("step {id} done")))?;
         self.timing_key("delay", secs)
+    }
+
+    /// `%% id <name>`: names the next step, so that a later `%% after` can wait for it.
+    fn name_next(&mut self, id: &str) -> Result<(), String> {
+        if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+            return Err(format!("an id has only letters, digits, '-' and '_': '{id}'"));
+        }
+        if ["pipette", "rotate", "needle"].contains(&id) || self.antennas().iter().any(|a| a.0 == id) {
+            return Err(format!("'{id}' is already the name of an antenna or an action: choose another id"));
+        }
+        if self.ids.iter().any(|i| i == id) {
+            return Err(format!("the id '{id}' is already used: each line has its own"));
+        }
+        if let Some(prev) = &self.next_id {
+            return Err(format!("'id {id}' after 'id {prev}': a line has one id"));
+        }
+        self.ids.push(id.to_string());
+        self.next_id = Some(id.to_string());
+        Ok(())
     }
 
     fn carrier(&mut self, plain: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
@@ -657,7 +683,6 @@ impl Importer {
         if found.is_none() {
             k.push(("event", text(&event)));
         }
-        self.sent.push((body, carrier, event));
         self.step("message", k)
     }
 
@@ -682,6 +707,9 @@ impl Importer {
         }
         if self.color.is_some() {
             return Err("'color' at the end of the diagram: its message is missing".into());
+        }
+        if let Some(id) = &self.next_id {
+            return Err(format!("'id {id}' at the end of the diagram: its line is missing"));
         }
         let video = self.doc.tables.get("video");
         if !video.is_some_and(|v| v.entries.contains_key("subtitle")) {
@@ -841,8 +869,8 @@ mod tests {
 
     const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle=both\n%% carrier id=C2 sid=SID-2 needle=2\n\
         %% move C1 to d1\n%% move C1 to s1\n%% at 0\n%% move C2 to w1\n\
-        %% on antenna1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
-        %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 Add Tube C1\nAN-->>IF: Late\n\
+        %% on antenna1\n%% id tube1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
+        %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 tube1\nAN-->>IF: Late\n\
         %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
         %% after 0.5 antenna2 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done sid=SID-1\n";
 
@@ -853,7 +881,8 @@ mod tests {
         assert!(has(&d, "step", &[("text", "Add Tube"), ("params", "SampleId={SampleId}"), ("carrier", "C1"), ("when", "C1 at nsd")]));
         assert!(has(&d, "step", &[("action", "caption"), ("when", "C2 at nsd")]) && has(&d, "step", &[("carrier", "C2"), ("when", "C2 at nsd")]));
         assert!(has(&d, "step", &[("text", "Again"), ("when", "C1 at d1"), ("color", "#9333EA")]));
-        assert!(has(&d, "step", &[("text", "Late"), ("when", "add_tube C1 arrived"), ("delay", "0.2")]));
+        assert!(has(&d, "step", &[("text", "Add Tube"), ("id", "tube1")]));
+        assert!(has(&d, "step", &[("text", "Late"), ("when", "step tube1 done"), ("delay", "0.2")]));
         assert!(has(&d, "step", &[("text", "Go"), ("after", "1")]));
         assert!(has(&d, "step", &[("action", "caption"), ("when", "C1 at d1"), ("delay", "0.5")]));
         assert!(has(&d, "step", &[("text", "Done"), ("when", "pipette sp1 done"), ("delay", "0.2")]));
@@ -864,6 +893,18 @@ mod tests {
         same(at("Fine"), at("Add Tube") + 1.5);
         same(at("Late"), at("Add Tube") + 1.5 + 0.2);
         same(at("Go"), at("Again") + 1.5 + 1.0);
+    }
+
+    #[test]
+    fn after_an_id_waits_for_the_end_of_that_line() {
+        // The id of a move: it ends when the carrier arrives.
+        let d = doc(&format!("{ON_HEAD}%% id go\n%% move C1 to d1\nIF->>AN: Here SampleId=SID-1\n%% id ok\nAN-->>IF: Fine\n%% after 0.5 go\nIF->>AN: Later SampleId=SID-1\n%% after 0.25 ok\nIF->>AN: Last SampleId=SID-1\n")).unwrap();
+        assert!(has(&d, "step", &[("action", "move"), ("id", "go")]));
+        let (_, tl) = build(&d);
+        let at = |name: &str| tl.events.iter().find(|e| matches!(&e.ev, Ev::Message { text, .. } if text == name)).unwrap().t0;
+        let same = |a: f64, b: f64| assert!((a - b).abs() < 0.011, "{a} != {b}");
+        same(at("Later"), at("Here") + 0.5);
+        same(at("Last"), at("Fine") + 1.5 + 0.25);
     }
 
     const ON_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
@@ -879,7 +920,15 @@ mod tests {
         fails(&k("%% after 1 antenna1\nIF->>AN: X SampleId=SID-1\n"), "needs the carrier");
         fails(&k("%% after 1 antenna1 C9\nIF->>AN: X SampleId=SID-1\n"), "no carrier 'C9'");
         fails(&k("%% on antenna1\n"), "its step is missing");
-        fails(&k("%% after 1 Nothing C1\nIF->>AN: X\n"), "no message 'Nothing' for C1");
+        fails(&k("%% after 1 nothing\nIF->>AN: X\n"), "no line with id 'nothing' before this one");
+        fails(&k("%% after 1 Add Tube C1\nIF->>AN: X\n"), "write the id of a line");
+        fails(&k("IF->>AN: X\n%% after 1 later\n%% id later\nIF->>AN: Y\n"), "no line with id 'later'");
+        fails(&k("%% id a b\nIF->>AN: X\n"), "'id' is written: id <name>");
+        fails(&k("%% id a.b\nIF->>AN: X\n"), "only letters, digits");
+        fails(&k("%% id antenna1\nIF->>AN: X\n"), "already the name of an antenna");
+        fails(&k("%% id a\nIF->>AN: X\n%% id a\nIF->>AN: Y\n"), "the id 'a' is already used");
+        fails(&k("%% id a\n%% id b\nIF->>AN: X\n"), "a line has one id");
+        fails(&k("%% id a\n"), "'id a' at the end of the diagram");
         fails(&k("%% color blue\nIF->>AN: X\n"), "like #9333EA");
         fails(&k("%% color #9333EA\n%% caption a | b\n"), "applies to the next message");
         fails(&k("%% color #9333EA\n"), "its message is missing");

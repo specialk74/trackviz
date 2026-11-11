@@ -30,13 +30,16 @@ sequenceDiagram
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
 
     %% at 4.9
     %% move C2 to gone
     %% on antenna2
+    %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
     %% # C2 reaches the NSD: logically diverted (ghost appears), physically straight on.
     %% on antenna1 C2
@@ -46,62 +49,73 @@ sequenceDiagram
     %% on antenna1 C2
     %% move C2L to queue
     %% on antenna1
+    %% id prepare-c2
     IF->>AN: Prepare SampleId=SID-000124
-    %% after 0.1 Sample Acquisition C1
+    %% after 0.1 sample-acquisition-c1
     %% for C1
+    %% id ok-c1-2
     AN-->>IF: OK
 
     %% at 7.9
     %% move C3 to queue
-    %% after 0.1 Query C1
+    %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0.1 Prepare C2
+    %% after 0.1 prepare-c2
+    %% id ok-c2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-2
     %% pipette sp duration=5 sid=SID-000123
     %% on antenna1 C3
     %% caption 4 · Third carrier — one position, two carriers | The third carrier is diverted (Prepare) and stops in the queue on the same position as the second one: the second is not physically there, it went straight on along the Main-Lane.
     %% on antenna1
+    %% id prepare-c3
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.1 OK C2
+    %% after 0.1 ok-c2
+    %% id query-c2
     AN->>DMX: Query SampleId=SID-000124
-    %% after 0.1 Prepare C3
+    %% after 0.1 prepare-c3
     AN-->>IF: OK SampleId=SID-000125
-    %% after 0.1 Query C2
+    %% after 0.1 query-c2
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0.1
+    %% id query-c3
     AN->>DMX: Query SampleId=SID-000125
 
     %% after 0.3 pipette sp
     %% caption 5 · Sample Complete | Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point.
     %% after 0.3 pipette sp
+    %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% after 0.1 Query C3
+    %% after 0.1 query-c3
     DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% after 0.1 Sample Complete C1
+    %% after 0.1 sample-complete-c1
     %% for C1
+    %% id ok-c1-3
     IF-->>AN: OK
     %% pass sp
-    %% after 0 OK C1
+    %% after 0 ok-c1-3
     %% move C2L to sampling
-    %% after 0 OK C1
+    %% after 0 ok-c1-3
     %% move C3 to sampling
     %% after 0.2 antenna2 C3
     %% caption 6 · Clear | The interface expects the second sample at the sampling point, but finds the third one: the second never arrived. It sends Clear for the second sample and waits for the reply.
     %% after 0.2 antenna2 C3
+    %% id clear-c2
     IF->>AN: Clear SampleId=SID-000124
     %% on antenna3
+    %% id release-c1
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1 Clear C2
+    %% after 0.1 clear-c2
+    %% id ok-c2-2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.1 Release C1
+    %% after 0.1 release-c1
     %% for C1
     AN-->>IF: OK
-    %% after 0 OK C2
+    %% after 0 ok-c2-2
     %% hide C2L duration=0.6
-    %% after 0.3 OK C2
+    %% after 0.3 ok-c2-2
     %% caption 7 · Sample Acquisition — Release | Only after the reply to Clear the interface sends Sample Acquisition for the third sample. Meanwhile the first carrier leaves the module: Release.
-    %% after 0.2 OK C2
+    %% after 0.2 ok-c2-2
     IF->>AN: Sample Acquisition SampleId=SID-000125
     %% after 0.1
     %% for C3
@@ -120,10 +134,11 @@ sequenceDiagram
     IF->>AN: Release SampleId=SID-000125
     %% after 0.1
     %% for C3
+    %% id ok-c3
     AN-->>IF: OK
     %% after 0.5
     %% caption 9 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% after 0.5 OK C3
+    %% after 0.5 ok-c3
     AN->>DMX: Results SampleId=SID-000123
     %% after 0.2
     AN->>DMX: Results SampleId=SID-000125

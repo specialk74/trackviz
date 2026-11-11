@@ -31,30 +31,36 @@ sequenceDiagram
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
     %% after 0.5 antenna2 C1
     %% color #9333EA
+    %% id prepare-c1
     IF->>AN: Prepare SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0.1 Prepare C1
+    %% after 0.1 prepare-c1
     %% for C1
+    %% id ok-c1-2
     AN-->>IF: OK
-    %% after 0.1 Query C1
+    %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-2
     %% pass antenna2
     %% after 0.15
     %% rotate ts
     %% after 0.25
     %% caption 3 · Sample Acquisition | The first carrier is under the needle: Sample Acquisition, and the analyzer aspirates.
     %% after 0.25 rotate ts
+    %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123
 
     %% at 12.9
     %% move C2 to gone
-    %% after 0.1 Sample Acquisition C1
+    %% after 0.1 sample-acquisition-c1
     %% for C1
+    %% id ok-c1-3
     AN-->>IF: OK
     %% on antenna1 C2
     %% caption 4 · Physically straight, logically diverted | The second carrier should be diverted too, and the interface sends Prepare. But physically it goes straight on the Main-Lane: the dashed outline is where the interface believes it is.
@@ -63,10 +69,12 @@ sequenceDiagram
     %% on antenna1 C2
     %% move C2L to pit_wait
     %% on antenna1
+    %% id prepare-c2
     IF->>AN: Prepare SampleId=SID-000124
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-3
     %% pipette ts duration=10 sid=SID-000123
-    %% after 0.1 Prepare C2
+    %% after 0.1 prepare-c2
+    %% id ok-c2
     AN-->>IF: OK SampleId=SID-000124
 
     %% at 15.9
@@ -74,29 +82,36 @@ sequenceDiagram
     %% on antenna1 C3
     %% caption 5 · Third carrier — Clear | The third carrier is diverted (Prepare) and stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
     %% on antenna1
+    %% id prepare-c3
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.1 OK C2
+    %% after 0.1 ok-c2
+    %% id query-c2
     AN->>DMX: Query SampleId=SID-000124
-    %% after 0.1 Prepare C3
+    %% after 0.1 prepare-c3
     AN-->>IF: OK SampleId=SID-000125
     %% after 0.2 antenna2 C3
+    %% id clear-c2
     IF->>AN: Clear SampleId=SID-000124
-    %% after 0.1 Query C2
+    %% after 0.1 query-c2
+    %% id tests-to-perform-c2
     DMX-->>AN: Tests to perform SampleId=SID-000124
-    %% after 0.1 Clear C2
+    %% after 0.1 clear-c2
+    %% id ok-c2-2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.1 Tests to perform C2
+    %% after 0.1 tests-to-perform-c2
+    %% id query-c3
     AN->>DMX: Query SampleId=SID-000125
-    %% after 0 OK C2
+    %% after 0 ok-c2-2
     %% hide C2L duration=0.6
-    %% after 0 OK C2
+    %% after 0 ok-c2-2
     %% caption 6 · Prepare again for the third carrier | Only after the reply to Clear the interface sends Prepare again for the third carrier. It waits at the closed gate until the first sample is complete.
-    %% after 0.2 OK C2
+    %% after 0.2 ok-c2-2
     %% color #9333EA
+    %% id prepare-c3-2
     IF->>AN: Prepare SampleId=SID-000125
-    %% after 0.1 Query C3
+    %% after 0.1 query-c3
     DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% after 0.1 Prepare C3
+    %% after 0.1 prepare-c3-2
     %% for C3
     AN-->>IF: OK
     %% after 0.2 pipette ts
@@ -112,16 +127,19 @@ sequenceDiagram
     %% after 0.15
     %% move C1 to gone
     %% after 0.25 rotate ts
+    %% id sample-acquisition-c3
     IF->>AN: Sample Acquisition SampleId=SID-000125
     %% on antenna3
+    %% id release-c1
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1 Sample Acquisition C3
+    %% after 0.1 sample-acquisition-c3
     %% for C3
+    %% id ok-c3
     AN-->>IF: OK
-    %% after 0.1 Release C1
+    %% after 0.1 release-c1
     %% for C1
     AN-->>IF: OK
-    %% after 0.1 OK C3
+    %% after 0.1 ok-c3
     %% pipette ts duration=4.5 sid=SID-000125
     %% after 0.2
     %% caption 8 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
@@ -137,10 +155,11 @@ sequenceDiagram
     IF->>AN: Release SampleId=SID-000125
     %% after 0.1
     %% for C3
+    %% id ok-c3-2
     AN-->>IF: OK
     %% after 0.5
     %% caption 9 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
-    %% after 0.5 OK C3
+    %% after 0.5 ok-c3-2
     AN->>DMX: Results SampleId=SID-000123
     %% after 0.2
     AN->>DMX: Results SampleId=SID-000125

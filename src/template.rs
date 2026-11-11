@@ -121,7 +121,7 @@ const TURNSTILE: &str = "    %% move C1 to pit_wait
     %% after 0.1
     %% for C1
     AN-->>IF: OK
-    %% after 0.1 OK C1
+    %% after 0.1
     %% pass antenna2
     %% after 0.15
     %% caption 3 · Rotation — Sample Acquisition | The wheel brings the carrier under the needle: Sample Acquisition, then the analyzer aspirates.
@@ -166,7 +166,7 @@ const SPUR2: &str = "    %% move C1 to d1
     %% after 0.1
     %% for C1
     AN-->>IF: OK
-    %% after 0.1 OK C1
+    %% after 0.1
     %% pass div1
     %% on antenna3 C1
     %% caption 3 · Sample Acquisition | The gate stops the carrier on sampling point 1: Sample Acquisition with Needle=1, then needle 1 aspirates.

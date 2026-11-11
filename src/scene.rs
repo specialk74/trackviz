@@ -236,8 +236,8 @@ pub enum StartMode {
 pub enum Anchor {
     /// "C1 at merge": the carrier reaches the point.
     Arrival { carrier: String, point: String },
-    /// "query C1 arrived", "pipette sp done": the end of the latest matching step
-    /// before this one in the file.
+    /// "query C1 arrived", "pipette sp done", "step q1 done" (the step with that
+    /// id): the end of the latest matching step before this one in the file.
     Event { key: String },
 }
 
@@ -247,7 +247,7 @@ impl Anchor {
         match t[..] {
             [carrier, "at", point] => Some(Anchor::Arrival { carrier: carrier.into(), point: point.into() }),
             [ref who @ .., "arrived"] if (1..=2).contains(&who.len()) => Some(Anchor::Event { key: who.join(" ") }),
-            [kind @ ("pipette" | "rotate" | "needle"), device, "done"] => Some(Anchor::Event { key: format!("{kind} {device}") }),
+            [kind @ ("pipette" | "rotate" | "needle" | "step"), name, "done"] => Some(Anchor::Event { key: format!("{kind} {name}") }),
             _ => None,
         }
     }
@@ -256,6 +256,8 @@ impl Anchor {
 #[derive(Clone)]
 pub struct Step {
     pub action: Action,
+    /// `id`: its name, for the steps that start when it ends.
+    pub id: Option<String>,
     pub start: StartMode,
     pub delay: f64,
     pub duration: Option<f64>,
@@ -632,7 +634,7 @@ impl Scene {
 
         let mut steps = Vec::new();
         for t in arr(doc, "step") {
-            let common = ["action", "at", "after", "when", "delay", "duration"];
+            let common = ["action", "id", "at", "after", "when", "delay", "duration"];
             let action_name = t.str_req("action")?;
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
@@ -731,13 +733,14 @@ impl Scene {
             let delay = t.num_opt("delay")?.unwrap_or(0.0) + after.unwrap_or(0.0);
             let start = match (when, at) {
                 (Some(w), _) => StartMode::When(Anchor::parse(&w).ok_or_else(|| {
-                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] arrived\" or \"pipette|rotate|needle <device> done\", not \"{w}\"", t.location())
+                    format!("{}: 'when' is \"<carrier> at <point>\", \"<message type> [<carrier>] arrived\", \"pipette|rotate|needle <device> done\" or \"step <id> done\", not \"{w}\"", t.location())
                 })?),
                 (None, Some(at)) => StartMode::At(at),
                 (None, None) => StartMode::After,
             };
             steps.push(Step {
                 action,
+                id: t.str_opt("id")?,
                 start,
                 delay,
                 duration: t.num_opt("duration")?,
@@ -863,7 +866,8 @@ impl Scene {
         }
         // What each step makes happen, for the steps that start from it.
         let keys = |st: &Step| -> Vec<String> {
-            match &st.action {
+            let mut v: Vec<String> = st.id.iter().map(|id| format!("step {id}")).collect();
+            v.extend(match &st.action {
                 Action::Message { kind: Some(k), carrier, .. } => {
                     let mut v = vec![k.clone()];
                     v.extend(carrier.iter().map(|c| format!("{k} {c}")));
@@ -873,7 +877,8 @@ impl Scene {
                 Action::Rotate { device } => vec![format!("rotate {device}")],
                 Action::Needle { device, .. } => vec![format!("needle {device}")],
                 _ => Vec::new(),
-            }
+            });
+            v
         };
         loop {
             let mut more = false;
@@ -1606,6 +1611,9 @@ impl Timeline {
                 Action::Pass { .. } => unreachable!("a pass is laid out as a move"),
             };
             let t1 = t0 + dur;
+            if let Some(id) = &st.id {
+                history.push((format!("step {id}"), t0, t1));
+            }
             match &st.action {
                 Action::Message { kind: Some(k), carrier, .. } => {
                     history.push((k.clone(), t0, t1));

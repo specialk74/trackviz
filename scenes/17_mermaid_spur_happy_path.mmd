@@ -2,8 +2,8 @@
 %% # The %% comments describe the physical side and don't appear in the diagram.
 %% # Every step starts when the one before it ends, unless a directive before it
 %% # says otherwise: "on antennaN" when its carrier is over that antenna, "after N"
-%% # N seconds after the step before, "after N <message> <carrier>" N seconds after
-%% # that message has arrived, "at N" at second N of the video.
+%% # N seconds after the step before, "after N <id>" N seconds after
+%% # the end of the line with "%% id <id>" above it, "at N" at second N of the video.
 %% include common/spur_one_carrier.mmd
 %% subtitle Spur — happy path, written in Mermaid
 sequenceDiagram
@@ -15,17 +15,21 @@ sequenceDiagram
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping (Prepare) and stopped by the gate at the sampling point: Sample Acquisition.
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
 
     %% on antenna2
+    %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123
-    %% after 0 OK C1
+    %% after 0 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0 Sample Acquisition C1
+    %% after 0 sample-acquisition-c1
+    %% id ok
     AN-->>IF: OK
-    %% after 0 Query C1
+    %% after 0 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0 OK
+    %% after 0 ok
     %% pipette sp duration=4 sid=SID-000123
     AN->>IF: Sample Complete SampleId=SID-000123
     IF-->>AN: OK

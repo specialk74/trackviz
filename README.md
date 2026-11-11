@@ -109,14 +109,25 @@ unless a directive right before it says otherwise:
 | `on <antenna>` | when its carrier is over that antenna: the carrier of the `SampleId` in the message, or the one it moves or shows |
 | `on <antenna> <carrier>` | when that carrier is over the antenna (required for captions, highlights, pipettes, notes) |
 | `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives, a move when the carrier arrives) |
-| `after <seconds> <message> [<carrier>]` | that many seconds after the latest message with that text (for that carrier) has arrived |
+| `after <seconds> <id>` | that many seconds after the line marked `id <id>` has ended |
 | `after <seconds> <antenna> <carrier>` | that many seconds after the carrier is over the antenna |
 | `after <seconds> pipette\|rotate\|needle <device>` | that many seconds after that action on the device ends |
 | `at <seconds>` | at that second of the video |
 
-Only one of them per step. `after ... <message>` refers to the latest such message
-written before it, so keep the diagram in time order. A step tied to an antenna or to a
-message moves with it when a carrier has to wait, so the scene works at any belt speed.
+Only one of them per step. To wait for a line that is not the one right before, give
+that line a name with `%% id <name>` above it, then write `%% after <seconds> <name>`:
+
+```
+    %% id ack1
+    AN-->>IF: OK SampleId=SID-000123
+    ...
+    %% after 0.1 ack1
+    %% pass sp
+```
+
+The id must be written before the `after` that uses it, and each id is used once per
+file. A step tied to an antenna or to another line moves with it when a carrier has to
+wait, so the scene works at any belt speed.
 
 The antennas of each geometry, numbered in the direction of the carriers:
 
@@ -155,10 +166,11 @@ each.
 | Directive | What it does | Optional |
 |---|---|---|
 | `on <antenna>` | The next step starts when its carrier is over the antenna | `<carrier>` after the antenna: which carrier. Without it, the carrier of the step (the `SampleId` of the message, the one it moves or shows); for captions, highlights, pipettes and notes it is required |
-| `after <seconds>` | The next step starts that many seconds after the step before ends | what to wait for: `<message> [<carrier>]` (the arrival of the latest message with that text), `<antenna> <carrier>` (the carrier over the antenna), `pipette\|rotate\|needle <device>` (the end of that action) |
+| `after <seconds>` | The next step starts that many seconds after the step before ends | what to wait for: `<id>` (the end of the line marked with that id), `<antenna> <carrier>` (the carrier over the antenna), `pipette\|rotate\|needle <device>` (the end of that action) |
 | `at <seconds>` | The next step starts at that second of the video | — |
+| `id <name>` | Names the next line (message, note, move, pipette, ...), so that a later `after <seconds> <name>` can start from its end. Letters, digits, `-`, `_`; one per line, never used twice in a file | — |
 | `color #RRGGBB` | Colors the next message (the purple Prepare is `#9333EA`) | without it: the color of the named message or of the sender |
-| `for <carrier>` | The carrier of the next message, when its text has no `SampleId=` (e.g. `OK`): `after <message> <carrier>`, `on` and the pit-lane capacity use it | without it: the message has no carrier |
+| `for <carrier>` | The carrier of the next message, when its text has no `SampleId=` (e.g. `OK`): `on` and the pit-lane capacity use it | without it: the message has no carrier |
 | `duration <seconds>` | How long the next step lasts | without it: the step's default |
 
 Only one of `on`, `after`, `at` per step.

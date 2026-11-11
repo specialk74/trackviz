@@ -22,18 +22,22 @@ sequenceDiagram
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
+    %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
     %% after 0.5 antenna2 C1
     %% color #9333EA
+    %% id prepare-c1
     IF->>AN: Prepare SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1
+    %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0.1 Prepare C1
+    %% after 0.1 prepare-c1
     %% for C1
+    %% id ok-c1-2
     AN-->>IF: OK
-    %% after 0.1 Query C1
+    %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-2
     %% pass antenna2
     %% after 0.15
     %% rotate ts
@@ -43,10 +47,11 @@ sequenceDiagram
     IF->>AN: Sample Acquisition SampleId=SID-000123
     %% after 0.1
     %% for C1
+    %% id ok-c1-3
     AN-->>IF: OK
     %% after 0.1
     %% needle ts down
-    %% after 0.1 OK C1
+    %% after 0.1 ok-c1-3
     %% duration 2.6
     Note over AN: Pipetting Analyzer - SampleId=SID-000123
     %% after 1.7 needle ts
@@ -55,22 +60,24 @@ sequenceDiagram
     %% status analyzer error
     %% after 1.7 needle ts
     %% for C1
+    %% id status-c1
     AN->>IF: Status State=Error
+    %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
-    %% after 0.3 Status C1
+    %% after 0.3 status-c1
     %% for C1
     IF-->>AN: OK
-    %% after 0.1 Sample Complete C1
+    %% after 0.1 sample-complete-c1
     %% for C1
     IF-->>AN: OK
-    %% after 2.1 Status C1
+    %% after 2.1 status-c1
     %% caption 5 · Operator recovery | Sample Complete is not enough: with the analyzer in error the wheel does not rotate, the needle is still in the tube. An operator comes to the instrument for a recovery: the needle goes back up.
-    %% after 2.1 Status C1
+    %% after 2.1 status-c1
     %% duration 6
     Note over AN: Operator recovery
-    %% after 2.1 Status C1
+    %% after 2.1 status-c1
     %% operator analyzer duration=7
-    %% after 4.6 Status C1
+    %% after 4.6 status-c1
     %% needle ts up duration=1.2
     %% after 2.6
     %% caption 6 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
@@ -78,15 +85,17 @@ sequenceDiagram
     %% status analyzer ready
     %% after 2.6 needle ts
     %% for C1
+    %% id status-c1-2
     AN->>IF: Status State=Ready
     %% after 0.2
     %% for C1
+    %% id ok-c1-4
     IF-->>AN: OK
-    %% after 1.5 Status C1
+    %% after 1.5 status-c1-2
     %% status analyzer normal
-    %% after 0.2 OK C1
+    %% after 0.2 ok-c1-4
     %% caption 7 · Carrier released — Release | The wheel brings the carrier to the exit and the interface releases it. As soon as it has left the interface module, the interface sends Release.
-    %% after 1.9 Status C1
+    %% after 1.9 status-c1-2
     %% rotate ts
     %% after 0.2
     %% move C1 to gone
