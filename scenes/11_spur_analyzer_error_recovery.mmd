@@ -38,15 +38,15 @@ sequenceDiagram
     %% after 0.1 ok-c1-2
     %% caption 3 · Test query — Aspiration | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now its needle goes down into the tube and it starts aspirating.
     %% after 0.1 ok-c1-2
-    %% needle sp down
+    %% needle antenna2 down
     %% after 0.1 ok-c1-2
     %% duration 2.6
     Note over AN: Pipetting Analyzer - SampleId=SID-000123
-    %% after 1.7 needle sp
+    %% after 1.7 needle antenna2
     %% caption 4 · Instrument error | During aspiration the analyzer goes into error, leaving the needle down in the tube. It immediately sends its status (Error) and Sample Complete. The interface replies OK to the status.
-    %% after 1.7 needle sp
+    %% after 1.7 needle antenna2
     %% status analyzer error
-    %% after 1.7 needle sp
+    %% after 1.7 needle antenna2
     %% id status
     AN->>IF: Status State=Error
     %% id sample-complete-c1
@@ -64,12 +64,12 @@ sequenceDiagram
     %% duration 6
     Note over AN: Operator recovery
     %% after 4.6 status
-    %% needle sp up duration=1.2
+    %% needle antenna2 up duration=1.2
     %% after 2.6
     %% caption 6 · Instrument ready | The instrument is green again: it sends its status (Ready) to the interface, which replies OK. Only now the carrier is released.
-    %% after 2.6 needle sp
+    %% after 2.6 needle antenna2
     %% status analyzer ready
-    %% after 2.6 needle sp
+    %% after 2.6 needle antenna2
     %% id status-2
     AN->>IF: Status State=Ready
     %% after 0.2

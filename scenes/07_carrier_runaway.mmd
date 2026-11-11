@@ -64,7 +64,7 @@ sequenceDiagram
     %% after 1.5 sample-acquisition-c1
     %% status interface error
     %% after 0.5 antenna2 C2
-    %% pipette sp duration=4.5 sid=SID-000123
+    %% pipette antenna2 duration=4.5 sid=SID-000123
     %% after 0.1 tests-to-perform-c1
     AN->>DMX: Query SampleId=SID-000124
     %% after 0.1
@@ -73,9 +73,9 @@ sequenceDiagram
     %% id query-c3
     AN->>DMX: Query SampleId=SID-000125
 
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     %% caption 4 · Sample Complete — Cancel | The analyzer sends Sample Complete for the first sample. The interface knows the first carrier is gone: it sends Cancel for the first sample, and the analyzer replies OK.
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1 query-c3

@@ -70,7 +70,7 @@ sequenceDiagram
     %% id query-c2
     AN->>DMX: Query SampleId=SID-000124
     %% after 0.1 ok-c1-2
-    %% needle sp1 down
+    %% needle antenna4 down
     %% after 0.1 ok-c1-2
     %% duration 2.6
     Note over AN: Pipetting Analyzer · Needle 1 - SampleId=SID-000123
@@ -81,11 +81,11 @@ sequenceDiagram
     %% after 0.57 antenna6 C2
     %% id sample-acquisition-c2
     IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
-    %% after 1.7 needle sp1
+    %% after 1.7 needle antenna4
     %% caption 4 · Error on needle 1 | Needle 1 goes into error, left down in the tube: the analyzer sends its status (Error, Needle=1) and Sample Complete, and the interface replies OK to the status. The carrier stays still.
-    %% after 1.7 needle sp1
+    %% after 1.7 needle antenna4
     %% status sp1 error
-    %% after 1.7 needle sp1
+    %% after 1.7 needle antenna4
     %% id status
     AN->>IF: Status State=Error Needle=1
     %% after 0.1 sample-acquisition-c2
@@ -98,7 +98,7 @@ sequenceDiagram
     %% after 0.3 status
     IF-->>AN: OK
     %% after 0.1 ok-c2-2
-    %% pipette sp2 duration=4 sid=SID-000124
+    %% pipette antenna6 duration=4 sid=SID-000124
     %% after 0.1 sample-complete-c1
     %% for C1
     IF-->>AN: OK
@@ -110,8 +110,8 @@ sequenceDiagram
     %% duration 6
     Note over AN: Operator recovery · Needle 1
     %% after 4.6 status
-    %% needle sp1 up duration=1.2
-    %% after 0.2 pipette sp2
+    %% needle antenna4 up duration=1.2
+    %% after 0.2 pipette antenna6
     %% id sample-complete-c2
     AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
     %% after 0.1

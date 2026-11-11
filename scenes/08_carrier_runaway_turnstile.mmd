@@ -87,7 +87,7 @@ sequenceDiagram
     %% id tests-to-perform-c2
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0.1 ok-c1
-    %% pipette ts duration=4.5 sid=SID-000123
+    %% pipette antenna3 duration=4.5 sid=SID-000123
     %% after 0.1 rotate ts
     %% move C1 to gone runaway
     %% after 0.1 tests-to-perform-c2
@@ -97,9 +97,9 @@ sequenceDiagram
     %% caption 3 · Nothing is aspirated | The analyzer pipettes the empty pocket: there is no tube under the needle, but it believes it is sampling the first sample.
     %% after 0.2 query-c3
     DMX-->>AN: Tests to perform SampleId=SID-000125
-    %% after 0.2 pipette ts
+    %% after 0.2 pipette antenna3
     %% caption 4 · Sample Complete — Cancel | The analyzer sends Sample Complete for the first sample. The interface knows the first carrier is gone: it sends Cancel for the first sample, and the analyzer replies OK.
-    %% after 0.2 pipette ts
+    %% after 0.2 pipette antenna3
     %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
@@ -133,5 +133,5 @@ sequenceDiagram
     %% rotate ts
     %% after 0.2
     %% move C3 to gone
-    %% on antenna3 C3
+    %% on antenna4 C3
     %% status interface normal

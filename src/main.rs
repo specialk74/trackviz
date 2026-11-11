@@ -7,6 +7,7 @@
 //!   trackviz <scene.mmd>... --sheet       (out/<scene name>_sheet.png: one frame per caption)
 //!   trackviz new <scene> [--geometry spur2] [--carriers 3]   (the skeleton of a new scene)
 //!   trackviz index [<scene.mmd>...] [-o out/index.html]   (the page that lists the videos)
+//!   trackviz sort <scene.mmd>... [--dry-run]   (the steps in time order, same video)
 //!   trackviz <scene.mmd>... --check         (validate + print the timeline)
 //!   trackviz <scene.mmd> --preview --from 15 --to 25   (quick look, out/<scene name>_preview.mp4)
 //!   trackviz <scene.mmd> --preview --watch  (regenerate when the scene or a file it uses changes)
@@ -25,6 +26,7 @@ mod lint;
 mod mermaid;
 mod render;
 mod scene;
+mod sort;
 mod template;
 
 use resvg::{tiny_skia, usvg};
@@ -56,7 +58,8 @@ fn usage() -> String {
          \x20 --layout writes only that image, without the video\n\
          \x20 --sheet writes out/<scene name>_sheet.png: one frame per caption, at its end, to check a scene at a glance\n\
          \x20 trackviz new <scene> [--geometry name] [--carriers n] writes the skeleton of a new scene\n\
-         \x20 trackviz index [<scene>...] [-o out/index.html] writes the page that lists the videos (default all of scenes/)"
+         \x20 trackviz index [<scene>...] [-o out/index.html] writes the page that lists the videos (default all of scenes/)\n\
+         \x20 trackviz sort <scene>... [--dry-run] rewrites a scene with its steps in time order (the video stays the same)"
     )
 }
 
@@ -160,8 +163,8 @@ fn timeline_text(path: &str, sc: &scene::Scene, tl: &scene::Timeline) -> String 
     for l in &tl.log {
         t.push_str(&format!("  {l}\n"));
     }
-    for w in lint::warnings(sc, tl) {
-        t.push_str(&format!("warning: {path}: {w}\n"));
+    for w in lint::warnings_at(sc, tl) {
+        t.push_str(&format!("warning: {}\n", w.show(path)));
     }
     t
 }
@@ -313,8 +316,8 @@ fn render_many(files: &[String], opts: VideoOpts, jobs: usize) -> Result<(), Str
                 while let Some(path) = files.get(next.fetch_add(1, Ordering::SeqCst)) {
                     let out = default_out(path, opts);
                     let r = load(path).and_then(|(sc, tl)| {
-                        for w in lint::warnings(&sc, &tl) {
-                            eprintln!("warning: {path}: {w}");
+                        for w in lint::warnings_at(&sc, &tl) {
+                            eprintln!("warning: {}", w.show(path));
                         }
                         render_video(&sc, &tl, &out, opts, each, &opt, false)
                     });
@@ -346,6 +349,9 @@ fn run() -> Result<(), String> {
     }
     if args.first().is_some_and(|a| a == "index") {
         return index_cmd(&args[1..]);
+    }
+    if args.first().is_some_and(|a| a == "sort") {
+        return sort_cmd(&args[1..]);
     }
     let mut scene_args = Vec::new();
     let mut out = None;
@@ -575,6 +581,54 @@ fn write_layout(sc: &scene::Scene, tl: &scene::Timeline, path: &str) -> Result<(
 /// `trackviz index [scene...] [-o page.html]`: the page that lists the videos
 /// (default: every scene in scenes/, page out/index.html). The videos are looked
 /// for next to the page, with the names a full render gives them.
+/// `trackviz sort`: the steps of each scene in time order. The rewritten scene is
+/// built and must give the same timeline before the file is replaced.
+fn sort_cmd(args: &[String]) -> Result<(), String> {
+    let dry = args.iter().any(|a| a == "--dry-run");
+    let names: Vec<&String> = args.iter().filter(|a| *a != "--dry-run").collect();
+    if names.is_empty() {
+        return Err("usage: trackviz sort <scene.mmd>... [--dry-run]".into());
+    }
+    if let Some(o) = names.iter().find(|a| a.starts_with('-')) {
+        return Err(format!("sort: unknown option {o}"));
+    }
+    let mut failures = Vec::new();
+    let mut total = 0;
+    for name in names {
+        for path in expand(name)? {
+            total += 1;
+            if let Err(e) = sort_one(&path, dry) {
+                failures.push(format!("{path}: {e}"));
+            }
+        }
+    }
+    report_failures(failures, total)
+}
+
+fn sort_one(path: &str, dry: bool) -> Result<(), String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let (sc, tl) = load(path)?;
+    let Some((new, moved, anchors)) = sort::sorted(path, &text, &sc, &tl)? else {
+        println!("{path}: already in time order");
+        return Ok(());
+    };
+    // Built next to the scene, so that its common/ files are found.
+    let p = Path::new(path);
+    let tmp = p.with_file_name(format!(".{}.sorting.mmd", p.file_stem().and_then(|s| s.to_str()).unwrap_or("scene")));
+    std::fs::write(&tmp, &new).map_err(|e| e.to_string())?;
+    let check = load(&tmp.to_string_lossy()).and_then(|(_, tl2)| sort::same_timeline(&tl, &tl2));
+    let _ = std::fs::remove_file(&tmp);
+    check.map_err(|e| format!("not sorted, the file is unchanged: {e}"))?;
+    let what = format!("{moved} steps moved, {anchors} anchored with an id");
+    if dry {
+        println!("{path}: would be sorted ({what})");
+    } else {
+        std::fs::write(path, new).map_err(|e| e.to_string())?;
+        println!("{path}: sorted ({what}); the video is the same");
+    }
+    Ok(())
+}
+
 fn index_cmd(args: &[String]) -> Result<(), String> {
     let usage = || "usage: trackviz index [<scene.mmd>...] [-o out/index.html]".to_string();
     let (mut scenes, mut out) = (Vec::new(), "out/index.html".to_string());
@@ -759,6 +813,26 @@ mod tests {
             assert!(t >= caps[i] + 0.4 && caps.get(i + 1).is_none_or(|&n| t < n), "caption {i}: {t}");
         }
         assert!((times.last().unwrap() - tl.duration).abs() < 1e-9);
+    }
+
+    #[test]
+    fn sort_puts_the_steps_in_time_order_and_keeps_the_video() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes");
+        let src = format!("{dir}/02_turnstile_three_carriers.mmd");
+        let copy = format!("{dir}/.test_sort_02.mmd");
+        std::fs::copy(&src, &copy).unwrap();
+        let r = sort_one(&copy, false);
+        let after = load(&copy);
+        let text = std::fs::read_to_string(&copy).unwrap();
+        let (sc2, tl2) = after.unwrap();
+        let again = sort::sorted(&copy, &text, &sc2, &tl2);
+        let _ = std::fs::remove_file(&copy);
+        r.unwrap();
+        let (_, tl) = load(&src).unwrap();
+        sort::same_timeline(&tl, &tl2).unwrap();
+        // The messages are now written in time order, and a second sort changes nothing.
+        assert!(lint::warnings(&sc2, &tl2).iter().all(|w| !w.contains("wrong order")), "{:?}", lint::warnings(&sc2, &tl2));
+        assert!(again.unwrap().is_none());
     }
 
     #[test]

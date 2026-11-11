@@ -72,7 +72,7 @@ sequenceDiagram
     %% id sample-acquisition-c2
     IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
     %% after 0.1 ok-c1-2
-    %% pipette sp1 duration=4 sid=SID-000123
+    %% pipette antenna4 duration=4 sid=SID-000123
     %% after 0.2 query-c2
     DMX-->>AN: Tests to perform SampleId=SID-000124
     %% after 0 sample-acquisition-c2
@@ -81,14 +81,14 @@ sequenceDiagram
     %% for C2
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp2 duration=4 sid=SID-000124
-    %% after 0.2 pipette sp1
+    %% pipette antenna6 duration=4 sid=SID-000124
+    %% after 0.2 pipette antenna4
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
     %% after 0.1
     %% for C1
     %% id ok-c1-3
     IF-->>AN: OK
-    %% after 0.2 pipette sp2
+    %% after 0.2 pipette antenna6
     %% id sample-complete-c2
     AN->>IF: Sample Complete SampleId=SID-000124 Needle=2
     %% after 0 ok-c1-3
@@ -116,7 +116,7 @@ sequenceDiagram
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp2 duration=4 sid=SID-000123
+    %% pipette antenna6 duration=4 sid=SID-000123
     %% on antenna7 C2
     %% caption 5 · Release | Leaving the interface module each carrier gets one Release, however many needles sampled it.
     %% on antenna7
@@ -124,7 +124,7 @@ sequenceDiagram
     %% after 0.1
     %% for C2
     AN-->>IF: OK
-    %% after 0.2 pipette sp2
+    %% after 0.2 pipette antenna6
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=2
     %% after 0.1
     %% for C1

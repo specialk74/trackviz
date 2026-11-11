@@ -72,8 +72,6 @@ Le assunzioni A1–A10 di `PROJECT.md`, sezione 10, sono confermate.
   fino al punto dell'antenna, e l'ingresso nella ruota resta un `move` esplicito.
 - Alcuni ritardi hanno ancora decimali poco "umani" (`after 0.972 ok-c1`): il riordino
   per tempo esprime una causa lontana sommando le durate degli step in mezzo.
-- Un tool per riordinare una scena per tempo (`trackviz sort`) sarebbe utile: oggi è
-  uno script esterno usato durante la riscrittura.
 - Una geometria diversa richiede un proprio file in `scenes/common/`.
 - Con più scene il resto della divisione di `-j` resta inutilizzato (4 scene con `-j 6`:
   2 thread fermi).
@@ -92,7 +90,7 @@ Scene in Mermaid con parti comuni (`include`, geometrie), righe `@`, messaggi co
 `{Needle}`, tempi con `on`/`after`/`at` legati alle antenne e ai messaggi, fisica dei
 carrier (code, incroci, nastro a 17,5 cm/s), antenne sulla corsia con gate, `pass` / `divert` sulle antenne,
 percorso dei carrier ricavato da `move`, `pass`, `divert` (niente `route=`), capienza della pit-lane, nota di pipettatura con `sid=`,
-accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), indice dei video (`trackviz index`), formato `@step` solo interno (le scene usano solo le direttive), `%% id` per legare uno step alla fine di una riga qualsiasi (al posto del riconoscimento per testo del messaggio), messaggi e note su più righe con `<br/>` come in Mermaid, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
+accensione automatica dei device letti dalle antenne, rotazione che aspetta la ruota libera, foglio riassuntivo (`--sheet`), indice dei video (`trackviz index`), formato `@step` solo interno (le scene usano solo le direttive), `%% id` per legare uno step alla fine di una riga qualsiasi (al posto del riconoscimento per testo del messaggio), messaggi e note su più righe con `<br/>` come in Mermaid, `trackviz sort` (riordina una scena per tempo, stesso video), avvisi con la riga, immagine di layout (`--layout`), snippet e controllo delle scene in VS Code (`.vscode`), scheletro di una scena nuova (`trackviz new`),
 avvisi in `--check` (sovrapposizioni, didascalie corte o fuori ordine, messaggi fuori
 ordine), più scene in parallelo con i caratteri jolly, anteprima veloce
 (`--preview`, `--from`, `--to`, `--watch`).

@@ -37,10 +37,10 @@ sequenceDiagram
     %% after 0.1 ok-c1-2
     %% caption 3 · Test query — Pipetting | After the reply to Prepare the analyzer has asked DMX (LIS) which tests to perform. Now it aspirates the tube, while the gate holds the carrier at the sampling point.
     %% after 0.1 ok-c1-2
-    %% pipette sp duration=4.5 sid=SID-000123
+    %% pipette antenna2 duration=4.5 sid=SID-000123
     %% after 0.2
     %% caption 4 · Sample Complete | When aspiration is finished the analyzer sends Sample Complete. Only then does the interface release the carrier, which goes round the top of the spur and down the other branch.
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
     %% for C1

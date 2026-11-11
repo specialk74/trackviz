@@ -72,7 +72,7 @@ sequenceDiagram
     %% id prepare-c2
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.1 ok-c1-3
-    %% pipette ts duration=10 sid=SID-000123
+    %% pipette antenna3 duration=10 sid=SID-000123
     %% after 0.1 prepare-c2
     %% id ok-c2
     AN-->>IF: OK SampleId=SID-000124
@@ -114,9 +114,9 @@ sequenceDiagram
     %% after 0.1 prepare-c3-2
     %% for C3
     AN-->>IF: OK
-    %% after 0.2 pipette ts
+    %% after 0.2 pipette antenna3
     %% caption 7 · Sample Complete — enter — rotate | Sample Complete for the first sample. The gate opens, the third carrier enters the wheel, then the wheel rotates: the third sample goes under the needle, the first one to the exit.
-    %% after 0.2 pipette ts
+    %% after 0.2 pipette antenna3
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
     %% for C1
@@ -129,7 +129,7 @@ sequenceDiagram
     %% after 0.25 rotate ts
     %% id sample-acquisition-c3
     IF->>AN: Sample Acquisition SampleId=SID-000125
-    %% on antenna3
+    %% on antenna4
     %% id release-c1
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1 sample-acquisition-c3
@@ -140,10 +140,10 @@ sequenceDiagram
     %% for C1
     AN-->>IF: OK
     %% after 0.1 ok-c3
-    %% pipette ts duration=4.5 sid=SID-000125
+    %% pipette antenna3 duration=4.5 sid=SID-000125
     %% after 0.2
     %% caption 8 · Back to normal | The first carrier has left the interface module: Release. Sample Complete for the third sample: the wheel brings it to the exit, and once it has left the module the interface sends Release.
-    %% after 0.2 pipette ts
+    %% after 0.2 pipette antenna3
     AN->>IF: Sample Complete SampleId=SID-000125
     %% after 0.1
     %% for C3
@@ -151,7 +151,7 @@ sequenceDiagram
     %% rotate ts
     %% after 0.2
     %% move C3 to gone
-    %% on antenna3
+    %% on antenna4
     IF->>AN: Release SampleId=SID-000125
     %% after 0.1
     %% for C3

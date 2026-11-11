@@ -414,7 +414,8 @@ impl Importer {
             }
             "pipette" | "rotate" | "highlight" | "operator" => {
                 need(1, &format!("{cmd} <device> [duration=s]"))?;
-                let mut k: Keys = vec![("device", text(plain[0]))];
+                let device = if cmd == "pipette" { self.probe(cmd, plain[0])? } else { plain[0].to_string() };
+                let mut k: Keys = vec![("device", text(&device))];
                 k.extend(duration(&o)?);
                 // The sample the analyzer aspirates, for its note: sid=.
                 match (cmd, o.get("sid")) {
@@ -446,8 +447,9 @@ impl Importer {
                 self.step("pass", k)?;
             }
             "needle" => {
-                need(2, "needle <device> down|up [duration=s]")?;
-                let mut k: Keys = vec![("device", text(plain[0])), ("to", text(plain[1]))];
+                need(2, "needle <antenna> down|up [duration=s]")?;
+                let device = self.probe(cmd, plain[0])?;
+                let mut k: Keys = vec![("device", text(&device)), ("to", text(plain[1]))];
                 k.extend(duration(&o)?);
                 self.step("needle", k)?;
             }
@@ -490,11 +492,22 @@ impl Importer {
             .iter()
             .filter_map(|t| match (field(t, "kind").as_str(), field(t, "antenna")) {
                 ("antenna", _) => Some((field(t, "id"), field(t, "at"))),
+                // The antenna of a turnstile is under the needle.
+                ("turnstile", a) if !a.is_empty() => Some((a, format!("{}.needle", field(t, "id")))),
                 // An antenna declared on another device: antenna=antenna2.
                 (_, a) if !a.is_empty() => Some((a, field(t, "at"))),
                 _ => None,
             })
             .collect()
+    }
+
+    /// The antenna under the needle of a turnstile: the wheel brings carriers
+    /// there, so a step can't wait for one to get on it.
+    fn not_in_a_wheel(cmd: &str, antenna: &str, point: &str) -> Result<(), String> {
+        match point.strip_suffix(".needle") {
+            Some(ts) => Err(format!("'{cmd} {antenna}': the wheel brings the carrier under the needle; start from the rotation: after <seconds> rotate {ts}")),
+            None => Ok(()),
+        }
     }
 
     /// The point an antenna reads.
@@ -507,6 +520,29 @@ impl Importer {
         })
     }
 
+    /// Where `pipette` and `needle` work: a sampling point by its antenna (the
+    /// device's own name is refused), a turnstile by its name (no antenna there).
+    fn probe(&self, cmd: &str, name: &str) -> Result<String, String> {
+        let field = |t: &Table, k: &str| t.str_opt(k).ok().flatten().unwrap_or_default();
+        let devices = self.list("device");
+        if let Some(t) = devices.iter().find(|t| field(t, "antenna") == name) {
+            return match field(t, "kind").as_str() {
+                "sampling" | "turnstile" => Ok(field(t, "id")),
+                _ => Err(format!("'{cmd} {name}': {name} is not on a sampling point")),
+            };
+        }
+        match devices.iter().find(|t| field(t, "id") == name) {
+            Some(t) if ["sampling", "turnstile"].contains(&field(t, "kind").as_str()) && !field(t, "antenna").is_empty() => {
+                Err(format!("'{cmd} {name}': write the antenna, {cmd} {}", field(t, "antenna")))
+            }
+            // A turnstile, or a sampling point without an antenna: by its name.
+            Some(t) if ["turnstile", "sampling"].contains(&field(t, "kind").as_str()) => Ok(name.to_string()),
+            Some(_) => Err(format!("'{cmd} {name}': {name} is not on a sampling point")),
+            None if self.antennas().iter().any(|a| a.0 == name) => Err(format!("'{cmd} {name}': {name} is not on a sampling point")),
+            None => Err(format!("'{cmd} {name}': not an antenna of this scene")),
+        }
+    }
+
     fn known_carrier(&self, what: &str, c: &str) -> Result<(), String> {
         if self.samples.iter().any(|s| s.0 == c) {
             Ok(())
@@ -517,6 +553,7 @@ impl Importer {
 
     fn on_antenna(&mut self, antenna: &str, carrier: Option<&str>) -> Result<(), String> {
         let point = self.antenna_point(antenna)?;
+        Self::not_in_a_wheel("on", antenna, &point)?;
         if let Some(c) = carrier {
             self.known_carrier(&format!("on {antenna} {c}"), c)?;
         }
@@ -538,11 +575,13 @@ impl Importer {
                 return Err(format!("'after <seconds> {}' needs the carrier: after <seconds> {} <carrier>", refer[0], refer[0]));
             };
             let point = self.antenna_point(antenna)?;
+            Self::not_in_a_wheel("after <seconds>", antenna, &point)?;
             self.known_carrier(&format!("after {antenna} {c}"), c)?;
             self.timing_key("when", text(&format!("{c} at {point}")))?;
             return self.timing_key("delay", secs);
         }
         if let [kind @ ("pipette" | "rotate" | "needle"), device] = refer {
+            let device = if *kind == "rotate" { device.to_string() } else { self.probe(kind, device)? };
             self.timing_key("when", text(&format!("{kind} {device} done")))?;
             return self.timing_key("delay", secs);
         }
@@ -824,7 +863,7 @@ mod tests {
         s.lines().map(str::trim).filter(|l| l.contains("->>") || l.starts_with("Note")).filter(|l| !l.starts_with("%%")).map(String::from).collect()
     }
 
-    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette sp\nNote over AN: Pipetting\nAN->>IF: Sample Complete sid=SID-1\nIF-->>AN: OK\n";
+    const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\nIF->>AN: Prepare SampleId=SID-1\nAN-->>IF: OK SampleId=SID-1\nAN->>DMX: Query SampleId=SID-1\nDMX-->>AN: Tests to perform SampleId=SID-1\nIF->>AN: Sample Acquisition SampleId=SID-1\nAN-->>IF: OK\n%% pipette antenna2\nNote over AN: Pipetting\nAN->>IF: Sample Complete sid=SID-1\nIF-->>AN: OK\n";
 
     #[test]
     fn a_diagram_builds_a_valid_scene_with_the_messages_written() {
@@ -877,7 +916,7 @@ mod tests {
         %% on antenna1\n%% id tube1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
         %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 tube1\nAN-->>IF: Late\n\
         %% color #9333EA\n%% on antenna3\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
-        %% after 0.5 antenna3 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done sid=SID-1\n";
+        %% after 0.5 antenna3 C1\n%% caption Read | x\n%% pipette antenna4 duration=2\n%% after 0.2 pipette antenna4\nAN->>IF: Done sid=SID-1\n";
 
     #[test]
     fn on_after_and_color_set_the_moment_and_the_look() {
@@ -993,17 +1032,27 @@ mod tests {
 
     #[test]
     fn a_note_after_a_pipette_is_its_text() {
-        let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
+        let d = doc(&format!("{HEAD}%% pipette antenna2\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
         assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
         assert!(has(&d, "step", &[("action", "pipette"), ("note", "Aspirating SID-1")]));
         assert!(has(&doc(&format!("{HEAD}%% pass antenna2 C1\n")).unwrap(), "step", &[("action", "pass"), ("device", "antenna2"), ("carrier", "C1")]));
         // Only antennas, not the names of the devices.
         fails(&format!("{HEAD}%% pass sp C1\n"), "'pass sp': write the antenna, pass antenna2");
+        // pipette and needle: the antenna of the sampling point.
+        assert!(has(&doc(&format!("{HEAD}%% pipette antenna2\n%% needle antenna2 down\n")).unwrap(), "step", &[("action", "needle"), ("device", "sp")]));
+        fails(&format!("{HEAD}%% pipette sp\n"), "'pipette sp': write the antenna, pipette antenna2");
+        fails(&format!("{HEAD}%% needle antenna1 down\n"), "'needle antenna1': antenna1 is not on a sampling point");
+        fails(&format!("{HEAD}%% after 1 pipette sp\nIF->>AN: X\n"), "'pipette sp': write the antenna, pipette antenna2");
+        // The turnstile: its antenna is under the needle.
+        let ts = "%% geometry turnstile\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
+        assert!(has(&doc(&format!("{ts}%% pipette antenna3\n")).unwrap(), "step", &[("action", "pipette"), ("device", "ts")]));
+        fails(&format!("{ts}%% pipette ts\n"), "'pipette ts': write the antenna, pipette antenna3");
+        fails(&format!("{ts}%% on antenna3 C1\n%% caption a | b\n"), "the wheel brings the carrier under the needle; start from the rotation: after <seconds> rotate ts");
         // A move to an antenna goes to its point.
         assert!(has(&doc(&format!("{HEAD}%% move C1 to antenna2\n")).unwrap(), "step", &[("action", "move"), ("to", "sampling")]));
         fails(&format!("{HEAD}%% move C1 to antenn2\n"), "'antenn2' is neither an antenna nor a point of this scene (antennas: antenna1, antenna2");
         fails(&format!("{HEAD}%% divert an C1\n"), "'an' is not an antenna of this scene");
-        let d = doc(&format!("{HEAD}%% pipette sp duration=4 sid=SID-1\n%% pipette sp sid=SID-2\n")).unwrap();
+        let d = doc(&format!("{HEAD}%% pipette antenna2 duration=4 sid=SID-1\n%% pipette antenna2 sid=SID-2\n")).unwrap();
         assert!(has(&d, "step", &[("action", "pipette"), ("sample_id", "SID-1"), ("duration", "4")]) && has(&d, "step", &[("sample_id", "SID-2")]));
         fails(&format!("{HEAD}%% rotate sp sid=SID-1\n"), "only pipette does");
         fails("%% geometry spur\nsequenceDiagram\n%% carrier C1 SID-1\n", "carrier id=<id> [sid=<sample id>]");
@@ -1024,8 +1073,13 @@ mod tests {
         // start=: where it is at the beginning (an antenna stands for its point).
         assert_eq!(way("")[1], "nsd");
         let e = |body: &str| Scene::from_doc(&doc(&format!("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n{body}")).unwrap()).err().unwrap();
-        assert!(e("%% pass antenna2 C1\n").contains("'C1' is not sent to antenna2 before (move C1 to antenna2); it goes to 'main_in'"));
-        assert!(e("%% move C1 to main_out\n%% move C1 to nsd\n").contains("carrier 'C1' can't go from 'main_out' to 'nsd' along the lanes"));
+        let msg = e("%% pass antenna2 C1\n");
+        assert!(msg.contains("pass antenna2 C1: 'C1' is not on antenna2: it is still where it starts, on 'main_in'; send it there first (move C1 to antenna2"), "{msg}");
+        let msg = e("%% move C1 to main_out\n%% move C1 to antenna1\n");
+        assert!(msg.contains("move C1 to antenna1: 'C1' can't go there along the lanes from 'main_out', where it is"), "{msg}");
+        // The first wrong step in the file, with who is on the antenna instead.
+        let msg = e("%% carrier id=C2 sid=SID-2\n%% move C1 to antenna2\n%% move C2 to main_out\n%% pass antenna2 C2\n");
+        assert!(msg.contains("pass antenna2 C2: 'C2' is not on antenna2: after line 6 (move C2 to 'main_out') it goes to 'main_out'; on antenna2 there is C1: did you mean pass antenna2 C1?"), "{msg}");
     }
 
     #[test]

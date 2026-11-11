@@ -84,7 +84,7 @@ sequenceDiagram
     %% on antenna3 C3
     %% caption 4 · Read at the divert — Clear | The third carrier stops at the divert on top of the second one, which is not there. It reads the third sample instead of the second: the interface sends Clear for the second.
     %% after 0.1 ok-c1-2
-    %% pipette sp1 duration=6.6 sid=SID-000123
+    %% pipette antenna4 duration=6.6 sid=SID-000123
     %% after 0.195 antenna3 C3
     %% id clear-c2
     IF->>AN: Clear SampleId=SID-000124
@@ -104,7 +104,7 @@ sequenceDiagram
     %% after 0.1 prepare-c3-2
     %% for C3
     AN-->>IF: OK
-    %% after 0.2 pipette sp1
+    %% after 0.2 pipette antenna4
     %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
     %% caption 6 · Sample Complete | Sample Complete: the first carrier is released and the third moves up to the sampling point.
@@ -124,7 +124,7 @@ sequenceDiagram
     %% after 0.401 antenna5 C1
     %% pass antenna5 C1
     %% after 0.1 ok-c3
-    %% pipette sp1 duration=4 sid=SID-000125
+    %% pipette antenna4 duration=4 sid=SID-000125
     %% after 0.2
     %% id sample-complete-c3
     AN->>IF: Sample Complete SampleId=SID-000125 Needle=1

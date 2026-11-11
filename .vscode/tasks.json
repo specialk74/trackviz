@@ -72,6 +72,21 @@
           ],
           "severity": "warning",
           "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
             "regexp": "^warning: (.+?\\.mmd): (.*)$",
             "file": 1,
             "message": 2,
@@ -155,6 +170,21 @@
           ],
           "severity": "warning",
           "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
             "regexp": "^warning: (.+?\\.mmd): (.*)$",
             "file": 1,
             "message": 2,
@@ -222,6 +252,21 @@
             "file": 1,
             "message": 2,
             "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
           }
         },
         {
@@ -312,6 +357,21 @@
           ],
           "severity": "warning",
           "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
             "regexp": "^warning: (.+?\\.mmd): (.*)$",
             "file": 1,
             "message": 2,
@@ -391,6 +451,115 @@
           ],
           "severity": "warning",
           "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd): (.*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        }
+      ]
+    },
+    {
+      "label": "trackviz: sort this scene in time order",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "-q",
+        "--",
+        "sort",
+        "${file}"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): \\[\\w+\\] at line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": {
+            "regexp": "^error: (.+?\\.mmd): ([^\\[].*)$",
+            "file": 1,
+            "message": 2,
+            "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
             "regexp": "^warning: (.+?\\.mmd): (.*)$",
             "file": 1,
             "message": 2,
@@ -459,6 +628,21 @@
             "file": 1,
             "message": 2,
             "kind": "file"
+          }
+        },
+        {
+          "owner": "trackviz",
+          "source": "trackviz",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "severity": "warning",
+          "pattern": {
+            "regexp": "^warning: (.+?\\.mmd) line (\\d+): (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
           }
         },
         {

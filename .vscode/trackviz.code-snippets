@@ -117,7 +117,7 @@
   "after action": {
     "prefix": "tv-after-action",
     "body": [
-      "%% after ${1:0.3} ${2|pipette,rotate,needle|} ${3:sp}"
+      "%% after ${1:0.3} ${2|pipette,rotate,needle|} ${3|antenna2,antenna3,antenna4,antenna6|}"
     ],
     "description": "N seconds after that action on the device ends"
   },
@@ -173,7 +173,7 @@
   "pipette": {
     "prefix": "tv-pipette",
     "body": [
-      "%% pipette ${1:sp} duration=${2:4.5} sid=${3:SID-000123}"
+      "%% pipette ${1|antenna2,antenna3,antenna4,antenna6|} duration=${2:4.5} sid=${3:SID-000123}"
     ],
     "description": "The analyzer aspirates; adds the note 'Pipetting Analyzer - SampleId=...'. A Note right after it replaces the text"
   },
@@ -187,7 +187,7 @@
   "needle": {
     "prefix": "tv-needle",
     "body": [
-      "%% needle ${1:sp} ${2|down,up|}"
+      "%% needle ${1|antenna2,antenna3,antenna4,antenna6|} ${2|down,up|}"
     ],
     "description": "The analyzer needle goes down into the tube or back up"
   },

@@ -34,6 +34,7 @@ $B scenes/a.mmd --preview --watch     # again every time the scene is saved (Ctr
 $B "scenes/*.mmd"                # several scenes, in parallel
 $B new my_scene --geometry spur2 --carriers 3   # a new scene: scenes/my_scene.mmd
 $B index                         # out/index.html: the page that lists the videos
+$B sort scenes/a.mmd             # the steps in time order, same video (--dry-run: only say it)
 cargo test --release             # the tests, all the scenes included
 ```
 
@@ -47,21 +48,30 @@ cargo test --release             # the tests, all the scenes included
 - `--watch` takes one scene and also works with `--check` and `--still`.
 - With several scenes a failure doesn't stop the others; they are listed at the end and
   the exit code is 1. `-o` and `--still` take one scene.
+- `sort` rewrites a scene with its steps in the order in which they start in the
+  video, so that the Mermaid diagram (which follows the file) shows the messages in the
+  same order as the video. Each step moves with the directives above it (`on`, `after`,
+  `id`, `color`, `for`, comments); where a moved step was tied to the line before it
+  (no timing, `after <seconds>`, `after <seconds> pipette ...`), it is tied to the
+  same step with an `id` (`%% id pipette-antenna4` + `%% after 0 pipette-antenna4`).
+  The sorted scene is built first and must give the same timeline: otherwise the file
+  is left as it is. `--dry-run` only says what it would do.
 - `new` writes a scene that is valid as it is, for one geometry (`sampling`,
   `sampling_queue`, `sampling_queue2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`;
   default `sampling`): carrier C1 goes the whole way, the others are declared. It never
   overwrites a file.
 
 `--check` prints every step with its start and end time, and warnings for what is
-valid but looks wrong (they don't stop anything): carriers overlapping, captions too
-long for the band, captions shown less than 2.5 s or out of order, messages written in a
-different order from the one in which they are sent. On an error it prints the timeline
-up to that point.
+valid but looks wrong (they don't stop anything), on the line of the step: carriers
+overlapping, captions too long for the band, captions shown less than 2.5 s or out of
+order, messages written in a different order from the one in which they are sent
+(`sort` fixes these two). On an error it prints the timeline up to that point.
 
 **VS Code.** With the project open: type `tv-` for a snippet of every directive and
 message (`tv-on`, `tv-pipette`, `tv-msg-prepare`, `tv-scene`, ...); Ctrl+Shift+B runs
 `--check` on the open scene and puts errors and warnings on their lines. More tasks
-(preview, video, layout, contact sheet, check all) in Terminal > Run Task.
+(preview, video, layout, contact sheet, sort in time order, check all) in Terminal >
+Run Task.
 
 ## Writing a scene
 
@@ -85,8 +95,8 @@ sequenceDiagram
     %% on antenna2
     IF->>AN: Sample Acquisition SampleId=SID-000123
     %% after 0.1
-    %% pipette sp duration=4 sid=SID-000123
-    %% after 0.3 pipette sp
+    %% pipette antenna2 duration=4 sid=SID-000123
+    %% after 0.3 pipette antenna2
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
     %% pass antenna2 C1
@@ -113,7 +123,7 @@ unless a directive right before it says otherwise:
 | `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives, a move when the carrier arrives, a `pass` or `divert` when the carrier sets off) |
 | `after <seconds> <id>` | that many seconds after the line marked `id <id>` has ended |
 | `after <seconds> <antenna> <carrier>` | that many seconds after the carrier is over the antenna |
-| `after <seconds> pipette\|rotate\|needle <device>` | that many seconds after that action on the device ends |
+| `after <seconds> pipette\|needle <antenna>`, `after <seconds> rotate <turnstile>` | that many seconds after that action ends |
 | `at <seconds>` | at that second of the video |
 
 Only one of them per step. To wait for a line that is not the one right before, give
@@ -136,7 +146,7 @@ The antennas of each geometry, numbered in the direction of the carriers:
 | Geometry | Antennas |
 |---|---|
 | `sampling`, `spur` | 1 NSD, 2 sampling point, 3 end of the pit-lane (Release) |
-| `turnstile` | 1 NSD, 2 in front of the gate, 3 end of the pit-lane (Release) |
+| `turnstile` | 1 NSD, 2 in front of the gate, 3 under the needle (for `pipette` and `needle`: the wheel brings the carriers there, so `on`/`after` can't wait for it; start from `rotate`), 4 end of the pit-lane (Release) |
 | `spur2` | 1 NSD, 2 on the spur before Divert 1 (with a gate: it only lets the carrier go on with `pass antenna2 <carrier>`, it can't divert), 3 Divert 1, 4 sampling point 1, 5 Divert 2, 6 sampling point 2, 7 end of the spur (Release) |
 
 ### All the directives
@@ -168,7 +178,7 @@ each.
 | Directive | What it does | Optional |
 |---|---|---|
 | `on <antenna>` | The next step starts when its carrier is over the antenna | `<carrier>` after the antenna: which carrier. Without it, the carrier of the step (the `SampleId` of the message, the one it moves or shows); for captions, highlights, pipettes and notes it is required |
-| `after <seconds>` | The next step starts that many seconds after the step before ends | what to wait for: `<id>` (the end of the line marked with that id), `<antenna> <carrier>` (the carrier over the antenna), `pipette\|rotate\|needle <device>` (the end of that action) |
+| `after <seconds>` | The next step starts that many seconds after the step before ends | what to wait for: `<id>` (the end of the line marked with that id), `<antenna> <carrier>` (the carrier over the antenna), `pipette\|needle <antenna>` or `rotate <turnstile>` (the end of that action) |
 | `at <seconds>` | The next step starts at that second of the video | — |
 | `id <name>` | Names the next line (message, note, move, pipette, ...), so that a later `after <seconds> <name>` can start from its end. Letters, digits, `-`, `_`; one per line, never used twice in a file | — |
 | `color #RRGGBB` | Colors the next message (the purple Prepare is `#9333EA`) | without it: the color of the named message or of the sender |
@@ -184,10 +194,10 @@ Only one of `on`, `after`, `at` per step.
 | `move <carrier> to <antenna>\|<point>` | An antenna stands for its point (`move C1 to antenna2`); other places by the name of the point (`gone`, `iface_out`: see `--layout`). The carrier sets off towards the point, by the shortest way along the lanes from where it is (see The way of a carrier). It rides the belt at constant speed, queues behind other carriers and stops at the point. The step ends when it arrives | `duration=<s>`: the time of the trip; without it, from length and speed.<br>`speed=<px/s>`: only for this move; default the carrier's.<br>`ease=linear\|in\|out\|inout`: default `linear` (the belt starts and stops at once).<br>`runaway`: the carrier escapes by itself (red pulsing ring, tag "… · RUN-AWAY") |
 | `pass <antenna> <carrier>` | The gate on the antenna opens and the carrier, stopped there, goes on straight: along the lanes to the next stop (an antenna with a gate, a turnstile entry) or to the end of the track. The step ends when the carrier sets off: the next step starts then, not when it arrives (to wait for the arrival: `on <antenna> <carrier>`). Only antennas, not the names of devices (`pass sp C1` is an error that names `pass antenna2`). The carrier must have been sent to the antenna before (`move C1 to antenna2`, or a `pass`/`divert` that stops there), and be the one stopped there at that moment. If it went straight on because the pit-lane was full, its `pass` is skipped | — |
 | `divert <antenna> <carrier>` | Like `pass`, but the carrier turns into the lane that starts on the antenna (its pit-lane), then goes on to the next stop. Only on the antenna of a divert (`spur2`: `antenna3` Divert 1, `antenna5` Divert 2); elsewhere it is an error | — |
-| `pipette <device>` | Sampling: the analyzer's arm goes to the tube on the device, the needle goes down, aspirates and comes back up (20% down, 60% aspiration, 20% up). It also adds the note "Pipetting Analyzer" on the analyzer's lifeline, for the same time. It only draws the sampling: it sends no message and does not check that a carrier is under the needle (in scene 08 it samples an empty pocket). The device must be a sampling point or a turnstile, and the scene must have an analyzer. Lasts 3 s | `duration=<s>`: how long it lasts.<br>`sid=<sample id>`: the sample the analyzer believes it is aspirating (the one of its Sample Acquisition), added to the note: "Pipetting Analyzer - SampleId=SID-000123". Without it the note has no SampleId; and if that carrier goes straight on because the pit-lane is full, this pipette is not skipped.<br>A `Note over AN: ...` right after it replaces the text of the note |
+| `pipette <antenna>` | Sampling, on the sampling point of the antenna (`pipette antenna2`; `spur2`: `antenna4` needle 1, `antenna6` needle 2; turnstile: `antenna3`, under the needle). The name of the device is refused (`pipette sp` names `pipette antenna2`). The analyzer's arm goes to the tube there, the needle goes down, aspirates and comes back up (20% down, 60% aspiration, 20% up). It also adds the note "Pipetting Analyzer" on the analyzer's lifeline, for the same time. It only draws the sampling: it sends no message and does not check that a carrier is under the needle (in scene 08 it samples an empty pocket). The device must be a sampling point or a turnstile, and the scene must have an analyzer. Lasts 3 s | `duration=<s>`: how long it lasts.<br>`sid=<sample id>`: the sample the analyzer believes it is aspirating (the one of its Sample Acquisition), added to the note: "Pipetting Analyzer - SampleId=SID-000123". Without it the note has no SampleId; and if that carrier goes straight on because the pit-lane is full, this pipette is not skipped.<br>A `Note over AN: ...` right after it replaces the text of the note |
 | `rotate <device>` | The turnstile turns by one position: entry → needle → exit. It waits by itself until the wheel is free (see Turnstile). Lasts 2 s | `duration=<s>` |
 | `highlight <device>` | The device lights up. Not needed when an antenna reads a carrier: the NSD, a divert or an antenna on its own light up by themselves. Lasts 1.5 s | `duration=<s>` |
-| `needle <device> down\|up` | Moves the needle by hand: down it stays there until `up`. Meanwhile the wheel can't turn and the carrier can't leave. The device must be a sampling point or a turnstile. Lasts 0.9 s | `duration=<s>` |
+| `needle <antenna> down\|up` | On the sampling point of the antenna, like `pipette`. Moves the needle by hand: down it stays there until `up`. Meanwhile the wheel can't turn and the carrier can't leave. The device must be a sampling point or a turnstile. Lasts 0.9 s | `duration=<s>` |
 | `status <device> error\|ready\|normal` | The color of an analyzer, a zone or a sampling point (one needle): red, green, grey, until the next `status`. Takes no time | — |
 | `operator <device>` | An operator walks in, works on the analyzer and walks away. Lasts 7 s | `duration=<s>`, at least 2 |
 | `show <carrier>` / `hide <carrier>` | The carrier fades in / out. Lasts 0.5 s | `duration=<s>` |
@@ -257,7 +267,7 @@ others (written with its id: `divert antenna3 C2L`). Usually `hidden`, then `sho
 it should appear and `hide` when it is cleared (scenes 03 and 04).
 
 **Analyzer error and needle.** `status AN error|ready|normal` colors the analyzer
-(also a zone, or one needle of `spur2` with its sampling point). `needle <device> down`
+(also a zone, or one needle of `spur2` with its sampling point). `needle <antenna> down`
 keeps the needle in the tube until `needle ... up` (scenes 05, 06).
 
 ## More

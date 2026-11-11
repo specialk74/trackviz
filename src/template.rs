@@ -14,8 +14,8 @@ enum Kind {
     /// A sampling point on the pit-lane or on the spur: antenna1 NSD, antenna2
     /// sampling point, antenna3 end of the pit-lane.
     Sampling,
-    /// A turnstile: antenna1 NSD, antenna2 in front of the gate, antenna3 end of
-    /// the pit-lane.
+    /// A turnstile: antenna1 NSD, antenna2 in front of the gate, antenna3 under
+    /// the needle, antenna4 end of the pit-lane.
     Turnstile,
     /// Two sampling points: antenna1 NSD, antenna2 on the spur (pass only),
     /// antenna3 Divert 1, antenna4 sampling point 1, antenna5 Divert 2, antenna6
@@ -87,10 +87,10 @@ const SAMPLING: &str = "    %% move C1 to antenna2
     AN-->>IF: OK
     %% after 0.1
     %% caption 3 · Pipetting | The analyzer aspirates the sample while the gate holds the carrier.
-    %% pipette sp duration=4.5 sid=SID-000123
-    %% after 0.3 pipette sp
+    %% pipette antenna2 duration=4.5 sid=SID-000123
+    %% after 0.3 pipette antenna2
     %% caption 4 · Sample Complete | The analyzer sends Sample Complete; the interface replies and opens the gate.
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
     %% for C1
@@ -130,10 +130,10 @@ const TURNSTILE: &str = "    %% move C1 to antenna2
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pipette ts duration=4.5 sid=SID-000123
-    %% after 0.3 pipette ts
+    %% pipette antenna3 duration=4.5 sid=SID-000123
+    %% after 0.3 pipette antenna3
     %% caption 4 · Sample Complete | The analyzer sends Sample Complete; the wheel brings the carrier to the exit.
-    %% after 0.3 pipette ts
+    %% after 0.3 pipette antenna3
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
     %% for C1
@@ -141,9 +141,9 @@ const TURNSTILE: &str = "    %% move C1 to antenna2
     %% rotate ts
     %% after 0.1
     %% move C1 to gone
-    %% on antenna3 C1
+    %% on antenna4 C1
     %% caption 5 · Release | Before the carrier is back on the Main-Lane the interface sends Release.
-    %% on antenna3
+    %% on antenna4
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1
@@ -176,10 +176,10 @@ const SPUR2: &str = "    %% move C1 to antenna2
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp1 duration=4 sid=SID-000123
-    %% after 0.3 pipette sp1
+    %% pipette antenna4 duration=4 sid=SID-000123
+    %% after 0.3 pipette antenna4
     %% caption 4 · Sample Complete | The analyzer sends Sample Complete; the carrier goes on round the spur.
-    %% after 0.3 pipette sp1
+    %% after 0.3 pipette antenna4
     AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
     %% after 0.1
     %% for C1

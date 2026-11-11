@@ -261,6 +261,8 @@ impl Anchor {
 #[derive(Clone)]
 pub struct Step {
     pub action: Action,
+    /// Where it is written: (file, line); the file is empty when given as text.
+    pub at: (String, usize),
     /// `id`: its name, for the steps that start when it ends.
     pub id: Option<String>,
     pub start: StartMode,
@@ -545,7 +547,7 @@ impl Scene {
                     rect = (t.num_req("x")?, t.num_req("y")?, t.num_req("w")?, t.num_req("h")?);
                 }
                 DeviceKind::Turnstile => {
-                    t.check_keys(&["id", "kind", "x", "y", "r", "entry", "label"])?;
+                    t.check_keys(&["id", "kind", "x", "y", "r", "entry", "label", "antenna"])?;
                     let (cx, cy, r) = (t.num_req("x")?, t.num_req("y")?, t.num_opt("r")?.unwrap_or(70.0));
                     entry_right = match t.str_opt("entry")?.as_deref().unwrap_or("right") {
                         "right" => true,
@@ -571,9 +573,10 @@ impl Scene {
                 _ => return Err(format!("{}: give both label_x and label_y", t.location())),
             };
             let visible = t.bool_opt("visible")?.unwrap_or(true);
-            let antenna = if matches!(kind, DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Divert) { t.str_opt("antenna")? } else { None };
+            let antenna = if matches!(kind, DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Divert | DeviceKind::Turnstile) { t.str_opt("antenna")? } else { None };
             let gate = t.bool_opt("gate")?.unwrap_or(false);
-            let point = at.clone();
+            // A turnstile's antenna is under the needle.
+            let point = if kind == DeviceKind::Turnstile { Some(format!("{id}.needle")) } else { at.clone() };
             devices.push(Device { id: id.clone(), kind, at, rect, label: t.str_opt("label")?.unwrap_or_default(), entry_right, label_pos, visible, part_of: None });
             if let Some(aid) = antenna {
                 if gate {
@@ -788,6 +791,7 @@ impl Scene {
                 delay,
                 duration: t.num_opt("duration")?,
                 loc: t.location(),
+                at: (t.file.clone(), t.line),
             });
         }
         if steps.is_empty() {
@@ -805,70 +809,100 @@ impl Scene {
             devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true, part_of });
         }
         let mut sc = Scene { video, points, lanes, devices, actors, carriers, steps, straight: Vec::new() };
-        for ci in 0..sc.carriers.len() {
-            if sc.carriers[ci].route.is_empty() {
-                sc.carriers[ci].route = sc.derive_route(ci)?;
+        let routes = sc.derive_routes()?;
+        for (c, r) in sc.carriers.iter_mut().zip(routes) {
+            if c.route.is_empty() {
+                c.route = r;
             }
         }
         Ok(sc)
     }
 
-    /// The way of a carrier written without `route`, from its steps in the order
-    /// of the file: from `start`; a `move` adds the shortest way along the lanes to
-    /// its point; `pass` goes straight on, `divert` into the lane that starts on
-    /// the antenna, then along the lanes to the next stop (an antenna with a gate,
-    /// a turnstile entry) or to the end.
-    fn derive_route(&self, ci: usize) -> Result<Vec<String>, String> {
+    /// The ways of the carriers written without `route`, from their steps in the
+    /// order of the file: from `start`; a `move` adds the shortest way along the
+    /// lanes to its point; `pass` goes straight on, `divert` into the lane that
+    /// starts on the antenna, then along the lanes to the next stop (an antenna
+    /// with a gate, a turnstile entry) or to the end. All the carriers together, so
+    /// that the first wrong step in the file is the one reported, with where the
+    /// carrier is and who is on the antenna instead.
+    fn derive_routes(&self) -> Result<Vec<Vec<String>>, String> {
         let graph = LaneGraph::new(&self.points, &self.lanes, &self.devices);
         let stops = self.stops();
-        let cid = self.carriers[ci].id.clone();
-        let mut route = vec![self.carriers[ci].start.clone()];
-        let mut lane = String::new();
+        let n = self.carriers.len();
+        let derived: Vec<bool> = self.carriers.iter().map(|c| c.route.is_empty()).collect();
+        let mut routes: Vec<Vec<String>> = self.carriers.iter().map(|c| vec![c.start.clone()]).collect();
+        let mut lanes = vec![String::new(); n];
+        // The step that put each carrier where it is: (line, what it says).
+        let mut last: Vec<Option<(String, String)>> = vec![None; n];
+        // An antenna's name for a point, or the point.
+        let place = |p: &str| {
+            self.devices.iter().find(|d| d.kind == DeviceKind::Antenna && d.at.as_deref() == Some(p)).map_or_else(|| format!("'{p}'"), |d| d.id.clone())
+        };
+        let line = |loc: &str| loc.rsplit("line ").next().unwrap_or(loc).to_string();
         for st in &self.steps {
-            let cur = route.last().unwrap().clone();
             match &st.action {
-                Action::Move { carrier, to, .. } if *carrier == cid && *to != cur => {
-                    let (w, l) = graph.way(&cur, to).ok_or_else(|| format!("{}: carrier '{cid}' can't go from '{cur}' to '{to}' along the lanes", st.loc))?;
-                    route.extend(w.into_iter().skip(1));
-                    lane = l;
+                Action::Move { carrier, to, .. } => {
+                    let Some(ci) = self.carrier_idx(carrier).filter(|&ci| derived[ci]) else { continue };
+                    let cur = routes[ci].last().unwrap().clone();
+                    if *to == cur {
+                        continue;
+                    }
+                    let (w, l) = graph.way(&cur, to).ok_or_else(|| {
+                        format!("{}: move {carrier} to {}: '{carrier}' can't go there along the lanes from {}, where it is", st.loc, place(to), place(&cur))
+                    })?;
+                    routes[ci].extend(w.into_iter().skip(1));
+                    lanes[ci] = l;
+                    last[ci] = Some((line(&st.loc), format!("move {carrier} to {}", place(to))));
                 }
-                Action::Pass { device, divert, carrier: Some(c) } if *c == cid => {
+                Action::Pass { device, divert, carrier: Some(c) } => {
+                    let Some(ci) = self.carrier_idx(c).filter(|&ci| derived[ci]) else { continue };
                     let cmd = if *divert { "divert" } else { "pass" };
                     let at = self.devices.iter().find(|d| d.id == *device).and_then(|d| d.at.clone()).unwrap_or_default();
+                    let cur = routes[ci].last().unwrap().clone();
                     if cur != at {
-                        return Err(format!("{}: {cmd} {device} {cid}: '{cid}' is not sent to {device} before (move {cid} to {device}); it goes to '{cur}'", st.loc));
+                        let was = match &last[ci] {
+                            Some((l, what)) => format!("after line {l} ({what}) it goes to {}", place(&cur)),
+                            None => format!("it is still where it starts, on {}", place(&cur)),
+                        };
+                        let here: Vec<&str> = (0..n).filter(|&j| j != ci && derived[j] && routes[j].last() == Some(&at)).map(|j| self.carriers[j].id.as_str()).collect();
+                        let hint = match here.as_slice() {
+                            [] => format!("send it there first (move {c} to {device}, or the pass/divert that brings it there)"),
+                            [one] => format!("on {device} there is {one}: did you mean {cmd} {device} {one}?"),
+                            many => format!("on {device} there are {}", many.join(", ")),
+                        };
+                        return Err(format!("{}: {cmd} {device} {c}: '{c}' is not on {device}: {was}; {hint}", st.loc));
                     }
                     // The lanes that turn off here.
                     let turns: Vec<&str> = self.lanes.iter().filter(|l| l.points.first() == Some(&at)).map(|l| l.id.as_str()).collect();
                     let ways: Vec<&(String, f64, String)> = graph.out(&at).iter().filter(|e| turns.contains(&e.2.as_str()) == *divert).collect();
                     let first = match ways.as_slice() {
-                        [] if *divert => return Err(format!("{}: divert {device} {cid}: no lane turns off there: pass {device} {cid}", st.loc)),
+                        [] if *divert => return Err(format!("{}: divert {device} {c}: no lane turns off there: pass {device} {c}", st.loc)),
                         [] => None,
                         [one] => Some(*one),
-                        many => many.iter().find(|e| e.2 == lane).copied().or(Some(many[0])),
+                        many => many.iter().find(|e| e.2 == lanes[ci]).copied().or(Some(many[0])),
                     };
+                    last[ci] = Some((line(&st.loc), format!("{cmd} {device} {c}")));
                     let Some((mut p, _, l)) = first.cloned() else { continue };
-                    lane = l;
-                    route.push(p.clone());
+                    lanes[ci] = l;
+                    routes[ci].push(p.clone());
                     // Along the lanes to the next stop.
                     while !stops.contains(&p) {
-                        let out = graph.out(&p);
-                        let next = match out {
+                        let next = match graph.out(&p) {
                             [] => break,
                             [one] => one,
-                            many => many.iter().find(|e| e.2 == lane).ok_or_else(|| {
-                                format!("{}: after {cmd} {device} {cid} the lanes split at '{p}': send it on with a move", st.loc)
+                            many => many.iter().find(|e| e.2 == lanes[ci]).ok_or_else(|| {
+                                format!("{}: after {cmd} {device} {c} the lanes split at '{p}': send it on with a move", st.loc)
                             })?,
                         };
                         p = next.0.clone();
-                        lane = next.2.clone();
-                        route.push(p.clone());
+                        lanes[ci] = next.2.clone();
+                        routes[ci].push(p.clone());
                     }
                 }
                 _ => {}
             }
         }
-        Ok(route)
+        Ok(routes)
     }
 
     pub fn actor_idx(&self, id: &str) -> Option<usize> {
@@ -1482,6 +1516,8 @@ pub struct Timed {
     pub t0: f64,
     pub t1: f64,
     pub ev: Ev,
+    /// Where the step it comes from is written (file, line), for warnings.
+    pub at: Option<(String, usize)>,
 }
 
 pub struct Timeline {
@@ -1822,10 +1858,10 @@ impl Timeline {
                 (Ev::Pipette { device }, Action::Pipette { note, sample, .. }) => sc.pipetting_note(*device, note.as_deref(), sample.as_deref()),
                 _ => None,
             };
-            events.push(Timed { t0, t1, ev });
+            events.push(Timed { t0, t1, ev, at: Some(st.at.clone()) });
             if let Some((ai, text)) = note {
                 log.push(format!("{t0:7.2}s - {t1:7.2}s  note      {}: {text}", sc.actors[ai].id));
-                events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row: 0 } });
+                events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row: 0 }, at: Some(st.at.clone()) });
             }
             prev_end = end;
             max_end = max_end.max(t1);
@@ -1949,7 +1985,7 @@ impl Timeline {
                         let off = path.reaches(path.cum[k] + 1.0).unwrap_or(max_end);
                         let t1 = off.max(t0 + READ_LIGHT);
                         log.push(format!("{t0:7.2}s - {t1:7.2}s  highlight {}  ({} read by {})", sc.devices[target].id, c.id, d.id));
-                        events.push(Timed { t0, t1, ev: Ev::Highlight { device: target } });
+                        events.push(Timed { t0, t1, ev: Ev::Highlight { device: target }, at: None });
                     }
                 }
             }

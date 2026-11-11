@@ -14,7 +14,7 @@
 %% @point id=gone x=-40 y=740
 
 %% # The turnstile generates the points "ts.in", "ts.needle" and "ts.out".
-%% @device id=ts kind=turnstile label=Turnstile x=440 y=505 r=70 entry=right
+%% @device id=ts kind=turnstile label=Turnstile x=440 y=505 r=70 entry=right antenna=antenna3
 
 %% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=800
 
@@ -39,5 +39,6 @@
 %% # antenna= on a device puts one on its point; gate=true: a gate holds the carrier
 %% # on the antenna (the belt never stops);
 %% # visible=false: a trigger only (the last one, at the end of the pit-lane: Release).
+%% # antenna= on the turnstile puts one under the needle (pipette antenna3).
 %% @device id=antenna2 kind=antenna at=pit_wait
-%% @device id=antenna3 kind=antenna at=pit_out visible=false
+%% @device id=antenna4 kind=antenna at=pit_out visible=false

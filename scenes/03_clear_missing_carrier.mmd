@@ -64,7 +64,7 @@ sequenceDiagram
     %% id ok-c2
     AN-->>IF: OK SampleId=SID-000124
     %% after 0.1 ok-c1-2
-    %% pipette sp duration=5 sid=SID-000123
+    %% pipette antenna2 duration=5 sid=SID-000123
     %% on antenna1 C3
     %% caption 4 · Third carrier — one position, two carriers | The third carrier is diverted (Prepare) and stops in the queue on the same position as the second one: the second is not physically there, it went straight on along the Main-Lane.
     %% on antenna1
@@ -81,9 +81,9 @@ sequenceDiagram
     %% id query-c3
     AN->>DMX: Query SampleId=SID-000125
 
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     %% caption 5 · Sample Complete | Sampling is finished: Sample Complete. The first carrier is released, and the queue moves up to the sampling point.
-    %% after 0.3 pipette sp
+    %% after 0.3 pipette antenna2
     %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1 query-c3
@@ -121,10 +121,10 @@ sequenceDiagram
     %% for C3
     AN-->>IF: OK
     %% after 0.1
-    %% pipette sp duration=4.5 sid=SID-000125
+    %% pipette antenna2 duration=4.5 sid=SID-000125
     %% after 0.2
     %% caption 8 · Back to normal | Sample Complete for the third sample: the carrier is released and, once it has left the module, the interface sends Release.
-    %% after 0.2 pipette sp
+    %% after 0.2 pipette antenna2
     AN->>IF: Sample Complete SampleId=SID-000125
     %% after 0.1
     %% for C3

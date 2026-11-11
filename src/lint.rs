@@ -6,12 +6,48 @@ use crate::scene::*;
 
 use crate::physics::TRACK_X;
 
-pub fn warnings(sc: &Scene, tl: &Timeline) -> Vec<String> {
-    let mut w = overlapping_carriers(sc, tl);
+/// A warning, with where the step it is about is written (file, line).
+#[derive(Debug)]
+pub struct Warning {
+    pub at: Option<(String, usize)>,
+    pub text: String,
+}
+
+impl Warning {
+    /// As printed: "<file> line <n>: <text>" (the scene's own path for a step
+    /// written in it), or "<scene>: <text>".
+    pub fn show(&self, path: &str) -> String {
+        match &self.at {
+            Some((file, line)) => format!("{} line {line}: {}", if file.is_empty() { path } else { file }, self.text),
+            None => format!("{path}: {}", self.text),
+        }
+    }
+}
+
+/// Where a step is written: (file, line).
+type At = Option<(String, usize)>;
+
+fn w(at: &At, text: String) -> Warning {
+    Warning { at: at.clone(), text }
+}
+
+/// " (line n)": where another step is written, in the text of a warning.
+fn line_of(at: &At) -> String {
+    at.as_ref().map_or(String::new(), |a| format!(" (line {})", a.1))
+}
+
+pub fn warnings_at(sc: &Scene, tl: &Timeline) -> Vec<Warning> {
+    let mut w: Vec<Warning> = overlapping_carriers(sc, tl).into_iter().map(|text| Warning { at: None, text }).collect();
     w.extend(cut_captions(tl));
     w.extend(short_captions(tl));
     w.extend(messages_out_of_order(sc, tl));
     w
+}
+
+/// The texts of the warnings.
+#[cfg(test)]
+pub fn warnings(sc: &Scene, tl: &Timeline) -> Vec<String> {
+    warnings_at(sc, tl).into_iter().map(|w| w.text).collect()
 }
 
 /// Physical carriers touching on the track (once for each pair and contact).
@@ -46,13 +82,13 @@ fn overlapping_carriers(sc: &Scene, tl: &Timeline) -> Vec<String> {
 }
 
 /// Captions longer than the band are cut.
-fn cut_captions(tl: &Timeline) -> Vec<String> {
+fn cut_captions(tl: &Timeline) -> Vec<Warning> {
     tl.events
         .iter()
         .filter_map(|e| match &e.ev {
             Ev::Caption { title, text } => {
                 let (lines, max) = caption_lines(title, text);
-                (lines.len() > max).then(|| format!("caption '{title}' at {:.2}s is cut: {} lines, {max} fit", e.t0, lines.len()))
+                (lines.len() > max).then(|| w(&e.at, format!("caption '{title}' at {:.2}s is cut: {} lines, {max} fit", e.t0, lines.len())))
             }
             _ => None,
         })
@@ -61,7 +97,7 @@ fn cut_captions(tl: &Timeline) -> Vec<String> {
 
 /// Messages and notes written in a different order from the one in which they
 /// are sent: the video follows time, but the Mermaid diagram follows the file.
-fn messages_out_of_order(sc: &Scene, tl: &Timeline) -> Vec<String> {
+fn messages_out_of_order(sc: &Scene, tl: &Timeline) -> Vec<Warning> {
     let name = |e: &Timed| match &e.ev {
         Ev::Message { from, to, text, .. } => format!("{} -> {} {text}", sc.actors[*from].id, sc.actors[*to].id),
         Ev::Note { actor, text, .. } => format!("note {}: {text}", sc.actors[*actor].id),
@@ -69,9 +105,19 @@ fn messages_out_of_order(sc: &Scene, tl: &Timeline) -> Vec<String> {
     };
     let msgs: Vec<&Timed> = tl.events.iter().filter(|e| matches!(e.ev, Ev::Message { .. } | Ev::Note { .. })).collect();
     let mut out = Vec::new();
-    for w in msgs.windows(2) {
-        if w[1].t0 < w[0].t0 - 1e-6 {
-            out.push(format!("'{}' at {:.2}s is written after '{}' at {:.2}s: the Mermaid diagram shows them in the wrong order", name(w[1]), w[1].t0, name(w[0]), w[0].t0));
+    for p in msgs.windows(2) {
+        if p[1].t0 < p[0].t0 - 1e-6 {
+            out.push(w(
+                &p[1].at,
+                format!(
+                    "'{}' at {:.2}s is written after '{}'{} at {:.2}s: the Mermaid diagram shows them in the wrong order",
+                    name(p[1]),
+                    p[1].t0,
+                    name(p[0]),
+                    line_of(&p[0].at),
+                    p[0].t0
+                ),
+            ));
         }
     }
     out
@@ -82,30 +128,30 @@ const CAPTION_MIN: f64 = 2.5;
 
 /// Captions replaced by the next one before they can be read, or out of order
 /// (a caption shows until the next one in time).
-fn short_captions(tl: &Timeline) -> Vec<String> {
-    let caps: Vec<(f64, &str, usize)> = tl
+fn short_captions(tl: &Timeline) -> Vec<Warning> {
+    let caps: Vec<(f64, &str, usize, &At)> = tl
         .events
         .iter()
         .filter_map(|e| match &e.ev {
-            Ev::Caption { title, .. } => Some((e.t0, title.as_str())),
+            Ev::Caption { title, .. } => Some((e.t0, title.as_str(), &e.at)),
             _ => None,
         })
         .enumerate()
-        .map(|(i, (t, title))| (t, title, i))
+        .map(|(i, (t, title, at))| (t, title, i, at))
         .collect();
     let mut out = Vec::new();
-    for w in caps.windows(2) {
-        let ((t0, a, _), (t1, b, _)) = (w[0], w[1]);
+    for p in caps.windows(2) {
+        let ((t0, a, _, at_a), (t1, b, _, at_b)) = (p[0], p[1]);
         if t1 < t0 {
-            out.push(format!("caption '{b}' at {t1:.2}s comes before '{a}' at {t0:.2}s, which is written before it"));
+            out.push(w(at_b, format!("caption '{b}' at {t1:.2}s comes before '{a}'{} at {t0:.2}s, which is written before it", line_of(at_a))));
         }
     }
     let mut sorted = caps.clone();
     sorted.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.2.cmp(&y.2)));
-    for w in sorted.windows(2) {
-        let ((t0, a, _), (t1, b, _)) = (w[0], w[1]);
+    for p in sorted.windows(2) {
+        let ((t0, a, _, at_a), (t1, b, _, at_b)) = (p[0], p[1]);
         if t1 - t0 < CAPTION_MIN {
-            out.push(format!("caption '{a}' at {t0:.2}s is shown only {:.1}s before '{b}'", t1 - t0));
+            out.push(w(at_a, format!("caption '{a}' at {t0:.2}s is shown only {:.1}s before '{b}'{}", t1 - t0, line_of(at_b))));
         }
     }
     out
@@ -151,7 +197,11 @@ mod tests {
     #[test]
     fn messages_written_out_of_time_order_are_reported() {
         let w = warned(&[msg("A", 2.0, ""), msg("B", 1.0, "")].concat());
-        assert!(w.iter().any(|x| x.contains("'IF -> AN B' at 1.00s is written after 'IF -> AN A' at 2.00s")), "{w:?}");
+        assert!(w.iter().any(|x| x.contains("'IF -> AN B' at 1.00s is written after 'IF -> AN A' (line ")), "{w:?}");
+        // On the line of the step written later, naming the line of the other one.
+        let (sc, tl) = ok(SAMPLING, &[msg("A", 2.0, ""), msg("B", 1.0, "")].concat());
+        let shown: Vec<String> = warnings_at(&sc, &tl).iter().map(|w| w.show("x.mmd")).collect();
+        assert!(shown.iter().any(|x| x.starts_with("x.mmd line 18: 'IF -> AN B'") && x.contains("'IF -> AN A' (line 17)")), "{shown:?}");
     }
 
     #[test]
