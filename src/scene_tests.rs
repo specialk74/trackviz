@@ -118,13 +118,39 @@ fn unknown_keys_and_actions_are_rejected() {
 // ------------------------------------------------------------ messages
 
 #[test]
+fn br_starts_a_new_line_of_a_label() {
+    let l = |t: &str, p: &str| label_lines(t, p).into_iter().map(|(a, b)| format!("{a}|{b}")).collect::<Vec<_>>();
+    assert_eq!(l("Prepare", ""), ["Prepare|"]);
+    assert_eq!(l("EAC^U07<br/>ECD-2: Prepare <BR> SAC-3", ""), ["EAC^U07|", "ECD-2: Prepare|", "SAC-3|"]);
+    // The parameters go on the last line of the text, and may go on.
+    assert_eq!(l("OK<br />now", "SampleId=S <br/> Needle=1"), ["OK|", "now|SampleId=S", "|Needle=1"]);
+}
+
+#[test]
+fn a_label_of_more_lines_takes_more_rows() {
+    // In half rows: a row each, half a row for each more line, above the arrow.
+    let (_, tl) = ok(SAMPLING, &[msg("at=1 ").replace("text=M", "text=\"a<br/>b<br/>c\""), msg("at=2 ")].concat());
+    let rows: Vec<usize> = tl.events.iter().filter_map(|e| match e.ev { Ev::Message { row, .. } => Some(row), _ => None }).collect();
+    assert_eq!((rows, tl.rows), (vec![2, 4], 6));
+}
+
+#[test]
+fn the_arrow_of_a_message_takes_message_seconds() {
+    let span = |tl: &Timeline| tl.events.iter().filter(|e| matches!(e.ev, Ev::Message { .. })).map(|e| e.t1 - e.t0).collect::<Vec<_>>();
+    let (_, tl) = ok(SAMPLING, &[msg(""), msg("duration=0.5 ")].concat());
+    assert_eq!(span(&tl), [1.5, 0.5]);
+    let (_, tl) = ok(&format!("{SAMPLING}\n%% @video message=0.8\n"), &[msg(""), msg("duration=0.5 ")].concat());
+    assert_eq!(span(&tl), [0.8, 0.5]);
+}
+
+#[test]
 fn rows_follow_time_whatever_the_file_order() {
     let (_, tl) = ok(SAMPLING, &[msg("at=5 text=\"\" ").replace("text=M ", ""), msg("at=2 ")].concat());
     let row_of = |i: usize| match tl.events[i].ev {
         Ev::Message { row, .. } => row,
         _ => panic!(),
     };
-    assert_eq!((row_of(0), row_of(1)), (1, 0));
+    assert_eq!((row_of(0), row_of(1)), (2, 0));
 }
 
 #[test]
@@ -140,8 +166,8 @@ fn messages_take_rows_and_substitute_placeholders() {
         })
         .collect();
     // Without `carrier` the first carrier is used.
-    assert_eq!(got, vec![(0, "SampleId=SID-1 C=C1".to_string()), (1, "SID-2".to_string())]);
-    assert_eq!(tl.rows, 2);
+    assert_eq!(got, vec![(0, "SampleId=SID-1 C=C1".to_string()), (2, "SID-2".to_string())]);
+    assert_eq!(tl.rows, 4);
 }
 
 #[test]
@@ -224,9 +250,15 @@ fn a_carrier_that_is_never_let_through_stays_in_the_queue() {
 }
 
 #[test]
-fn ghosts_go_through_carriers() {
-    let (_, tl) = ok(LANE, "\n%% @step action=move ease=linear carrier=G to=s ");
-    assert!((tl.events[0].t1 - 3.0).abs() < 1e-9);
+fn a_ghost_stops_behind_a_carrier_but_carriers_drive_through_it() {
+    // C1 stands on s: the ghost stops in contact behind it (C2 is out of the way, on c).
+    let lane = LANE.replace("%% @carrier id=C2 route=a,s,c speed=100", "%% @carrier id=C2 route=a,s,c start=c speed=100");
+    let (_, tl) = ok(&lane, "\n%% @step action=move ease=linear carrier=G to=s ");
+    assert!(tl.log[0].contains("G -> s  (stops behind C1"), "{}", tl.log[0]);
+    // The ghost stands on s: C2 drives through it (C1 is out of the way, on c).
+    let lane = LANE.replace("route=a,s,c start=s speed=100", "route=a,s,c start=c speed=100").replace("ghost=true route=a,s,c speed=100", "ghost=true route=a,s,c start=s speed=100");
+    let (_, tl) = ok(&lane, "\n%% @step action=move ease=linear carrier=C2 to=s ");
+    assert!(!tl.log[0].contains("behind") && (tl.events[0].t1 - 3.0).abs() < 1e-9, "{}", tl.log[0]);
 }
 
 #[test]
@@ -310,7 +342,7 @@ fn a_device_can_carry_its_antenna_and_gate() {
 #[test]
 fn pass_sends_the_stopped_carrier_to_its_next_stop_or_to_the_end() {
     let gated = SAMPLING.replace("%% @device id=sp kind=sampling at=s\n", "%% @device id=sp kind=sampling at=s antenna=ant gate=true\n");
-    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=pass device=sp ";
+    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=pass device=ant ";
     // No other stop on the route: to its end.
     let (_, tl) = ok(&gated, steps);
     assert!(tl.log[1].contains("move      C1 -> c"), "{}", tl.log[1]);
@@ -319,8 +351,10 @@ fn pass_sends_the_stopped_carrier_to_its_next_stop_or_to_the_end() {
     let (_, tl) = ok(&two, steps);
     assert!(tl.log[1].contains("move      C1 -> c"), "{}", tl.log[1]);
     // Nobody stopped there.
-    err(&gated, "\n%% @step action=pass device=sp ", "no carrier is stopped on 's'");
-    err(&gated, "\n%% @step action=pass device=an ", "'pass' needs a device on a point");
+    err(&gated, "\n%% @step action=pass device=ant ", "no carrier is stopped on 's'");
+    // Only antennas.
+    err(&gated, "\n%% @step action=move carrier=C1 to=s \n%% @step action=pass device=sp ", "'pass sp': write the antenna, pass ant");
+    err(&gated, "\n%% @step action=pass device=an ", "'pass an': not an antenna of this scene");
 }
 
 /// A pit-lane with room for one carrier.
@@ -346,8 +380,19 @@ const PIT: &str = r#"
 "#;
 
 #[test]
+fn a_carrier_without_route_that_finds_its_pit_lane_full_goes_to_the_end_of_the_main_lane() {
+    // The way comes from the steps and ends in the pit-lane: sent straight on, C2
+    // goes to the end of the Main-Lane; its pass is skipped.
+    let base = PIT.replace("route=a,pit,z", "start=a");
+    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=move at=0.5 carrier=C2 to=s \n%% @step action=pass at=6 device=ant carrier=C1 \n%% @step action=pass at=9 device=ant carrier=C2 ";
+    let (sc, tl) = ok(&base, steps);
+    assert!(tl.log[0].contains("C2 goes straight on"), "{}", tl.log[0]);
+    assert_eq!(sc.carriers[1].route.last().map(String::as_str), Some("z"));
+}
+
+#[test]
 fn a_carrier_that_finds_its_pit_lane_full_goes_straight_on() {
-    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=move at=0.5 carrier=C2 to=s                  \n%% @step action=message when=\"C2 at n\" from=IF to=AN text=Prepare carrier=C2 event=prepare                  \n%% @step action=message type=analyzer_ok when=\"prepare C2 arrived\" carrier=C2                  \n%% @step action=pipette at=8 device=sp sample_id=SID-1 \n%% @step action=pass device=sp ";
+    let steps = "\n%% @step action=move carrier=C1 to=s \n%% @step action=move at=0.5 carrier=C2 to=s                  \n%% @step action=message when=\"C2 at n\" from=IF to=AN text=Prepare carrier=C2 event=prepare                  \n%% @step action=message type=analyzer_ok when=\"prepare C2 arrived\" carrier=C2                  \n%% @step action=pipette at=8 device=sp sample_id=SID-1 \n%% @step action=pass device=ant ";
     let base = format!("{PIT}%% @message id=analyzer_ok from=AN to=IF text=OK\n");
     let (sc, tl) = ok(&base, steps);
     assert!(tl.log[0].contains("C2 goes straight on"), "{}", tl.log[0]);
@@ -596,7 +641,7 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
     assert_ne!(with_actor, SAMPLING);
     let (_, tl) = ok(&with_actor, steps);
     assert_eq!(notes(&tl), vec![("Pipetting Analyzer".to_string(), 1.0, 5.0)]);
-    assert_eq!(tl.rows, 1);
+    assert_eq!(tl.rows, 2);
     // The SampleId given to the pipette.
     let (_, tl) = ok(&with_actor, "\n%% @step action=pipette at=1 device=sp sample_id=SID-7 ");
     assert_eq!(notes(&tl)[0].0, "Pipetting Analyzer - SampleId=SID-7");

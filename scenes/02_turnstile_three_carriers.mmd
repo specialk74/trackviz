@@ -16,13 +16,13 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,pit_entry,pit_exit,gone color=#0EA5E9
-    %% carrier id=C3 sid=SID-000125 route=spawn,pit_entry,pit_exit,gone color=#DB2777
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 color=#DB2777
 
     %% caption 1 · Turnstile with gate and antenna | The Pit-Lane ends in a turnstile, a wheel with three positions: entry, under the analyzer needle, exit. In front of it, an antenna and a gate: every carrier stops there first.
     %% at 2.6
-    %% move C1 to pit_wait
+    %% move C1 to antenna2
 
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The first carrier is diverted into the Pit-Lane without stopping: Prepare. The gate stops it on the antenna, which reads it: the interface sends Prepare again. Nothing is being sampled, so the gate will open.
@@ -45,13 +45,13 @@ sequenceDiagram
     %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
     %% after 0.1 ok-c1-2
-    %% pass antenna2
+    %% pass antenna2 C1
     %% after 0.15
     %% caption 3 · Rotation — Sample Acquisition | With the carrier in the entry position the wheel rotates it under the needle: Sample Acquisition and aspiration. Meanwhile the second carrier is diverted, read at the antenna and held by the gate.
     %% rotate ts
 
     %% at 8.4
-    %% move C2 to pit_wait
+    %% move C2 to antenna2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000124
     %% after 0.1
@@ -85,7 +85,7 @@ sequenceDiagram
     %% id sample-complete-c1
     AN->>IF: Sample Complete SampleId=SID-000123
     %% at 20.3
-    %% move C3 to pit_wait
+    %% move C3 to antenna2
     %% on antenna1
     %% id prepare-c3
     IF->>AN: Prepare SampleId=SID-000125
@@ -97,7 +97,7 @@ sequenceDiagram
     %% id ok-c3
     AN-->>IF: OK SampleId=SID-000125
     %% after 0.1 ok-c1-4
-    %% pass antenna2
+    %% pass antenna2 C2
     %% after 0.15
     %% caption 5 · Rotation — Sample Acquisition | Now the wheel rotates: the new carrier goes under the needle, the processed one to the exit and back to the Main-Lane (Release once it has left). The third carrier is diverted, read at the antenna and held by the closed gate.
     %% rotate ts
@@ -139,7 +139,7 @@ sequenceDiagram
     %% for C2
     IF-->>AN: OK
     %% after 0.1
-    %% pass antenna2
+    %% pass antenna2 C3
     %% after 0.15
     %% rotate ts
     %% after 0.1

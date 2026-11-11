@@ -6,8 +6,6 @@
 struct Geo {
     name: &'static str,
     /// Route of the first carrier (it starts on the panel) and of the others.
-    first_route: &'static str,
-    other_route: &'static str,
     kind: Kind,
 }
 
@@ -19,19 +17,20 @@ enum Kind {
     /// A turnstile: antenna1 NSD, antenna2 in front of the gate, antenna3 end of
     /// the pit-lane.
     Turnstile,
-    /// Two sampling points: antenna1 NSD, antenna2 Divert 1, antenna3 sampling
-    /// point 1, antenna4 Divert 2, antenna5 sampling point 2, antenna6 end.
+    /// Two sampling points: antenna1 NSD, antenna2 on the spur (pass only),
+    /// antenna3 Divert 1, antenna4 sampling point 1, antenna5 Divert 2, antenna6
+    /// sampling point 2, antenna7 end.
     Spur2,
 }
 
 const GEOMETRIES: [Geo; 7] = [
-    Geo { name: "sampling", first_route: "main_in,pit,gone", other_route: "spawn,pit,gone", kind: Kind::Sampling },
-    Geo { name: "sampling_queue", first_route: "main_in,pit,gone", other_route: "spawn,pit,gone", kind: Kind::Sampling },
-    Geo { name: "sampling_queue2", first_route: "main_in,pit,gone", other_route: "spawn,pit,gone", kind: Kind::Sampling },
-    Geo { name: "turnstile", first_route: "main_in,pit_entry,pit_exit,gone", other_route: "spawn,pit_entry,pit_exit,gone", kind: Kind::Turnstile },
-    Geo { name: "turnstile_queue", first_route: "main_in,pit_entry,pit_exit,gone", other_route: "spawn,pit_entry,pit_exit,gone", kind: Kind::Turnstile },
-    Geo { name: "spur", first_route: "main_in,spur,gone", other_route: "spawn,spur,gone", kind: Kind::Sampling },
-    Geo { name: "spur2", first_route: "main_in,pit1,gone", other_route: "spawn,pit1,gone", kind: Kind::Spur2 },
+    Geo { name: "sampling", kind: Kind::Sampling },
+    Geo { name: "sampling_queue", kind: Kind::Sampling },
+    Geo { name: "sampling_queue2", kind: Kind::Sampling },
+    Geo { name: "turnstile", kind: Kind::Turnstile },
+    Geo { name: "turnstile_queue", kind: Kind::Turnstile },
+    Geo { name: "spur", kind: Kind::Sampling },
+    Geo { name: "spur2", kind: Kind::Spur2 },
 ];
 
 pub fn geometry_names() -> Vec<&'static str> {
@@ -59,8 +58,7 @@ pub fn scene(name: &str, geometry: &str, carriers: usize) -> Result<String, Stri
          \x20   participant DMX as DMX\n\n"
     );
     for n in 1..=carriers {
-        let route = if n == 1 { g.first_route } else { g.other_route };
-        s.push_str(&format!("    %% carrier id=C{n} sid=SID-{:06} route={route}\n", 122 + n));
+        s.push_str(&format!("    %% carrier id=C{n} sid=SID-{:06}\n", 122 + n));
     }
     s.push_str(
         "\n    %% caption 1 · Start | A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface.\n\
@@ -75,7 +73,7 @@ pub fn scene(name: &str, geometry: &str, carriers: usize) -> Result<String, Stri
 }
 
 /// C1 through a sampling point (pit-lane or spur).
-const SAMPLING: &str = "    %% move C1 to sampling
+const SAMPLING: &str = "    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping and the interface sends Prepare. The gate stops it on the sampling point: Sample Acquisition.
     %% on antenna1
@@ -97,7 +95,7 @@ const SAMPLING: &str = "    %% move C1 to sampling
     %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% pass sp
+    %% pass antenna2 C1
     %% on antenna3 C1
     %% caption 5 · Release | Before the carrier is back on the Main-Lane the interface sends Release.
     %% on antenna3
@@ -108,7 +106,7 @@ const SAMPLING: &str = "    %% move C1 to sampling
 ";
 
 /// C1 through a turnstile.
-const TURNSTILE: &str = "    %% move C1 to pit_wait
+const TURNSTILE: &str = "    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The carrier is diverted without stopping (Prepare) and read at the antenna in front of the gate: Prepare again. Nothing is sampled, so the gate opens.
     %% on antenna1
@@ -122,7 +120,7 @@ const TURNSTILE: &str = "    %% move C1 to pit_wait
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pass antenna2
+    %% pass antenna2 C1
     %% after 0.15
     %% caption 3 · Rotation — Sample Acquisition | The wheel brings the carrier under the needle: Sample Acquisition, then the analyzer aspirates.
     %% rotate ts
@@ -153,24 +151,26 @@ const TURNSTILE: &str = "    %% move C1 to pit_wait
 ";
 
 /// C1 through needle 1 of a spur with two sampling points.
-const SPUR2: &str = "    %% move C1 to d1
+const SPUR2: &str = "    %% move C1 to antenna2
     %% on antenna1 C1
-    %% caption 2 · Diverted — Prepare | The carrier is diverted into the spur without stopping and the interface sends Prepare. At Divert 1 it is read: Prepare again, and it is diverted to needle 1.
+    %% caption 2 · Diverted — Prepare | The carrier is diverted into the spur without stopping and the interface sends Prepare. The antenna on the spur stops it and lets it go on; at Divert 1 it is read: Prepare again, and it is diverted to needle 1.
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
     AN-->>IF: OK SampleId=SID-000123
-    %% after 0.1 antenna2 C1
+    %% after 0.2 antenna2 C1
+    %% pass antenna2 C1
+    %% after 0.1 antenna3 C1
     %% color #9333EA
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
     %% for C1
     AN-->>IF: OK
     %% after 0.1
-    %% pass div1
-    %% on antenna3 C1
+    %% divert antenna3 C1
+    %% on antenna4 C1
     %% caption 3 · Sample Acquisition | The gate stops the carrier on sampling point 1: Sample Acquisition with Needle=1, then needle 1 aspirates.
-    %% on antenna3
+    %% on antenna4
     IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
     %% after 0.1
     %% for C1
@@ -184,12 +184,12 @@ const SPUR2: &str = "    %% move C1 to d1
     %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% pass sp1
-    %% after 0.4 antenna4 C1
-    %% pass div2
-    %% on antenna6 C1
+    %% pass antenna4 C1
+    %% after 0.4 antenna5 C1
+    %% pass antenna5 C1
+    %% on antenna7 C1
     %% caption 5 · Release | Before the carrier is back on the Main-Lane the interface sends Release.
-    %% on antenna6
+    %% on antenna7
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1
@@ -229,6 +229,6 @@ mod tests {
     fn skeleton_errors() {
         assert!(scene("x", "nowhere", 1).unwrap_err().contains("unknown geometry 'nowhere'"));
         assert!(scene("x", "spur", 0).is_err());
-        assert!(scene("x", "spur", 2).unwrap().contains("%% carrier id=C2 sid=SID-000124 route=spawn,spur,gone"));
+        assert!(scene("x", "spur", 2).unwrap().contains("%% carrier id=C2 sid=SID-000124\n"));
     }
 }

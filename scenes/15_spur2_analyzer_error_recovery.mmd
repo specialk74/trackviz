@@ -11,14 +11,14 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit1,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,pit2,gone color=#0EA5E9
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
 
     %% caption 1 · One analyzer, two sampling points | Two carriers travel towards the spur: the first one needs needle 1, the second one needle 2.
     %% at 2.5
-    %% move C1 to d1
+    %% move C1 to antenna3
     %% at 2.89
-    %% move C2 to d1
+    %% move C2 to antenna3
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare | Each carrier is diverted into the spur without stopping, and the interface sends Prepare to the analyzer.
     %% on antenna1
@@ -30,28 +30,28 @@ sequenceDiagram
     %% after 0.2 prepare-c1
     %% id ok-c1
     AN-->>IF: OK SampleId=SID-000123
-    %% after 0.1 antenna2 C1
+    %% after 0.1 antenna3 C1
     %% color #9333EA
     %% id prepare-c1-2
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.2 prepare-c2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.6 antenna2 C1
-    %% pass div1
+    %% after 0.6 antenna3 C1
+    %% divert antenna3 C1
     %% after 0.2 ok-c1
     %% id query-c1
     AN->>DMX: Query SampleId=SID-000123
-    %% after 0.401 antenna2 C2
-    %% pass div1
+    %% after 0.401 antenna3 C2
+    %% pass antenna3 C2
     %% after 0.1 prepare-c1-2
     %% for C1
     AN-->>IF: OK
-    %% after 0.2 antenna3 C1
+    %% after 0.2 antenna4 C1
     %% id sample-acquisition-c1
     IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
-    %% after 0.2 antenna3 C1
+    %% after 0.2 antenna4 C1
     %% caption 3 · Sample Acquisition | The first carrier is at sampling point 1: Sample Acquisition with Needle=1, and the needle starts aspirating.
-    %% after 0.1 antenna4 C2
+    %% after 0.1 antenna5 C2
     %% color #9333EA
     %% id prepare-c2-2
     IF->>AN: Prepare SampleId=SID-000124
@@ -75,10 +75,10 @@ sequenceDiagram
     %% duration 2.6
     Note over AN: Pipetting Analyzer · Needle 1 - SampleId=SID-000123
     %% after 0.1 ok-c2
-    %% pass div2
+    %% divert antenna5 C2
     %% after 0.2 query-c2
     DMX-->>AN: Tests to perform SampleId=SID-000124
-    %% after 0.57 antenna5 C2
+    %% after 0.57 antenna6 C2
     %% id sample-acquisition-c2
     IF->>AN: Sample Acquisition SampleId=SID-000124 Needle=2
     %% after 1.7 needle sp1
@@ -126,23 +126,23 @@ sequenceDiagram
     %% id status-2
     AN->>IF: Status State=Ready Needle=1
     %% after 0 ok-c2-3
-    %% pass sp2
+    %% pass antenna6 C2
     %% after 0.2 status-2
     IF-->>AN: OK
     %% after 1.5 status-2
     %% status sp1 normal
     %% after 1.8 status-2
-    %% pass sp1
-    %% after 0.401 antenna4 C1
-    %% pass div2
-    %% on antenna6 C2
+    %% pass antenna4 C1
+    %% after 0.401 antenna5 C1
+    %% pass antenna5 C1
+    %% on antenna7 C2
     %% caption 7 · Release | Each carrier gets its Release when it has left the interface module.
-    %% on antenna6
+    %% on antenna7
     IF->>AN: Release SampleId=SID-000124
     %% after 0.1
     %% for C2
     AN-->>IF: OK
-    %% on antenna6
+    %% on antenna7
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1

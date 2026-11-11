@@ -47,13 +47,13 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 
 | Section | Keys |
 |---|---|
-| `@video` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times`, `belt` (cm/s, default 17.5) |
+| `@video` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times`, `belt` (cm/s, default 17.5), `message` (s the arrow of a message takes, default 1.5) |
 | `@point` | `id`, `x`, `y` |
 | `@lane` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = list of ids, `label_x`, `label_y`, `capacity` (most carriers in it at once, see Pit-lane capacity in `README.md`) |
 | `@device` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |
 | `@actor` | `id`, `label`, `sub`, `color` (sequence-diagram lifelines, left to right), `analyzer` (this actor gets the "Pipetting" note) |
 | `@message` | `id`, `from`, `to`, `text`, `params`, `reply`, `color` (named message, see below) |
-| `@carrier` | `id`, `tube`, `sample_id`, `route` = list of points and lane ids (see Routes in `README.md`), `start`, `speed` (px/s), `cap_color`, `ghost` (see below), `visible` (default true), `tag` (tag text, default the SampleId) |
+| `@carrier` | `id`, `tube`, `sample_id`, `route` = list of points and lane ids, the way between filled in along the lanes (only in the tests: without it the way comes from the steps, see The way of a carrier in `README.md`), `start` (where it is at the beginning; required without `route`), `speed` (px/s), `cap_color`, `ghost` (see below), `visible` (default true), `tag` (tag text, default the SampleId) |
 | `@step` | only inside the program (see Steps): `action`, one of `at` / `after` / `when`, `delay`, `duration` + action keys |
 
 ## Steps

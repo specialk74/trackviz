@@ -99,8 +99,11 @@ fn pieces(samples: &[(f64, f64)], runaway: bool) -> Vec<MoveSeg> {
 }
 
 /// Plays all the moves together. `paths` gives routes, visibility and ghosts
-/// (their moves are not used); the result is keyed by step index.
-pub fn simulate(paths: &[CarrierPath], plans: &[Plan]) -> HashMap<usize, Done> {
+/// (their moves are not used); the result is keyed by step index. A ghost stops
+/// behind any carrier in front of it, while the other carriers drive through it;
+/// `twin[ci]`: the real carrier a ghost stands for (the same sample), which it
+/// doesn't wait for.
+pub fn simulate(paths: &[CarrierPath], plans: &[Plan], twin: &[Option<usize>]) -> HashMap<usize, Done> {
     let n = paths.len();
     let mut s: Vec<f64> = paths.iter().map(|p| p.start_s).collect();
     let mut queue: Vec<VecDeque<usize>> = vec![VecDeque::new(); n];
@@ -125,6 +128,14 @@ pub fn simulate(paths: &[CarrierPath], plans: &[Plan]) -> HashMap<usize, Done> {
                 let p = &paths[ci];
                 let q = p.pos_at_s(s[ci]);
                 (!p.ghost && !attached[ci] && p.opacity(t) > 0.0).then_some(q)
+            })
+            .collect();
+        // A ghost can't drive through a carrier in front of it (real or ghost),
+        // but the others drive through it.
+        let bodies: Vec<Option<(f64, f64)>> = (0..n)
+            .map(|ci| {
+                let p = &paths[ci];
+                (!attached[ci] && p.opacity(t) > 0.0).then(|| p.pos_at_s(s[ci]))
             })
             .collect();
         // The way ahead of each moving carrier, up to where its move ends.
@@ -168,7 +179,8 @@ pub fn simulate(paths: &[CarrierPath], plans: &[Plan]) -> HashMap<usize, Done> {
         }
         for ci in 0..n {
             let path = &paths[ci];
-            let solid = !path.ghost && path.opacity(t) > 0.0;
+            let solid = path.opacity(t) > 0.0;
+            let ahead = if path.ghost { &bodies } else { &obstacles };
             // The carrier in front, if moving from s_from to s_to would go into it.
             let blocker = |s_from: f64, s_to: f64| -> Option<usize> {
                 let (p0, p1) = (path.pos_at_s(s_from), path.pos_at_s(s_to));
@@ -182,8 +194,8 @@ pub fn simulate(paths: &[CarrierPath], plans: &[Plan]) -> HashMap<usize, Done> {
                 // Two carriers on the same spot (they start there): the one declared
                 // first goes, the other one waits for room.
                 let same_spot = |j: usize, q: (f64, f64)| j < ci && dist(p0, q) < 1.0 && dist(p1, q) < 2.0 * CARRIER_R - 1e-6;
-                (0..n).filter(|&j| j != ci && !first[ci][j]).find(|&j| {
-                    obstacles[j].is_some_and(|q| closer(q) || same_spot(j, q) || (first[j][ci] && way[j].iter().any(|w| closer(*w))))
+                (0..n).filter(|&j| j != ci && !first[ci][j] && twin[ci] != Some(j)).find(|&j| {
+                    ahead[j].is_some_and(|q| closer(q) || same_spot(j, q) || (first[j][ci] && way[j].iter().any(|w| closer(*w))))
                 })
             };
             let mut u = t;

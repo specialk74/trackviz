@@ -13,16 +13,16 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,spur,gone
+    %% carrier id=C1 sid=SID-000123
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier id=C2 sid=SID-000124 route=spawn,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the spur.
-    %% carrier id=C2L sid=SID-000124 route=nsd,sampling color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier id=C3 sid=SID-000125 route=spawn,spur,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 start=antenna1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes travel on the Main-Lane towards the spur of the analyzer interface.
     %% at 2.2
-    %% move C1 to sampling
+    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The first carrier is diverted into the spur without stopping (Prepare) and stopped by the gate on the sampling point: Sample Acquisition, then the analyzer aspirates.
     %% on antenna1
@@ -90,11 +90,11 @@ sequenceDiagram
     %% for C1
     %% id ok-c1-3
     IF-->>AN: OK
-    %% pass sp
+    %% pass antenna2 C1
     %% after 0 ok-c1-3
-    %% move C2L to sampling
+    %% move C2L to antenna2
     %% after 0 ok-c1-3
-    %% move C3 to sampling
+    %% move C3 to antenna2
     %% after 0.2 antenna2 C3
     %% caption 6 · Clear | The interface expects the second sample at the sampling point, but finds the third one: the second never arrived. It sends Clear for the second sample and waits for the reply.
     %% after 0.2 antenna2 C3
@@ -127,7 +127,7 @@ sequenceDiagram
     %% after 0.1
     %% for C3
     IF-->>AN: OK
-    %% pass sp
+    %% pass antenna2 C3
     %% on antenna3
     IF->>AN: Release SampleId=SID-000125
     %% after 0.1

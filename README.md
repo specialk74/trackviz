@@ -73,11 +73,11 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,spur,gone
+    %% carrier id=C1 sid=SID-000123
 
     %% caption 1 · Start | The carrier travels along the Main-Lane.
     %% at 2.5
-    %% move C1 to sampling
+    %% move C1 to antenna2
     %% on antenna1
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.1
@@ -89,14 +89,16 @@ sequenceDiagram
     %% after 0.3 pipette sp
     AN->>IF: Sample Complete SampleId=SID-000123
     %% after 0.1
-    %% pass sp
+    %% pass antenna2 C1
 ```
 
 `geometry` loads the track. Every scene also reads `common/video.mmd` (title, size,
 belt speed), `common/actors.mmd` and `common/messages.mmd` (`common/` is looked for next
 to the scene, then in `scenes/`). The participants are matched with the actors by id or
 label. `SampleId=` in a message must be the `sid=` of a carrier, and it makes that
-carrier the carrier of the message. `alt`, `loop`, `opt` and `par` are refused: write
+carrier the carrier of the message. As in Mermaid, `<br/>` in a message or a note
+starts a new line (`IF->>AN: EAC^U07<br/>SAC-3: SID-000123`): the label is drawn on
+more lines, above its arrow. `alt`, `loop`, `opt` and `par` are refused: write
 one diagram for each case.
 
 ### When a step starts
@@ -108,7 +110,7 @@ unless a directive right before it says otherwise:
 |---|---|
 | `on <antenna>` | when its carrier is over that antenna: the carrier of the `SampleId` in the message, or the one it moves or shows |
 | `on <antenna> <carrier>` | when that carrier is over the antenna (required for captions, highlights, pipettes, notes) |
-| `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives, a move when the carrier arrives) |
+| `after <seconds>` | that many seconds after the step before has ended (a message ends when it arrives, a move when the carrier arrives, a `pass` or `divert` when the carrier sets off) |
 | `after <seconds> <id>` | that many seconds after the line marked `id <id>` has ended |
 | `after <seconds> <antenna> <carrier>` | that many seconds after the carrier is over the antenna |
 | `after <seconds> pipette\|rotate\|needle <device>` | that many seconds after that action on the device ends |
@@ -122,7 +124,7 @@ that line a name with `%% id <name>` above it, then write `%% after <seconds> <n
     AN-->>IF: OK SampleId=SID-000123
     ...
     %% after 0.1 ack1
-    %% pass sp
+    %% pass antenna2 C1
 ```
 
 The id must be written before the `after` that uses it, and each id is used once per
@@ -135,7 +137,7 @@ The antennas of each geometry, numbered in the direction of the carriers:
 |---|---|
 | `sampling`, `spur` | 1 NSD, 2 sampling point, 3 end of the pit-lane (Release) |
 | `turnstile` | 1 NSD, 2 in front of the gate, 3 end of the pit-lane (Release) |
-| `spur2` | 1 NSD, 2 Divert 1, 3 sampling point 1, 4 Divert 2, 5 sampling point 2, 6 end of the spur (Release) |
+| `spur2` | 1 NSD, 2 on the spur before Divert 1 (with a gate: it only lets the carrier go on with `pass antenna2 <carrier>`, it can't divert), 3 Divert 1, 4 sampling point 1, 5 Divert 2, 6 sampling point 2, 7 end of the spur (Release) |
 
 ### All the directives
 
@@ -156,7 +158,7 @@ each.
 | `geometry <name>` | Loads the track from `common/<name>.mmd`: points, lanes, devices, antennas, gates. One of `sampling`, `sampling_queue`, `sampling_queue2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`. Write it before the carriers | — |
 | `title <text>` | The title at the top of the video | without it: the title in `common/video.mmd` |
 | `subtitle <text>` | The line under the title | without it: no subtitle |
-| `carrier id=<id>` | Declares a carrier. Declare all of them before the steps; the order counts when two start on the same spot (the first one goes first) | `sid=<sample id>`: the sample in its tube, used by `SampleId=` in the messages; without it the carrier is empty (no tube, tag `<id> (empty)`).<br>`route=a,b,c`: its way, as points and lane ids (see Routes); without it the default route of the geometry (the first carrier starts on the Main-Lane, the others off the panel).<br>`needle=1\|2\|both` (`spur2` only, for the default route): which sampling points it visits; default `1`.<br>`color=#RRGGBB`: color of its cap; default purple `#7C3AED`.<br>`speed=<px/s>`: its own speed; default the belt's.<br>`tag=<text>`: the text of its label, `_` for spaces; default the sample id (`<id> (empty)` without a tube).<br>`ghost`: drawn dashed, where the interface *believes* it is (see Ghost carriers).<br>`hidden`: not shown until a `show` |
+| `carrier id=<id>` | Declares a carrier. Declare all of them before the steps; the order counts when two start on the same spot (the first one goes first) | `sid=<sample id>`: the sample in its tube, used by `SampleId=` in the messages; without it the carrier is empty (no tube, tag `<id> (empty)`).<br>`start=<antenna>\|<point>`: where it is at the beginning; default the Main-Lane for the first carrier (`main_in`), off the panel for the others (`spawn`). Its way is not written: it comes from its `move`, `pass` and `divert` (see The way of a carrier).<br>`color=#RRGGBB`: color of its cap; default purple `#7C3AED`.<br>`speed=<px/s>`: its own speed; default the belt's.<br>`tag=<text>`: the text of its label, `_` for spaces; default the sample id (`<id> (empty)` without a tube).<br>`ghost`: drawn dashed, where the interface *believes* it is (see Ghost carriers).<br>`hidden`: not shown until a `show` |
 | `include <file>` | Puts here the `%%` lines of another file (path relative to this one) | — |
 | `@<section> key=value ...` | A row of a data table (see Scene format) | — |
 | `# <text>` | A comment, ignored | — |
@@ -171,7 +173,7 @@ each.
 | `id <name>` | Names the next line (message, note, move, pipette, ...), so that a later `after <seconds> <name>` can start from its end. Letters, digits, `-`, `_`; one per line, never used twice in a file | — |
 | `color #RRGGBB` | Colors the next message (the purple Prepare is `#9333EA`) | without it: the color of the named message or of the sender |
 | `for <carrier>` | The carrier of the next message, when its text has no `SampleId=` (e.g. `OK`): `on` and the pit-lane capacity use it | without it: the message has no carrier |
-| `duration <seconds>` | How long the next step lasts | without it: the step's default |
+| `duration <seconds>` | How long the next step lasts; for a message, how long its arrow takes to arrive | without it: the step's default (a message 1.5 s, or `%% @video message=<s>` for the whole scene) |
 
 Only one of `on`, `after`, `at` per step.
 
@@ -179,8 +181,9 @@ Only one of `on`, `after`, `at` per step.
 
 | Directive | What it does | Optional |
 |---|---|---|
-| `move <carrier> to <point>` | The carrier sets off along its route towards the point, which must be ahead of it. It rides the belt at constant speed, queues behind other carriers and stops at the point. The step ends when it arrives | `duration=<s>`: the time of the trip; without it, from length and speed.<br>`speed=<px/s>`: only for this move; default the carrier's.<br>`ease=linear\|in\|out\|inout`: default `linear` (the belt starts and stops at once).<br>`runaway`: the carrier escapes by itself (red pulsing ring, tag "… · RUN-AWAY") |
-| `pass <device>` | The gate of the device opens: the carrier stopped there (`sp`, `div1`, `antenna2`, ...) sets off to the next stop of its route (an antenna with a gate, a turnstile entry) or to its end. Ghosts and carriers in a turnstile are not counted. No carrier stopped there is an error, unless a carrier went straight on because the pit-lane was full | — |
+| `move <carrier> to <antenna>\|<point>` | An antenna stands for its point (`move C1 to antenna2`); other places by the name of the point (`gone`, `iface_out`: see `--layout`). The carrier sets off towards the point, by the shortest way along the lanes from where it is (see The way of a carrier). It rides the belt at constant speed, queues behind other carriers and stops at the point. The step ends when it arrives | `duration=<s>`: the time of the trip; without it, from length and speed.<br>`speed=<px/s>`: only for this move; default the carrier's.<br>`ease=linear\|in\|out\|inout`: default `linear` (the belt starts and stops at once).<br>`runaway`: the carrier escapes by itself (red pulsing ring, tag "… · RUN-AWAY") |
+| `pass <antenna> <carrier>` | The gate on the antenna opens and the carrier, stopped there, goes on straight: along the lanes to the next stop (an antenna with a gate, a turnstile entry) or to the end of the track. The step ends when the carrier sets off: the next step starts then, not when it arrives (to wait for the arrival: `on <antenna> <carrier>`). Only antennas, not the names of devices (`pass sp C1` is an error that names `pass antenna2`). The carrier must have been sent to the antenna before (`move C1 to antenna2`, or a `pass`/`divert` that stops there), and be the one stopped there at that moment. If it went straight on because the pit-lane was full, its `pass` is skipped | — |
+| `divert <antenna> <carrier>` | Like `pass`, but the carrier turns into the lane that starts on the antenna (its pit-lane), then goes on to the next stop. Only on the antenna of a divert (`spur2`: `antenna3` Divert 1, `antenna5` Divert 2); elsewhere it is an error | — |
 | `pipette <device>` | Sampling: the analyzer's arm goes to the tube on the device, the needle goes down, aspirates and comes back up (20% down, 60% aspiration, 20% up). It also adds the note "Pipetting Analyzer" on the analyzer's lifeline, for the same time. It only draws the sampling: it sends no message and does not check that a carrier is under the needle (in scene 08 it samples an empty pocket). The device must be a sampling point or a turnstile, and the scene must have an analyzer. Lasts 3 s | `duration=<s>`: how long it lasts.<br>`sid=<sample id>`: the sample the analyzer believes it is aspirating (the one of its Sample Acquisition), added to the note: "Pipetting Analyzer - SampleId=SID-000123". Without it the note has no SampleId; and if that carrier goes straight on because the pit-lane is full, this pipette is not skipped.<br>A `Note over AN: ...` right after it replaces the text of the note |
 | `rotate <device>` | The turnstile turns by one position: entry → needle → exit. It waits by itself until the wheel is free (see Turnstile). Lasts 2 s | `duration=<s>` |
 | `highlight <device>` | The device lights up. Not needed when an antenna reads a carrier: the NSD, a divert or an antenna on its own light up by themselves. Lasts 1.5 s | `duration=<s>` |
@@ -203,31 +206,31 @@ shows it: `move C2 -> sampling  (waits 12.0s behind C1)`.
 
 - Where two lanes join, the carrier nearer to the junction goes first (on a tie, the
   one declared first); carriers on the same spot go in the order they are declared.
-- Ghosts, hidden carriers and carriers in a turnstile pocket don't take space; outside
-  the panel carriers don't stop.
+- Hidden carriers and carriers in a turnstile pocket don't take space. A ghost can't
+  drive through a carrier in front of it (it stops behind it, real or ghost), but the
+  carriers behind it drive through it; it doesn't wait for its own real carrier (same
+  `sid`). Outside the panel carriers don't stop.
 
 **Antennas and gates.** The antennas lie on the lanes, under the carriers. Wherever a
-carrier must stop on an antenna (sampling points, the diverts of `spur2`, in front of
-the turnstile) a gate holds it there, until `pass`; at the NSD the carrier is read on
+carrier must stop on an antenna (sampling points, antenna 2 and the diverts of `spur2`, in front of
+the turnstile) a gate holds it there, until `pass` (or `divert`); at the NSD the carrier is read on
 the fly. The gate opens and closes in 0.22 s. The last antenna is not drawn: it only
 triggers the Release. When an antenna reads a carrier the NSD, a divert or the antenna
 itself lights up by itself, at least 1 s.
 
-**Routes.** A route lists points and lane ids, in order; a lane id stands for all its
-points, and the way between two places is filled in along the lanes:
+**The way of a carrier.** It is not written: it comes from its steps, in the order of
+the file. The carrier starts on its `start`; `move` takes the shortest way along the
+lanes (in their direction) to the antenna or point, so `move C1 to antenna2` goes into
+the pit-lane and `move C2 to gone` straight on along the Main-Lane; `pass` goes on
+straight to the next stop, `divert` turns into the lane that starts on the antenna.
 
 ```
-%% carrier id=C1 sid=SID-000123 route=main_in,pit,main_out
-     -> main_in, nsd, pit_in, sampling, pit_out, merge, main_out
-%% carrier id=C2 sid=SID-000124 route=spawn,gone        (straight on the Main-Lane)
+%% carrier id=C1 sid=SID-000123          (starts on the Main-Lane, main_in)
+%% carrier id=C2 sid=SID-000124          (starts off the panel, spawn)
+%% move C1 to antenna3                   (into the spur, up to Divert 1)
+%% divert antenna3 C1                    (into the pit-lane of needle 1, up to antenna4)
+%% move C2 to gone                       (straight on the Main-Lane)
 ```
-
-| Geometry | Lanes |
-|---|---|
-| `sampling`, `sampling_queue`, `sampling_queue2` | `main`, `pit` |
-| `turnstile`, `turnstile_queue` | `main`, `pit_entry`, `pit_exit` |
-| `spur` | `main`, `spur` |
-| `spur2` | `main`, `spur`, `pit1` (needle 1), `pit2` (needle 2) |
 
 The layout image (`--layout`) shows the name of every point and device.
 
@@ -235,7 +238,7 @@ The layout image (`--layout`) shows the name of every point and device.
 the sampling pit-lane holds 10). A carrier counts from the NSD until it has passed the
 first antenna or gate. One that would find the lane full goes straight on along the
 Main-Lane, and its steps after the diversion are skipped by themselves (moves,
-messages, the pipettes of its `sid`, and the steps that depend on them); `--check` says
+`pass`/`divert`, messages, the pipettes of its `sid`, and the steps that depend on them); `--check` says
 so at the top of the timeline.
 
 **Turnstile.** A wheel with three pockets: entry, under the needle, exit. A carrier
@@ -248,7 +251,9 @@ the exit or with the needle down.
 
 **Ghost carriers.** `%% carrier ... ghost` is drawn dashed: where the interface
 *believes* a carrier is, while the real one (same `sid`, another id) is somewhere else.
-Antennas don't read it and gates don't open for it. Usually `hidden`, then `show` when
+Antennas don't read it and gates don't open for it; it queues behind the carriers in
+front, but doesn't hold up anyone. It moves with `move`, `pass` and `divert` like the
+others (written with its id: `divert antenna3 C2L`). Usually `hidden`, then `show` when
 it should appear and `hide` when it is cleared (scenes 03 and 04).
 
 **Analyzer error and needle.** `status AN error|ready|normal` colors the analyzer

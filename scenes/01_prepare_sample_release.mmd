@@ -9,11 +9,11 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit,main_out
+    %% carrier id=C1 sid=SID-000123
 
     %% caption 1 · Main-Lane | A carrier holding a sample tube travels along the Main-Lane towards the analyzer interface.
     %% at 2.2
-    %% move C1 to sampling
+    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted into the Pit-Lane without stopping and the interface sends Prepare. The gate stops it on the sampling point: the interface sends Sample Acquisition, the tube can be aspirated.
     %% on antenna1
@@ -48,7 +48,7 @@ sequenceDiagram
     %% after 0.1
     %% caption 5 · Carrier released — Release | The interface opens the gate and the carrier leaves the sampling point. Before it reaches the Main-Lane the interface sends Release: the sample has left the analyzer interface.
     %% after 0.1 ok-c1-3
-    %% pass sp
+    %% pass antenna2 C1
     %% on antenna3
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1

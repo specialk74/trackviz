@@ -10,7 +10,7 @@
       "    participant AN as Analyzer",
       "    participant DMX as DMX",
       "",
-      "    %% carrier id=C1 sid=SID-000123 route=${4:main_in,pit,main_out}",
+      "    %% carrier id=C1 sid=SID-000123",
       "",
       "    %% caption 1 · ${5:Title} | ${6:Text}",
       "    %% at 2",
@@ -54,35 +54,35 @@
   "carrier": {
     "prefix": "tv-carrier",
     "body": [
-      "%% carrier id=${1:C1} sid=${2:SID-000123} route=${3:spawn,pit,gone}"
+      "%% carrier id=${1:C1} sid=${2:SID-000123}"
     ],
-    "description": "A carrier with a sample; route = points and lane ids, the way between is filled in. Options: needle=1|2|both, color=#hex, tag=text, ghost, hidden"
+    "description": "A carrier with a sample; its way comes from its move, pass and divert. Options: start=<antenna|point> (default: main_in for the first, spawn for the others), color=#hex, tag=text, ghost, hidden"
   },
   "empty carrier": {
     "prefix": "tv-carrier-empty",
     "body": [
-      "%% carrier id=${1:E} route=${2:spawn,gone}"
+      "%% carrier id=${1:E}"
     ],
     "description": "An empty carrier: no tube, no sample"
   },
   "ghost carrier": {
     "prefix": "tv-carrier-ghost",
     "body": [
-      "%% carrier id=${1:C2L} sid=${2:SID-000124} route=${3:nsd,sampling} ghost hidden tag=${4:SID-000124_(expected)}"
+      "%% carrier id=${1:C2L} sid=${2:SID-000124} start=antenna1 ghost hidden tag=${3:SID-000124_(expected)}"
     ],
     "description": "Where the interface believes a carrier is (dashed outline); shown with 'show'"
   },
   "on antenna": {
     "prefix": "tv-on",
     "body": [
-      "%% on ${1|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6|}"
+      "%% on ${1|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6,antenna7|}"
     ],
     "description": "The next step starts when its carrier (SampleId of the message, or the one it moves) is over the antenna"
   },
   "on antenna carrier": {
     "prefix": "tv-on-carrier",
     "body": [
-      "%% on ${1|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6|} ${2:C1}"
+      "%% on ${1|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6,antenna7|} ${2:C1}"
     ],
     "description": "The next step starts when this carrier is over the antenna"
   },
@@ -110,7 +110,7 @@
   "after antenna": {
     "prefix": "tv-after-antenna",
     "body": [
-      "%% after ${1:0.2} ${2|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6|} ${3:C1}"
+      "%% after ${1:0.2} ${2|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6,antenna7|} ${3:C1}"
     ],
     "description": "N seconds after the carrier is over the antenna"
   },
@@ -152,16 +152,23 @@
   "move": {
     "prefix": "tv-move",
     "body": [
-      "%% move ${1:C1} to ${2:sampling}"
+      "%% move ${1:C1} to ${2|antenna1,antenna2,antenna3,antenna4,antenna5,antenna6,antenna7,gone|}"
     ],
-    "description": "The carrier sets off towards the point; the physics makes it wait behind others. Options: runaway, ease=, speed=, duration="
+    "description": "The carrier sets off towards the antenna (or point); the physics makes it wait behind others. Options: runaway, ease=, speed=, duration="
   },
   "pass": {
     "prefix": "tv-pass",
     "body": [
-      "%% pass ${1:sp}"
+      "%% pass ${1|antenna2,antenna3,antenna4,antenna5,antenna6|} ${2:C1}"
     ],
-    "description": "The carrier stopped on the device sets off to the next stop of its route (gated antenna, turnstile entry) or its end"
+    "description": "The carrier stopped on the antenna goes on, straight, to the next stop of its route (gated antenna, turnstile entry) or its end"
+  },
+  "divert": {
+    "prefix": "tv-divert",
+    "body": [
+      "%% divert ${1|antenna3,antenna5|} ${2:C1}"
+    ],
+    "description": "The carrier stopped on the antenna of a divert turns into its pit-lane"
   },
   "pipette": {
     "prefix": "tv-pipette",

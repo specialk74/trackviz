@@ -2,7 +2,9 @@
 
 %% # ---------------------------------------------------------------- track
 %% # Spur with one analyzer and two sampling points (two needles). The NSD diverts the carrier, without stopping, into the
-%% # spur. On the up branch there are two standard diverts (d1, d2): every carrier
+%% # spur. On its bottom stretch an antenna with a gate (antenna2) stops and reads
+%% # every carrier: it can only let it go on (pass), towards Divert 1; it can't divert.
+%% # On the up branch there are two standard diverts (d1, d2): every carrier
 %% # stops there and is read, then it is diverted into the pit-lane of a needle or
 %% # goes straight on, while the next carrier stops behind. A pit-lane leaves to the
 %% # right, rises past the sampling point (needle on its right) and rejoins the up
@@ -11,6 +13,7 @@
 %% @point id=main_in x=910 y=790
 %% @point id=nsd x=800 y=790
 %% @point id=pit_in x=740 y=730
+%% @point id=spur_rd x=660 y=730
 %% @point id=spur_in x=440 y=730
 %% @point id=w1b x=500 y=730
 %% @point id=w1c x=560 y=730
@@ -42,7 +45,7 @@
 
 %% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=850
 
-%% @lane id=spur label=Spur kind=pit points=pit_in,spur_in,d1,d2,rj2,top_r,top_l,back,po label_x=310 label_y=460
+%% @lane id=spur label=Spur kind=pit points=pit_in,spur_rd,spur_in,d1,d2,rj2,top_r,top_l,back,po label_x=310 label_y=460
 
 %% @lane id=pit1 kind=pit points=d1,pc1,pt1u,rj1
 
@@ -62,15 +65,17 @@
 
 %% @device id=nsd kind=nsd at=nsd antenna=antenna1
 
-%% @device id=div1 kind=divert at=d1 antenna=antenna2 gate=true label="Divert 1" label_x=340 label_y=610
+%% @device id=antenna2 kind=antenna at=spur_rd gate=true
 
-%% @device id=div2 kind=divert at=d2 antenna=antenna4 gate=true label="Divert 2" label_x=340 label_y=370
+%% @device id=div1 kind=divert at=d1 antenna=antenna3 gate=true label="Divert 1" label_x=340 label_y=610
 
-%% @device id=sp1 kind=sampling at=s1 antenna=antenna3 gate=true label="Sampling point" label_x=520 label_y=545
+%% @device id=div2 kind=divert at=d2 antenna=antenna5 gate=true label="Divert 2" label_x=340 label_y=370
 
-%% @device id=sp2 kind=sampling at=s2 antenna=antenna5 gate=true label="Sampling point" label_x=520 label_y=305
+%% @device id=sp1 kind=sampling at=s1 antenna=antenna4 gate=true label="Sampling point" label_x=520 label_y=545
+
+%% @device id=sp2 kind=sampling at=s2 antenna=antenna6 gate=true label="Sampling point" label_x=520 label_y=305
 %% # Antennas on the lanes: a step can start when a carrier is over one (%% on antennaN).
 %% # antenna= on a device puts one on its point; gate=true: a gate holds the carrier
 %% # on the antenna (the belt never stops);
 %% # visible=false: a trigger only (the last one, at the end of the pit-lane: Release).
-%% @device id=antenna6 kind=antenna at=po visible=false
+%% @device id=antenna7 kind=antenna at=po visible=false

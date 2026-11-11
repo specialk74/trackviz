@@ -12,11 +12,11 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
+    %% carrier id=C1 sid=SID-000123
 
     %% caption 1 · Turnstile with gate and antenna | A carrier holding a sample tube travels towards the interface. The Pit-Lane ends in a turnstile, with an antenna and a gate in front of it.
     %% at 2.6
-    %% move C1 to pit_wait
+    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The carrier is diverted without stopping (Prepare) and read at the antenna (Prepare again). Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
     %% on antenna1
@@ -38,7 +38,7 @@ sequenceDiagram
     %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
     %% after 0.1 ok-c1-2
-    %% pass antenna2
+    %% pass antenna2 C1
     %% after 0.15
     %% rotate ts
     %% after 0.25

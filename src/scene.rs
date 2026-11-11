@@ -16,6 +16,9 @@ pub struct Video {
     pub show_times: bool,
     /// Speed of the belt under the carriers, in cm/s (`belt=`).
     pub belt: f64,
+    /// How long the arrow of a message takes, in s, when the message has no
+    /// `duration` (`message=`).
+    pub message: f64,
 }
 
 impl Video {
@@ -183,7 +186,9 @@ pub enum Action {
     Move { carrier: String, to: String, ease: Ease, speed: Option<f64>, runaway: bool },
     /// The carrier stopped on the point of `device` sets off and rides the belt to
     /// the next stop of its route (a gated antenna, a turnstile entry) or its end.
-    Pass { device: String },
+    /// `pass` / `divert`: the carrier stopped on the antenna goes on, or turns.
+    /// `carrier`: which one it must be.
+    Pass { device: String, divert: bool, carrier: Option<String> },
     Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
     /// `note`: the text of the note on the analyzer, if the diagram gives it;
@@ -344,48 +349,69 @@ fn lane_paths(points: &HashMap<String, Point>, lanes: &[Lane]) -> Vec<(String, V
 /// their direction, and through a turnstile from "<id>.in" to "<id>.out") is
 /// filled in. "main_in,pit,main_out" is main_in, nsd, pit_in, ..., pit_out, merge,
 /// main_out. Two points that no lane joins are joined by a straight line.
-fn expand_route(written: &[String], points: &HashMap<String, Point>, lanes: &[Lane], devices: &[Device]) -> Result<Vec<String>, String> {
-    let paths = lane_paths(points, lanes);
-    let mut edges: HashMap<&str, Vec<(&str, f64)>> = HashMap::new();
-    let dist = |a: &str, b: &str| {
-        let (p, q) = (sc_pt(points, a), sc_pt(points, b));
-        ((p.0 - q.0).powi(2) + (p.1 - q.1).powi(2)).sqrt()
-    };
-    for (_, path) in &paths {
-        for w in path.windows(2) {
-            edges.entry(w[0].as_str()).or_default().push((w[1].as_str(), dist(&w[0], &w[1])));
+/// The lanes as a graph: from each point, the next points along the lanes (in
+/// their direction), with the length and the lane; through a turnstile from
+/// "<id>.in" to "<id>.out" (lane "").
+struct LaneGraph {
+    edges: HashMap<String, Vec<(String, f64, String)>>,
+}
+
+impl LaneGraph {
+    fn new(points: &HashMap<String, Point>, lanes: &[Lane], devices: &[Device]) -> LaneGraph {
+        let mut edges: HashMap<String, Vec<(String, f64, String)>> = HashMap::new();
+        for (lane, path) in lane_paths(points, lanes) {
+            for w in path.windows(2) {
+                let (p, q) = (sc_pt(points, &w[0]), sc_pt(points, &w[1]));
+                let d = ((p.0 - q.0).powi(2) + (p.1 - q.1).powi(2)).sqrt();
+                edges.entry(w[0].clone()).or_default().push((w[1].clone(), d, lane.clone()));
+            }
         }
+        for d in devices.iter().filter(|d| d.kind == DeviceKind::Turnstile) {
+            edges.entry(format!("{}.in", d.id)).or_default().push((format!("{}.out", d.id), 0.0, String::new()));
+        }
+        LaneGraph { edges }
     }
-    let wheels: Vec<(String, String)> = devices.iter().filter(|d| d.kind == DeviceKind::Turnstile).map(|d| (format!("{}.in", d.id), format!("{}.out", d.id))).collect();
-    for (i, o) in &wheels {
-        edges.entry(i.as_str()).or_default().push((o.as_str(), 0.0));
+
+    fn out(&self, p: &str) -> &[(String, f64, String)] {
+        self.edges.get(p).map_or(&[][..], |v| v.as_slice())
     }
-    // Shortest way from a to b along the lanes (Dijkstra; the graphs are small).
-    let way = |a: &str, b: &str| -> Option<Vec<String>> {
-        let mut best: HashMap<&str, (f64, Option<&str>)> = HashMap::from([(a, (0.0, None))]);
+
+    /// Shortest way from a to b along the lanes (Dijkstra; the graphs are small),
+    /// with the lane of its last stretch.
+    fn way(&self, a: &str, b: &str) -> Option<(Vec<String>, String)> {
+        // Point -> (distance, previous point and lane).
+        type Best<'a> = HashMap<&'a str, (f64, Option<(&'a str, &'a str)>)>;
+        let mut best: Best = HashMap::from([(a, (0.0, None))]);
         let mut open = vec![a];
         while let Some(k) = (0..open.len()).min_by(|&x, &y| best[open[x]].0.total_cmp(&best[open[y]].0)) {
             let n = open.swap_remove(k);
             if n == b {
                 let mut out = vec![b.to_string()];
                 let mut cur = b;
-                while let Some(prev) = best[cur].1 {
+                let last = best[b].1.map_or(String::new(), |x| x.1.to_string());
+                while let Some((prev, _)) = best[cur].1 {
                     out.push(prev.to_string());
                     cur = prev;
                 }
                 out.reverse();
-                return Some(out);
+                return Some((out, last));
             }
             let d = best[n].0;
-            for &(m, w) in edges.get(n).map_or(&[][..], |v| v.as_slice()) {
-                if best.get(m).is_none_or(|x| d + w < x.0 - 1e-9) {
-                    best.insert(m, (d + w, Some(n)));
+            for (m, w, lane) in self.out(n) {
+                if best.get(m.as_str()).is_none_or(|x| d + w < x.0 - 1e-9) {
+                    best.insert(m, (d + w, Some((n, lane))));
                     open.push(m);
                 }
             }
         }
         None
-    };
+    }
+}
+
+fn expand_route(written: &[String], points: &HashMap<String, Point>, lanes: &[Lane], devices: &[Device]) -> Result<Vec<String>, String> {
+    let paths = lane_paths(points, lanes);
+    let graph = LaneGraph::new(points, lanes, devices);
+    let way = |a: &str, b: &str| graph.way(a, b).map(|w| w.0);
     let mut route: Vec<String> = Vec::new();
     for tok in written {
         let places: Vec<String> = if points.contains_key(tok) {
@@ -443,7 +469,7 @@ impl Scene {
             return Err("keys outside of any section are not allowed".into());
         }
         let v = doc.tables.get("video").ok_or("missing [video] section")?;
-        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times", "belt"])?;
+        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times", "belt", "message"])?;
         let video = Video {
             title: v.str_opt("title")?.unwrap_or_default(),
             subtitle: v.str_opt("subtitle")?.unwrap_or_default(),
@@ -457,6 +483,11 @@ impl Scene {
                 Some(b) if b > 0.0 => b,
                 Some(b) => return Err(format!("{}: belt must be a speed in cm/s above 0, not {b}", v.location())),
                 None => BELT_SPEED,
+            },
+            message: match v.num_opt("message")? {
+                Some(m) if m > 0.0 => m,
+                Some(m) => return Err(format!("{}: message must be a time in s above 0, not {m}", v.location())),
+                None => 1.5,
             },
         };
 
@@ -603,10 +634,22 @@ impl Scene {
         let mut carriers = Vec::new();
         for t in arr(doc, "carrier") {
             t.check_keys(&["id", "tube", "sample_id", "route", "start", "speed", "cap_color", "ghost", "visible", "tag"])?;
-            let route = expand_route(&t.str_list("route")?, &points, &lanes, &devices).map_err(|e| format!("{}: {e}", t.location()))?;
-            let start = t.str_opt("start")?.unwrap_or_else(|| route[0].clone());
-            if !route.contains(&start) {
+            // Without `route` the way of the carrier comes from its steps (see
+            // `derive_route`), from `start`.
+            let route = if t.entries.contains_key("route") {
+                expand_route(&t.str_list("route")?, &points, &lanes, &devices).map_err(|e| format!("{}: {e}", t.location()))?
+            } else {
+                Vec::new()
+            };
+            let start = match t.str_opt("start")? {
+                Some(s) => s,
+                None => route.first().cloned().ok_or_else(|| format!("{}: a carrier needs start= (or route=)", t.location()))?,
+            };
+            if !route.is_empty() && !route.contains(&start) {
                 return Err(format!("{}: start point '{start}' is not on the route", t.location()));
+            }
+            if !points.contains_key(&start) {
+                return Err(format!("{}: unknown point '{start}'", t.location()));
             }
             carriers.push(Carrier {
                 id: t.str_req("id")?,
@@ -639,7 +682,7 @@ impl Scene {
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed", "runaway"],
-                "pass" => &["device"],
+                "pass" => &["device", "divert", "carrier"],
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
@@ -657,7 +700,7 @@ impl Scene {
             t.check_keys(&allowed)?;
             let action = match action_name.as_str() {
                 "caption" => Action::Caption { title: t.str_opt("title")?.unwrap_or_default(), text: t.str_req("text")? },
-                "pass" => Action::Pass { device: t.str_req("device")? },
+                "pass" => Action::Pass { device: t.str_req("device")?, divert: t.bool_opt("divert")?.unwrap_or(false), carrier: t.str_opt("carrier")? },
                 "move" => Action::Move {
                     carrier: t.str_req("carrier")?,
                     to: t.str_req("to")?,
@@ -761,7 +804,71 @@ impl Scene {
             let part_of = Some(devices[di].part_of.clone().unwrap_or_else(|| devices[di].id.clone()));
             devices.push(Device { id: id.clone(), kind: DeviceKind::Gate, at: Some(id), rect: (0.0, 0.0, 0.0, 0.0), label: String::new(), entry_right: true, label_pos: None, visible: true, part_of });
         }
-        Ok(Scene { video, points, lanes, devices, actors, carriers, steps, straight: Vec::new() })
+        let mut sc = Scene { video, points, lanes, devices, actors, carriers, steps, straight: Vec::new() };
+        for ci in 0..sc.carriers.len() {
+            if sc.carriers[ci].route.is_empty() {
+                sc.carriers[ci].route = sc.derive_route(ci)?;
+            }
+        }
+        Ok(sc)
+    }
+
+    /// The way of a carrier written without `route`, from its steps in the order
+    /// of the file: from `start`; a `move` adds the shortest way along the lanes to
+    /// its point; `pass` goes straight on, `divert` into the lane that starts on
+    /// the antenna, then along the lanes to the next stop (an antenna with a gate,
+    /// a turnstile entry) or to the end.
+    fn derive_route(&self, ci: usize) -> Result<Vec<String>, String> {
+        let graph = LaneGraph::new(&self.points, &self.lanes, &self.devices);
+        let stops = self.stops();
+        let cid = self.carriers[ci].id.clone();
+        let mut route = vec![self.carriers[ci].start.clone()];
+        let mut lane = String::new();
+        for st in &self.steps {
+            let cur = route.last().unwrap().clone();
+            match &st.action {
+                Action::Move { carrier, to, .. } if *carrier == cid && *to != cur => {
+                    let (w, l) = graph.way(&cur, to).ok_or_else(|| format!("{}: carrier '{cid}' can't go from '{cur}' to '{to}' along the lanes", st.loc))?;
+                    route.extend(w.into_iter().skip(1));
+                    lane = l;
+                }
+                Action::Pass { device, divert, carrier: Some(c) } if *c == cid => {
+                    let cmd = if *divert { "divert" } else { "pass" };
+                    let at = self.devices.iter().find(|d| d.id == *device).and_then(|d| d.at.clone()).unwrap_or_default();
+                    if cur != at {
+                        return Err(format!("{}: {cmd} {device} {cid}: '{cid}' is not sent to {device} before (move {cid} to {device}); it goes to '{cur}'", st.loc));
+                    }
+                    // The lanes that turn off here.
+                    let turns: Vec<&str> = self.lanes.iter().filter(|l| l.points.first() == Some(&at)).map(|l| l.id.as_str()).collect();
+                    let ways: Vec<&(String, f64, String)> = graph.out(&at).iter().filter(|e| turns.contains(&e.2.as_str()) == *divert).collect();
+                    let first = match ways.as_slice() {
+                        [] if *divert => return Err(format!("{}: divert {device} {cid}: no lane turns off there: pass {device} {cid}", st.loc)),
+                        [] => None,
+                        [one] => Some(*one),
+                        many => many.iter().find(|e| e.2 == lane).copied().or(Some(many[0])),
+                    };
+                    let Some((mut p, _, l)) = first.cloned() else { continue };
+                    lane = l;
+                    route.push(p.clone());
+                    // Along the lanes to the next stop.
+                    while !stops.contains(&p) {
+                        let out = graph.out(&p);
+                        let next = match out {
+                            [] => break,
+                            [one] => one,
+                            many => many.iter().find(|e| e.2 == lane).ok_or_else(|| {
+                                format!("{}: after {cmd} {device} {cid} the lanes split at '{p}': send it on with a move", st.loc)
+                            })?,
+                        };
+                        p = next.0.clone();
+                        lane = next.2.clone();
+                        route.push(p.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(route)
     }
 
     pub fn actor_idx(&self, id: &str) -> Option<usize> {
@@ -834,7 +941,9 @@ impl Scene {
         let main = sc.main_points();
         let (i, _) = sc.off_main(ci, &main).ok_or("a carrier sent straight on must leave the Main-Lane")?;
         let old = sc.carriers[ci].route.clone();
-        let end = old[i..].iter().rev().find(|p| main.contains(p)).cloned().unwrap_or_else(|| old[i].clone());
+        // Back on the Main-Lane where its route rejoins it; a route that ends off
+        // the Main-Lane (written from the steps) goes on to the end of it.
+        let end = old[i + 1..].iter().rev().find(|p| main.contains(p)).or(main.last()).cloned().unwrap_or_else(|| old[i].clone());
         let mut written: Vec<String> = old[..=i].to_vec();
         written.push(end);
         let route = expand_route(&written, &sc.points, &sc.lanes, &sc.devices)?;
@@ -854,7 +963,7 @@ impl Scene {
                         gone = true;
                     }
                 }
-                Action::Message { carrier: Some(c), .. } if *c == cid => dropped[k] = true,
+                Action::Message { carrier: Some(c), .. } | Action::Pass { carrier: Some(c), .. } if *c == cid => dropped[k] = true,
                 Action::Pipette { sample: Some(s), .. } if !sid.is_empty() && *s == sid => dropped[k] = true,
                 _ => {}
             }
@@ -920,32 +1029,72 @@ impl Scene {
         stops
     }
 
-    /// The move a `pass` stands for: the carrier stopped on the point of the
-    /// device at time t sets off to the next stop of its route, or to its end.
-    fn pass_move(&self, device: &str, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
-        let d = self.devices.iter().find(|d| d.id == device).ok_or_else(|| format!("{loc}: unknown device '{device}'"))?;
-        let at = d
-            .at
-            .as_deref()
-            .filter(|_| matches!(d.kind, DeviceKind::Nsd | DeviceKind::Sampling | DeviceKind::Divert | DeviceKind::Antenna | DeviceKind::Gate))
-            .ok_or_else(|| format!("{loc}: 'pass' needs a device on a point of the track, not '{device}'"))?;
+    /// The move a `pass` (or `divert`) stands for: the carrier stopped on the point
+    /// of the device at time t sets off to the next stop of its route, or to its
+    /// end. Its route says where it goes; `divert` must be on a divert where the
+    /// route turns into a lane, `pass` where it goes straight on.
+    #[allow(clippy::too_many_arguments)]
+    fn pass_move(&self, device: &str, divert: bool, who: Option<&str>, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
+        let cmd = if divert { "divert" } else { "pass" };
+        // Only antennas: the antenna of a device is named instead of the device.
+        let d = self.devices.iter().find(|d| d.id == device && d.kind == DeviceKind::Antenna).ok_or_else(|| {
+            match self.devices.iter().find(|a| a.kind == DeviceKind::Antenna && a.part_of.as_deref() == Some(device)) {
+                Some(a) => format!("{loc}: '{cmd} {device}': write the antenna, {cmd} {}", a.id),
+                None => format!("{loc}: '{cmd} {device}': not an antenna of this scene"),
+            }
+        })?;
+        let at = d.at.as_deref().unwrap();
         let p = self.pt(at);
-        let ci = (0..self.carriers.len())
-            .find(|&ci| {
-                let c = &paths[ci];
-                let q = c.pos(t);
-                attached[ci].is_none() && !c.ghost && c.opacity(t) > 0.0 && !c.moving(t) && ((q.0 - p.0).powi(2) + (q.1 - p.1).powi(2)).sqrt() < 3.0
-            })
-            .ok_or_else(|| format!("{loc}: pass {device}: no carrier is stopped on '{at}' at t={t:.2}s"))?;
+        let stopped_here = |ci: usize| {
+            let c = &paths[ci];
+            let q = c.pos(t);
+            attached[ci].is_none() && !c.moving(t) && ((q.0 - p.0).powi(2) + (q.1 - p.1).powi(2)).sqrt() < 3.0
+        };
+        // The carrier stopped there (a ghost too, when it is the one written).
+        let real = (0..self.carriers.len()).find(|&ci| stopped_here(ci) && !paths[ci].ghost && paths[ci].opacity(t) > 0.0);
+        let ci = match who.and_then(|w| self.carrier_idx(w)) {
+            Some(wi) if self.carriers[wi].ghost && stopped_here(wi) => wi,
+            Some(wi) => match real {
+                Some(ci) if ci == wi => ci,
+                Some(ci) => return Err(format!("{loc}: {cmd} {device} {}: the carrier stopped there at t={t:.2}s is '{}', not '{}'", self.carriers[wi].id, self.carriers[ci].id, self.carriers[wi].id)),
+                None => return Err(format!("{loc}: {cmd} {device} {}: no carrier is stopped on '{at}' at t={t:.2}s", self.carriers[wi].id)),
+            },
+            None => real.ok_or_else(|| format!("{loc}: {cmd} {device}: no carrier is stopped on '{at}' at t={t:.2}s"))?,
+        };
         let c = &self.carriers[ci];
         let from = cur_idx[ci];
+        // A divert (or its antenna) can turn the carrier into a lane that starts
+        // there: the next point of its route is the first one of that lane.
+        let owner = d.part_of.as_deref().and_then(|o| self.devices.iter().find(|x| x.id == o)).unwrap_or(d);
+        let turn = (owner.kind == DeviceKind::Divert)
+            .then(|| c.route.get(from + 1))
+            .flatten()
+            .and_then(|next| {
+                lane_paths(&self.points, &self.lanes)
+                    .into_iter()
+                    .zip(&self.lanes)
+                    .find(|((_, path), l)| l.points.first().map(String::as_str) == Some(at) && path.get(1) == Some(next))
+                    .map(|((id, _), _)| id)
+            });
+        match (divert, &turn) {
+            (true, _) if owner.kind != DeviceKind::Divert => {
+                return Err(format!("{loc}: divert {device}: it is not on a divert, the carrier can only go on: pass {device}"));
+            }
+            (true, None) => {
+                return Err(format!("{loc}: divert {device}: the route of '{}' goes straight on at '{at}': write pass {device}, or give it a route into the lane", c.id));
+            }
+            (false, Some(lane)) => {
+                return Err(format!("{loc}: pass {device}: the route of '{}' turns into '{lane}' at '{at}': write divert {device}", c.id));
+            }
+            _ => {}
+        }
         let stops = self.stops();
         let to = c.route[from + 1..]
             .iter()
             .find(|p| stops.contains(p))
             .or(c.route.last())
             .filter(|_| from + 1 < c.route.len())
-            .ok_or_else(|| format!("{loc}: pass {device}: carrier '{}' is at the end of its route", c.id))?;
+            .ok_or_else(|| format!("{loc}: {cmd} {device}: carrier '{}' is at the end of its route", c.id))?;
         Ok(Action::Move { carrier: c.id.clone(), to: to.clone(), ease: Ease::Linear, speed: None, runaway: false })
     }
 
@@ -1290,6 +1439,8 @@ impl CarrierPath {
 pub enum Ev {
     Caption { title: String, text: String },
     /// `color`: overrides the sender's color (e.g. to tell apart a repeated message).
+    /// `row`: where its arrow is in the sequence diagram, in half rows (a label of
+    /// one line takes a row; each more line half a row, above it).
     Message { from: usize, to: usize, text: String, params: String, reply: bool, row: usize, color: Option<String> },
     Note { actor: usize, text: String, row: usize },
     Pipette { device: usize },
@@ -1299,6 +1450,32 @@ pub enum Ev {
     Needle { device: usize, down: bool },
     Operator { device: usize },
     Wait,
+}
+
+/// The lines of a label of the sequence diagram: as in Mermaid, `<br/>` (or `<br>`,
+/// `<br />`) starts a new line. Each line is (text, parameters): the parameters
+/// follow the text, on its last line, and may go on over more lines.
+pub fn label_lines(text: &str, params: &str) -> Vec<(String, String)> {
+    fn split(s: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = s;
+        loop {
+            let lower = rest.to_ascii_lowercase();
+            let Some(i) = ["<br/>", "<br />", "<br>"].iter().filter_map(|b| lower.find(b).map(|i| (i, b.len()))).min() else {
+                out.push(rest.trim().to_string());
+                return out;
+            };
+            out.push(rest[..i.0].trim().to_string());
+            rest = &rest[i.0 + i.1..];
+        }
+    }
+    let mut lines: Vec<(String, String)> = split(text).into_iter().map(|l| (l, String::new())).collect();
+    if !params.is_empty() {
+        let mut p = split(params).into_iter();
+        lines.last_mut().unwrap().1 = p.next().unwrap_or_default();
+        lines.extend(p.map(|l| (String::new(), l)));
+    }
+    lines
 }
 
 pub struct Timed {
@@ -1313,6 +1490,7 @@ pub struct Timeline {
     pub wheels: Vec<Wheel>,
     /// Gate devices: (device index, intervals in which a carrier drives through).
     pub gates: Vec<(usize, Vec<(f64, f64)>)>,
+    /// The height of the sequence diagram, in half rows (see `row` in `Ev`).
     pub rows: usize,
     pub duration: f64,
     pub log: Vec<String>,
@@ -1375,7 +1553,13 @@ impl Timeline {
         for _ in 0..40 {
             let mut log = Vec::new();
             let (tl, plans) = Self::build_inner(sc, &mut log, &actual, false).map_err(|e| with_log(e, &log))?;
-            let next = physics::simulate(&tl.carriers, &plans);
+            // A ghost stands for the real carrier with its sample.
+            let twin: Vec<Option<usize>> = sc
+                .carriers
+                .iter()
+                .map(|c| c.ghost.then(|| sc.carriers.iter().position(|o| !o.ghost && !c.sample_id.is_empty() && o.sample_id == c.sample_id)).flatten())
+                .collect();
+            let next = physics::simulate(&tl.carriers, &plans, &twin);
             let settled = next.len() == actual.len() && next.iter().all(|(k, d)| actual.get(k).is_some_and(|a| a.same(d)));
             actual = next;
             if settled {
@@ -1469,7 +1653,7 @@ impl Timeline {
             // `pass`: a move of the carrier stopped on the device, to its next stop.
             let passed;
             let action = match &st.action {
-                Action::Pass { device } => match sc.pass_move(device, &carriers, &cur_idx, &attached, t0, &st.loc) {
+                Action::Pass { device, divert, carrier } => match sc.pass_move(device, *divert, carrier.as_deref(), &carriers, &cur_idx, &attached, t0, &st.loc) {
                     Ok(a) => {
                         passed = a;
                         &passed
@@ -1483,6 +1667,8 @@ impl Timeline {
                 },
                 a => a,
             };
+            // When the carrier of a move actually sets off.
+            let mut depart = None;
             let (dur, ev, desc) = match action {
                 Action::Caption { title, text } => {
                     (st.duration.unwrap_or(0.0), Ev::Caption { title: title.clone(), text: text.clone() }, format!("caption   {title}"))
@@ -1518,6 +1704,7 @@ impl Timeline {
                         path.attach[ai].t1 = done.start;
                         attached[ci] = None;
                     }
+                    depart = Some(done.segs.first().map_or(done.start, |s| s.t0));
                     path.moves.extend(done.segs.iter().cloned());
                     cur_idx[ci] = ti;
                     // Entering a turnstile: the carrier drops into the pocket at the entry.
@@ -1549,7 +1736,7 @@ impl Timeline {
                     let params = subst(params, sc, ci, *needle).map_err(|e| format!("{}: {e}", st.loc))?;
                     let desc = format!("message   {from} -> {to}  {text}  {params}");
                     let ev = Ev::Message { from: fi, to: ti, text, params, reply: *reply, row: 0, color: color.clone() };
-                    (st.duration.unwrap_or(1.5), ev, desc)
+                    (st.duration.unwrap_or(sc.video.message), ev, desc)
                 }
                 Action::Note { actor, text } => {
                     let ai = sc.need_actor(actor, &st.loc)?;
@@ -1611,8 +1798,11 @@ impl Timeline {
                 Action::Pass { .. } => unreachable!("a pass is laid out as a move"),
             };
             let t1 = t0 + dur;
+            // For the steps after it, a pass (or divert) ends when the carrier sets
+            // off; any other step when it ends (a move when the carrier arrives).
+            let end = if matches!(st.action, Action::Pass { .. }) { depart.unwrap_or(t1) } else { t1 };
             if let Some(id) = &st.id {
-                history.push((format!("step {id}"), t0, t1));
+                history.push((format!("step {id}"), t0, end));
             }
             match &st.action {
                 Action::Message { kind: Some(k), carrier, .. } => {
@@ -1637,7 +1827,7 @@ impl Timeline {
                 log.push(format!("{t0:7.2}s - {t1:7.2}s  note      {}: {text}", sc.actors[ai].id));
                 events.push(Timed { t0, t1, ev: Ev::Note { actor: ai, text, row: 0 } });
             }
-            prev_end = t1;
+            prev_end = end;
             max_end = max_end.max(t1);
         }
         if !check {
@@ -1646,15 +1836,22 @@ impl Timeline {
         }
         simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
 
-        // Rows of the sequence diagram in time order (same start: file order).
+        // Rows of the sequence diagram in time order (same start: file order), in
+        // half rows: a label takes a row, and half a row for each more line.
         let mut order: Vec<usize> = (0..events.len()).filter(|&i| matches!(events[i].ev, Ev::Message { .. } | Ev::Note { .. })).collect();
         order.sort_by(|&a, &b| events[a].t0.total_cmp(&events[b].t0));
-        for (r, &i) in order.iter().enumerate() {
+        let mut rows = 0;
+        for &i in &order {
+            let n = match &events[i].ev {
+                Ev::Message { text, params, .. } => label_lines(text, params).len(),
+                Ev::Note { text, .. } => label_lines(text, "").len(),
+                _ => 1,
+            };
+            rows += n + 1;
             if let Ev::Message { row, .. } | Ev::Note { row, .. } = &mut events[i].ev {
-                *row = r;
+                *row = rows - 2;
             }
         }
-        let rows = order.len();
 
         // The gate in front of a turnstile holds carriers while the analyzer is
         // sampling there: nobody may drive into the wheel during a pipette.

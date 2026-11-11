@@ -81,9 +81,9 @@ impl MsgType {
 }
 
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 24] = [
+const DIRECTIVES: [&str; 25] = [
     "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "id", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
-    "show", "hide", "wait", "caption", "pass",
+    "show", "hide", "wait", "caption", "pass", "divert",
 ];
 
 fn distance(a: &str, b: &str) -> usize {
@@ -110,25 +110,6 @@ fn suggest(d: &str) -> Option<&'static str> {
         .filter(|&(dist, n)| dist > 0 && dist <= 2.max(n.len() / 4))
         .min()
         .map(|x| x.1)
-}
-
-/// The default way through a geometry. Spur2 depends on the needles of the sample.
-fn default_route(geometry: &str, needle: &str) -> Option<Vec<&'static str>> {
-    let head = ["pit_in", "w1c", "w1b", "spur_in", "w1", "d1"];
-    let n1 = ["q2", "pc1", "q1", "s1", "pt1u", "rj1", "w2", "d2"];
-    let n2 = ["qb2", "pc2", "qb1", "s2", "pt2u", "rj2"];
-    let tail = ["top_r", "top_l", "back", "po", "merge", "iface_out", "main_out", "gone"];
-    Some(match (geometry, needle) {
-        ("sampling", _) => vec!["main_in", "nsd", "pit_in", "sampling", "pit_out", "merge", "main_out"],
-        ("turnstile", _) => vec!["main_in", "nsd", "pit_in", "pit_wait", "ts.in", "ts.out", "pit_out", "merge", "main_out", "gone"],
-        ("spur", _) => vec![
-            "main_in", "nsd", "pit_in", "spur_in", "queue2", "queue", "sampling", "spur_top_in", "spur_top_out", "spur_out", "pit_out", "merge", "iface_out", "main_out", "gone",
-        ],
-        ("spur2", "1") => ["main_in", "nsd"].iter().chain(&head).chain(&n1).chain(&["rj2"]).chain(&tail).copied().collect(),
-        ("spur2", "2") => ["main_in", "nsd"].iter().chain(&head).chain(&["w2", "d2"]).chain(&n2).chain(&tail).copied().collect(),
-        ("spur2", "both") => ["main_in", "nsd"].iter().chain(&head).chain(&n1).chain(&n2).chain(&tail).copied().collect(),
-        _ => return None,
-    })
 }
 
 /// `key=value` options after the words of a directive.
@@ -368,7 +349,7 @@ impl Importer {
             }
             "carrier" => {
                 if !o.contains_key("id") {
-                    return Err("'carrier' is written: carrier id=<id> [sid=<sample id>] [needle=1|2|both] [route=a,b,c] [color=#hex] [speed=n] [tag=text] [ghost] [hidden]".into());
+                    return Err("'carrier' is written: carrier id=<id> [sid=<sample id>] [start=<antenna|point>] [color=#hex] [speed=n] [tag=text] [ghost] [hidden]".into());
                 }
                 self.carrier(&plain, &o)?;
             }
@@ -408,9 +389,17 @@ impl Importer {
             }
             "move" => {
                 if plain.len() < 3 || plain[1] != "to" {
-                    return Err("'move' is written: move <carrier> to <point> [ease=in|out|inout|linear] [speed=n] [duration=s] [runaway]".into());
+                    return Err("'move' is written: move <carrier> to <antenna>|<point> [ease=in|out|inout|linear] [speed=n] [duration=s] [runaway]".into());
                 }
-                let mut k: Keys = vec![("carrier", text(plain[0])), ("to", text(plain[2]))];
+                // An antenna stands for its point.
+                let to = self.antennas().into_iter().find(|a| a.0 == plain[2]).map_or_else(|| plain[2].to_string(), |a| a.1);
+                let points: Vec<String> = self.list("point").iter().filter_map(|t| t.str_opt("id").ok().flatten()).collect();
+                if !points.is_empty() && !points.contains(&to) {
+                    let mut names: Vec<String> = self.antennas().into_iter().map(|a| a.0).collect();
+                    names.sort();
+                    return Err(format!("'move {} to {to}': '{to}' is neither an antenna nor a point of this scene (antennas: {})", plain[0], names.join(", ")));
+                }
+                let mut k: Keys = vec![("carrier", text(plain[0])), ("to", text(&to))];
                 if let Some(e) = o.get("ease") {
                     k.push(("ease", text(e)));
                 }
@@ -435,9 +424,26 @@ impl Importer {
                 }
                 self.step(cmd, k)?;
             }
-            "pass" => {
-                need(1, "pass <device>")?;
-                self.step("pass", vec![("device", text(plain[0]))])?;
+            // The carrier stopped on the antenna goes on (pass) or is diverted (divert).
+            "pass" | "divert" => {
+                let [name, carrier] = plain[..] else {
+                    return Err(format!("'{cmd}' is written: {cmd} <antenna> <carrier>"));
+                };
+                self.known_carrier(&format!("{cmd} {name} {carrier}"), carrier)?;
+                if !self.antennas().iter().any(|a| a.0 == name) {
+                    let own = self.list("device").iter().find_map(|t| {
+                        (t.str_opt("id").ok()?.as_deref() == Some(name)).then(|| t.str_opt("antenna").ok().flatten()).flatten()
+                    });
+                    return Err(match own {
+                        Some(a) => format!("'{cmd} {name}': write the antenna, {cmd} {a}"),
+                        None => self.antenna_point(name).unwrap_err(),
+                    });
+                }
+                let mut k: Keys = vec![("device", text(name)), ("carrier", text(carrier))];
+                if cmd == "divert" {
+                    k.push(("divert", Value::Bool(true)));
+                }
+                self.step("pass", k)?;
             }
             "needle" => {
                 need(2, "needle <device> down|up [duration=s]")?;
@@ -495,7 +501,8 @@ impl Importer {
     fn antenna_point(&self, antenna: &str) -> Result<String, String> {
         let antennas = self.antennas();
         antennas.iter().find(|a| a.0 == antenna).map(|a| a.1.clone()).ok_or_else(|| {
-            let names: Vec<&str> = antennas.iter().map(|a| a.0.as_str()).collect();
+            let mut names: Vec<&str> = antennas.iter().map(|a| a.0.as_str()).collect();
+            names.sort();
             format!("'{antenna}' is not an antenna of this scene (antennas: {})", if names.is_empty() { "none".to_string() } else { names.join(", ") })
         })
     }
@@ -574,24 +581,17 @@ impl Importer {
     fn carrier(&mut self, plain: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
         // Without sid= the carrier is empty: no tube, no sample.
         let (id, sample) = (o["id"], o.get("sid").copied());
-        let route: Vec<String> = match o.get("route") {
-            Some(r) => r.split(',').map(String::from).collect(),
-            None => {
-                let geometry = self.geometry.clone().ok_or("the geometry must be given before a carrier without route=")?;
-                let needle = o.get("needle").copied().unwrap_or("1");
-                let mut r: Vec<String> = default_route(&geometry, needle)
-                    .ok_or_else(|| format!("no default route for geometry '{geometry}' with needle={needle}: give route=a,b,c"))?
-                    .into_iter()
-                    .map(String::from)
-                    .collect();
-                // Only the first carrier starts on the panel.
-                if !self.samples.is_empty() && geometry != "sampling" {
-                    r.insert(0, "spawn".to_string());
-                }
-                r
-            }
+        if o.contains_key("route") || o.contains_key("needle") {
+            return Err("a carrier has no route= or needle=: its way comes from its move, pass and divert; where it starts, if not the default: start=<antenna|point>".into());
+        }
+        // Where it starts: the first carrier on the Main-Lane, the others off the
+        // panel (if the geometry has a place for them); an antenna stands for its point.
+        let start = match o.get("start") {
+            Some(s) => self.antennas().into_iter().find(|a| a.0 == *s).map_or_else(|| s.to_string(), |a| a.1),
+            None if !self.samples.is_empty() && self.list("point").iter().any(|t| t.str_opt("id").ok().flatten().as_deref() == Some("spawn")) => "spawn".to_string(),
+            None => "main_in".to_string(),
         };
-        let mut k: Keys = vec![("id", text(id)), ("tube", Value::Bool(sample.is_some())), ("route", Value::Arr(route.iter().map(|p| text(p)).collect()))];
+        let mut k: Keys = vec![("id", text(id)), ("tube", Value::Bool(sample.is_some())), ("start", text(&start))];
         if let Some(sid) = sample {
             k.push(("sample_id", text(sid)));
         }
@@ -626,6 +626,11 @@ impl Importer {
         let (from, to) = (self.actor(a), self.actor(b));
         let reply = arrow.starts_with("--");
         // "Sample Complete SampleId=X Needle=1": the parameters start at the first key=value.
+        // `<br/>` starts a new line of the label (drawn so): it also ends a word.
+        let mut label = label.to_string();
+        for br in ["<br/>", "<br />", "<br>", "<BR/>", "<BR />", "<BR>"] {
+            label = label.replace(br, " <br/> ");
+        }
         let words: Vec<&str> = label.split_whitespace().collect();
         let split = words.iter().position(|w| w.contains('=')).unwrap_or(words.len());
         let (body, params) = (words[..split].join(" "), &words[split..]);
@@ -867,12 +872,12 @@ mod tests {
         assert!(has(&d, "step", &[("action", "note"), ("duration", "6"), ("actor", "AN")]));
     }
 
-    const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle=both\n%% carrier id=C2 sid=SID-2 needle=2\n\
+    const ON: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n\
         %% move C1 to d1\n%% move C1 to s1\n%% at 0\n%% move C2 to w1\n\
         %% on antenna1\n%% id tube1\nIF->>AN: Add Tube SampleId=SID-1\nAN-->>IF: Fine\nAN->>DMX: Which tests? SampleId=SID-1\nDMX-->>AN: These\n\
         %% on antenna1 C2\n%% caption Second | The next one.\n%% on antenna1\nIF->>AN: Add Tube SampleId=SID-2\n%% after 0.2 tube1\nAN-->>IF: Late\n\
-        %% color #9333EA\n%% on antenna2\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
-        %% after 0.5 antenna2 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done sid=SID-1\n";
+        %% color #9333EA\n%% on antenna3\nIF->>AN: Again SampleId=SID-1\n%% after 1\nIF->>AN: Go SampleId=SID-1\n\
+        %% after 0.5 antenna3 C1\n%% caption Read | x\n%% pipette sp1 duration=2\n%% after 0.2 pipette sp1\nAN->>IF: Done sid=SID-1\n";
 
     #[test]
     fn on_after_and_color_set_the_moment_and_the_look() {
@@ -905,6 +910,56 @@ mod tests {
         let same = |a: f64, b: f64| assert!((a - b).abs() < 0.011, "{a} != {b}");
         same(at("Later"), at("Here") + 0.5);
         same(at("Last"), at("Fine") + 1.5 + 0.25);
+    }
+
+    #[test]
+    fn br_also_ends_a_word() {
+        // The parameters are read across the lines of the label.
+        let d = doc(&format!("{ON_HEAD}IF->>AN: OK SampleId=SID-1<br/>Needle=1\nIF->>AN: EAC^U07<br/>SAC-3: SID-1\n")).unwrap();
+        assert!(has(&d, "step", &[("text", "OK"), ("carrier", "C1"), ("needle", "1"), ("params", "SampleId={SampleId} <br/> Needle={Needle}")]));
+        assert!(has(&d, "step", &[("text", "EAC^U07 <br/> SAC-3: SID-1")]));
+    }
+
+    #[test]
+    fn pass_goes_on_and_divert_turns_into_the_lane() {
+        // At Divert 1 (antenna3) C1 turns into needle 1, C2 goes on to Divert 2.
+        let head = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n";
+        let d = doc(&format!("{head}%% divert antenna3 C1\n")).unwrap();
+        assert!(has(&d, "step", &[("action", "pass"), ("device", "antenna3"), ("carrier", "C1"), ("divert", "true")]));
+        let run = |body: &str| Scene::from_doc(&doc(&format!("{head}{body}")).unwrap()).and_then(|sc| Timeline::build(&sc).map(|_| sc));
+        let sc = run("%% move C1 to antenna3\n%% divert antenna3 C1\n%% move C2 to antenna3\n%% pass antenna3 C2\n%% on antenna5 C2\n%% divert antenna5 C2\n").unwrap();
+        let tail = |ci: usize, n: usize| sc.carriers[ci].route[sc.carriers[ci].route.len() - n..].join(",");
+        assert_eq!(tail(0, 5), "d1,q2,pc1,q1,s1");
+        assert_eq!(tail(1, 8), "d1,rj1,w2,d2,qb2,pc2,qb1,s2");
+        let err = |body: &str, what: &str| {
+            let e = run(body).err().unwrap_or_else(|| panic!("expected an error with '{what}'"));
+            assert!(e.contains(what), "'{e}' does not contain '{what}'");
+        };
+        // A ghost too: it starts on Divert 1 and turns into needle 1.
+        let g = Scene::from_doc(&doc(&format!("{head}%% carrier id=C2L sid=SID-2 start=antenna3 ghost\n%% divert antenna3 C2L\n")).unwrap()).unwrap();
+        Timeline::build(&g).unwrap();
+        assert_eq!(g.carriers[2].route.join(","), "d1,q2,pc1,q1,s1");
+        // Antenna 2 can't divert.
+        err("%% move C1 to antenna2\n%% divert antenna2 C1\n", "divert antenna2 C1: no lane turns off there: pass antenna2 C1");
+        assert!(run("%% move C1 to antenna2\n%% pass antenna2 C1\n").is_ok());
+        // The carrier written must be the one stopped there.
+        err("%% move C1 to antenna3\n%% move C2 to antenna3\n%% pass antenna3 C2\n", "the carrier stopped there at t=");
+        fails(&format!("{head}%% divert antenna3\n"), "'divert' is written: divert <antenna> <carrier>");
+        fails(&format!("{head}%% pass antenna3 C9\n"), "no carrier 'C9'");
+    }
+
+    #[test]
+    fn a_ghost_stops_behind_the_carrier_in_front_but_is_driven_through() {
+        let log = |carriers: &str, body: &str| {
+            let d = doc(&format!("%% geometry spur2\nsequenceDiagram\n{carriers}{body}")).unwrap();
+            build(&d).1.log.join("\n")
+        };
+        // C1 waits at Divert 1; the ghost of C2 goes there too and stops behind it.
+        let l = log("%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n%% carrier id=C2L sid=SID-2 start=antenna1 ghost\n", "%% move C1 to antenna3\n%% move C2L to antenna3\n");
+        assert!(l.contains("C2L -> d1  (stops behind C1"), "{l}");
+        // A ghost standing on antenna 2: C1 drives through it.
+        let l = log("%% carrier id=C1 sid=SID-1\n%% carrier id=C2L sid=SID-2 start=antenna2 ghost\n", "%% move C1 to antenna3\n");
+        assert!(l.contains("move      C1 -> d1\n") || l.ends_with("move      C1 -> d1"), "{l}");
     }
 
     const ON_HEAD: &str = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
@@ -941,7 +996,13 @@ mod tests {
         let d = doc(&format!("{HEAD}%% pipette sp\nNote over AN: Aspirating SID-1\nNote over AN: Other\n")).unwrap();
         assert_eq!(d.arrays["step"].iter().filter(|t| t.str_req("action").unwrap() == "note").count(), 1);
         assert!(has(&d, "step", &[("action", "pipette"), ("note", "Aspirating SID-1")]));
-        assert!(has(&doc(&format!("{HEAD}%% pass sp\n")).unwrap(), "step", &[("action", "pass"), ("device", "sp")]));
+        assert!(has(&doc(&format!("{HEAD}%% pass antenna2 C1\n")).unwrap(), "step", &[("action", "pass"), ("device", "antenna2"), ("carrier", "C1")]));
+        // Only antennas, not the names of the devices.
+        fails(&format!("{HEAD}%% pass sp C1\n"), "'pass sp': write the antenna, pass antenna2");
+        // A move to an antenna goes to its point.
+        assert!(has(&doc(&format!("{HEAD}%% move C1 to antenna2\n")).unwrap(), "step", &[("action", "move"), ("to", "sampling")]));
+        fails(&format!("{HEAD}%% move C1 to antenn2\n"), "'antenn2' is neither an antenna nor a point of this scene (antennas: antenna1, antenna2");
+        fails(&format!("{HEAD}%% divert an C1\n"), "'an' is not an antenna of this scene");
         let d = doc(&format!("{HEAD}%% pipette sp duration=4 sid=SID-1\n%% pipette sp sid=SID-2\n")).unwrap();
         assert!(has(&d, "step", &[("action", "pipette"), ("sample_id", "SID-1"), ("duration", "4")]) && has(&d, "step", &[("sample_id", "SID-2")]));
         fails(&format!("{HEAD}%% rotate sp sid=SID-1\n"), "only pipette does");
@@ -952,24 +1013,25 @@ mod tests {
     }
 
     #[test]
-    fn a_route_names_lanes_and_the_way_between_is_filled_in() {
-        let route = |r: &str| {
-            let d = doc(&format!("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 route={r}\n%% caption a | b\n")).unwrap();
-            build(&d).0.carriers[0].route.join(",")
+    fn the_way_of_a_carrier_comes_from_its_steps() {
+        let way = |body: &str| {
+            let d = doc(&format!("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2 start=antenna1 ghost\n{body}%% caption a | b\n")).unwrap();
+            build(&d).0.carriers.iter().map(|c| c.route.join(",")).collect::<Vec<_>>()
         };
-        assert_eq!(route("main_in,pit,main_out"), "main_in,nsd,pit_in,sampling,pit_out,merge,main_out");
-        // Points on a segment of a lane are part of the way.
-        assert_eq!(route("main_in,sampling"), "main_in,nsd,pit_in,sampling");
-        assert_eq!(route("main_in,main_out"), "main_in,nsd,merge,main_out");
-        let d = doc("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 route=main_in,pitt,main_out\n%% caption a | b\n").unwrap();
-        let e = Scene::from_doc(&d).err().unwrap();
-        assert!(e.contains("'pitt' is neither a point nor a lane"), "{e}");
+        // A move: the shortest way along the lanes; pass: on to the next stop or the end.
+        assert_eq!(way("%% move C1 to antenna2\n%% pass antenna2 C1\n")[0], "main_in,nsd,pit_in,sampling,pit_out,merge,main_out,gone");
+        assert_eq!(way("%% move C1 to main_out\n")[0], "main_in,nsd,merge,main_out");
+        // start=: where it is at the beginning (an antenna stands for its point).
+        assert_eq!(way("")[1], "nsd");
+        let e = |body: &str| Scene::from_doc(&doc(&format!("%% geometry sampling\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n{body}")).unwrap()).err().unwrap();
+        assert!(e("%% pass antenna2 C1\n").contains("'C1' is not sent to antenna2 before (move C1 to antenna2); it goes to 'main_in'"));
+        assert!(e("%% move C1 to main_out\n%% move C1 to nsd\n").contains("carrier 'C1' can't go from 'main_out' to 'nsd' along the lanes"));
     }
 
     #[test]
     fn the_belt_speed_is_in_the_video_settings() {
         let speed = |extra: &str| {
-            let d = doc(&format!("%% geometry sampling\n{extra}sequenceDiagram\n%% carrier id=C1 sid=SID-1 route=main_in,pit,main_out\n%% caption a | b\n")).unwrap();
+            let d = doc(&format!("%% geometry sampling\n{extra}sequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% caption a | b\n")).unwrap();
             build(&d).0.carriers[0].speed
         };
         // 11 px/cm on screen.
@@ -980,24 +1042,13 @@ mod tests {
     }
 
     #[test]
-    fn every_default_route_exists() {
-        for (g, needle) in [("sampling", "1"), ("turnstile", "1"), ("spur", "1"), ("spur2", "1"), ("spur2", "2"), ("spur2", "both")] {
-            let src = format!("%% geometry {g}\nsequenceDiagram\n%% carrier id=C1 sid=SID-1 needle={needle}\n%% carrier id=C2 sid=SID-2 needle={needle}\n%% move C1 to merge\n");
-            let d = doc(&src).unwrap_or_else(|e| panic!("{g}: {e}"));
-            if g != "turnstile" {
-                build(&d); // a move through the wheel needs rotations
-            }
-        }
-    }
-
-    #[test]
     fn import_errors() {
         fails("graph TD\n", "must start with");
         fails(&format!("{HEAD}%% mvoe C1 to nsd\n"), "unknown directive 'mvoe'");
         fails(&format!("{HEAD}%% move C1 nsd\n"), "'move' is written");
         fails(&format!("{HEAD}alt ok\nIF->>AN: A\nend\n"), "'alt' is not supported");
         fails(&format!("{HEAD}IF->>AN: Prepare SampleId=SID-9\n"), "no carrier has sample id 'SID-9'");
-        fails("sequenceDiagram\n%% carrier id=C1 sid=SID-1\n", "geometry must be given before");
+        fails(&format!("{HEAD}%% carrier id=C2 sid=SID-2 route=main_in,pit,gone\n"), "a carrier has no route= or needle=");
         fails(&format!("{HEAD}%% on antenna1\n%% at 3\nIF->>AN: A SampleId=SID-1\n"), "only one of");
         fails(&format!("{HEAD}%% at soon\nIF->>AN: A\n"), "needs seconds");
         fails(&format!("{HEAD}%% when C1 at nsd\nIF->>AN: A\n"), "'when' no longer exists");
@@ -1037,7 +1088,7 @@ mod tests {
             &[
                 ("a.mmd", "%% include common/b.mmd\nsequenceDiagram\nIF->>AN: Prepare SampleId=SID-1\n"),
                 ("common/b.mmd", "%% @point id=p x=1 y=1\n%% include c.mmd\n\n%% caption T | x\n"),
-                ("common/c.mmd", "%% carrier id=C1 sid=SID-1 route=p,p\n"),
+                ("common/c.mmd", "%% carrier id=C1 sid=SID-1 start=p\n"),
                 ("common/messages.mmd", "%% @message id=prepare from=IF to=AN text=Prepare params=\"SampleId={SampleId}\"\n"),
             ],
         );

@@ -11,11 +11,11 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,spur,gone
+    %% carrier id=C1 sid=SID-000123
 
     %% caption 1 · Spur | A carrier holding a sample tube travels along the Main-Lane towards the spur of the analyzer interface.
     %% at 2.2
-    %% move C1 to sampling
+    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping into a short piece of pit-lane that turns into the spur: Prepare. The gate stops it on the sampling point of the up branch: Sample Acquisition.
     %% on antenna1
@@ -77,7 +77,7 @@ sequenceDiagram
     %% after 1.5 status-2
     %% status analyzer normal
     %% after 1.9 status-2
-    %% pass sp
+    %% pass antenna2 C1
     %% on antenna3 C1
     %% caption 7 · Release | The carrier went round the spur and has left the interface module: the interface sends Release.
     %% on antenna3

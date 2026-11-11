@@ -15,15 +15,15 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,pit,gone color=#0EA5E9
-    %% carrier id=C3 sid=SID-000125 route=spawn,pit,gone color=#DB2777
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 color=#DB2777
 
     %% caption 1 · Three carriers | Three carriers holding sample tubes are diverted into the Pit-Lane, one after the other: for each one the interface sends Prepare and the analyzer asks DMX which tests to perform.
     %% at 2.2
-    %% move C1 to sampling
+    %% move C1 to antenna2
     %% at 2.6
-    %% move C2 to sampling
+    %% move C2 to antenna2
     %% at 3
     %% move C3 to queue
     %% on antenna1
@@ -94,7 +94,7 @@ sequenceDiagram
     %% after 0.2 ok-c1-2
     %% caption 5 · All carriers sent away — Clear All | Right after the reply to Cancel the interface sends Clear All, which cancels every Prepare, and sends every carrier away, without sampling. Once they have left the interface, it turns grey again.
     %% after 0.2 ok-c1-2
-    %% pass sp
+    %% pass antenna2 C2
     %% after 0.2 ok-c1-2
     %% move C3 to gone
     %% after 0.1 clear-all

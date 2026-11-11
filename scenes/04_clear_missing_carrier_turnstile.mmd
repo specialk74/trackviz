@@ -16,16 +16,16 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit_entry,pit_exit,gone
+    %% carrier id=C1 sid=SID-000123
     %% # The real C2: it is not diverted and goes straight on the Main-Lane.
-    %% carrier id=C2 sid=SID-000124 route=spawn,gone color=#0EA5E9
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
     %% # Where the interface believes C2 is: diverted into the Pit-Lane, up to the antenna.
-    %% carrier id=C2L sid=SID-000124 route=nsd,pit_wait color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
-    %% carrier id=C3 sid=SID-000125 route=spawn,pit_entry,pit_exit,gone color=#DB2777
+    %% carrier id=C2L sid=SID-000124 start=antenna1 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% carrier id=C3 sid=SID-000125 color=#DB2777
 
     %% caption 1 · Turnstile with gate and antenna | Three carriers holding sample tubes travel towards the interface. Every carrier diverted into the Pit-Lane stops at the antenna in front of the gate and the turnstile.
     %% at 2.6
-    %% move C1 to pit_wait
+    %% move C1 to antenna2
     %% on antenna1 C1
     %% caption 2 · Diverted — Prepare — antenna | The first carrier is diverted without stopping (Prepare) and read at the antenna (Prepare again). Nothing is being sampled, so the gate opens, the carrier enters and the wheel brings it under the needle.
     %% on antenna1
@@ -47,7 +47,7 @@ sequenceDiagram
     %% after 0.1 query-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
     %% after 0.1 ok-c1-2
-    %% pass antenna2
+    %% pass antenna2 C1
     %% after 0.15
     %% rotate ts
     %% after 0.25
@@ -67,7 +67,7 @@ sequenceDiagram
     %% on antenna1 C2
     %% show C2L duration=0.4
     %% on antenna1 C2
-    %% move C2L to pit_wait
+    %% move C2L to antenna2
     %% on antenna1
     %% id prepare-c2
     IF->>AN: Prepare SampleId=SID-000124
@@ -78,7 +78,7 @@ sequenceDiagram
     AN-->>IF: OK SampleId=SID-000124
 
     %% at 15.9
-    %% move C3 to pit_wait
+    %% move C3 to antenna2
     %% on antenna1 C3
     %% caption 5 · Third carrier — Clear | The third carrier is diverted (Prepare) and stops at the antenna on top of the second one, which is not there. The antenna reads the third sample instead of the second: the interface sends Clear for the second.
     %% on antenna1
@@ -121,7 +121,7 @@ sequenceDiagram
     %% after 0.1
     %% for C1
     IF-->>AN: OK
-    %% pass antenna2
+    %% pass antenna2 C3
     %% after 0.15
     %% rotate ts
     %% after 0.15
