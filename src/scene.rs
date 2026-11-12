@@ -1076,7 +1076,9 @@ impl Scene {
     /// end. Its route says where it goes; `divert` must be on a divert where the
     /// route turns into a lane, `pass` where it goes straight on.
     #[allow(clippy::too_many_arguments)]
-    fn pass_move(&self, device: &str, divert: bool, who: Option<&str>, speed: Option<f64>, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
+    /// `strict`: false while the layout is not settled yet (the moves may still
+    /// change), when the carrier written is taken even if another one is there.
+    fn pass_move(&self, device: &str, divert: bool, who: Option<&str>, speed: Option<f64>, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str, strict: bool) -> Result<Action, String> {
         let cmd = if divert { "divert" } else { "pass" };
         // Only antennas: the antenna of a device is named instead of the device.
         let d = self.devices.iter().find(|d| d.id == device && d.kind == DeviceKind::Antenna).ok_or_else(|| {
@@ -1096,6 +1098,10 @@ impl Scene {
         let real = (0..self.carriers.len()).find(|&ci| stopped_here(ci) && !paths[ci].ghost && paths[ci].opacity(t) > 0.0);
         let ci = match who.and_then(|w| self.carrier_idx(w)) {
             Some(wi) if self.carriers[wi].ghost && stopped_here(wi) => wi,
+            Some(wi) if !strict => wi,
+            // The carrier written is stopped there. Another one may look stopped there
+            // too, when the step that sends it on is written later in the file.
+            Some(wi) if stopped_here(wi) && paths[wi].opacity(t) > 0.0 => wi,
             Some(wi) => match real {
                 Some(ci) if ci == wi => ci,
                 Some(ci) => return Err(format!("{loc}: {cmd} {device} {}: the carrier stopped there at t={t:.2}s is '{}', not '{}'", self.carriers[wi].id, self.carriers[ci].id, self.carriers[wi].id)),
@@ -1623,7 +1629,8 @@ impl Timeline {
         let mut carriers = Vec::new();
         let mut cur_idx = Vec::new();
         // A carrier whose last move ended in a queue: (the carrier in front, line).
-        let mut stuck: Vec<Option<(usize, String)>> = vec![None; sc.carriers.len()];
+        // (the carrier in front, line, where it stopped along its route).
+        let mut stuck: Vec<Option<(usize, String, f64)>> = vec![None; sc.carriers.len()];
         for c in &sc.carriers {
             let pts: Vec<(f64, f64)> = c.route.iter().map(|p| sc.pt(p)).collect();
             let mut cum = vec![0.0];
@@ -1698,11 +1705,16 @@ impl Timeline {
                             sc.devices.iter().find(|d| d.kind == DeviceKind::Antenna && d.at.as_deref() == Some(p)).map_or_else(|| format!("'{p}'"), |d| d.id.clone())
                         };
                         match &stuck[ci] {
-                            Some((b, line)) if i <= cur_idx[ci] => {
+                            Some((b, line, stop)) if i <= cur_idx[ci] => {
                                 let who = &sc.carriers[*b].id;
-                                let there = name(&sc.carriers[*b].route[cur_idx[*b]]);
+                                // The one in front waits at the next stop after where this one stopped.
+                                let stops = sc.stops();
+                                let route = &sc.carriers[ci].route;
+                                let there = (0..route.len())
+                                    .find(|&j| path.cum[j] > stop + 1.0 && stops.contains(&route[j]))
+                                    .map_or_else(|| name(&sc.carriers[*b].route[cur_idx[*b]]), |j| name(&route[j]));
                                 format!(
-                                    "{}: '{carrier}' never gets to {}: after {line} it stops behind '{who}', which stays on {there} because no step before this one sends it on (e.g. pass {there} {who})",
+                                    "{}: '{carrier}' never gets to {}: after {line} it stops behind '{who}', which stays on {there} because no step in the file sends it on (e.g. pass {there} {who})",
                                     st.loc,
                                     name(point)
                                 )
@@ -1719,7 +1731,7 @@ impl Timeline {
             // `pass`: a move of the carrier stopped on the device, to its next stop.
             let passed;
             let action = match &st.action {
-                Action::Pass { device, divert, carrier, speed } => match sc.pass_move(device, *divert, carrier.as_deref(), *speed, &carriers, &cur_idx, &attached, t0, &st.loc) {
+                Action::Pass { device, divert, carrier, speed } => match sc.pass_move(device, *divert, carrier.as_deref(), *speed, &carriers, &cur_idx, &attached, t0, &st.loc, check) {
                     Ok(a) => {
                         passed = a;
                         &passed
@@ -1782,7 +1794,7 @@ impl Timeline {
                         wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
                     }
                     stuck[ci] = match (done.end, done.waits.first()) {
-                        (None, Some(w)) => Some((w.2, format!("line {}", st.loc.rsplit("line ").next().unwrap_or(&st.loc)))),
+                        (None, Some(w)) => Some((w.2, format!("line {}", st.loc.rsplit("line ").next().unwrap_or(&st.loc)), done.segs.last().map_or(0.0, |g| g.s1))),
                         _ => None,
                     };
                     let mut tag = if *runaway { "  (run-away)".to_string() } else { String::new() };
@@ -2060,6 +2072,10 @@ fn source_lines(events: &[Timed]) -> Vec<(f64, String)> {
     let mut v = Vec::new();
     for e in events {
         let Some((f, n)) = &e.at else { continue };
+        // A step not written in a file (the caption of the video up to an error).
+        if *n == 0 {
+            continue;
+        }
         if !seen.insert((f.clone(), *n)) {
             continue;
         }

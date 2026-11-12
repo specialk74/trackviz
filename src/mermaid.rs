@@ -969,7 +969,38 @@ mod tests {
             %% move C1 to antenna2\n%% at 1\n%% move C2 to antenna2\n%% on antenna2 C2\nIF->>AN: A\n";
         let sc = Scene::from_doc(&doc(src).unwrap()).unwrap();
         let e = Timeline::build(&sc).err().unwrap();
-        assert!(e.contains("'C2' never gets to antenna2: after line 7 it stops behind 'C1', which stays on antenna2 because no step before this one sends it on (e.g. pass antenna2 C1)"), "{e}");
+        assert!(e.contains("'C2' never gets to antenna2: after line 7 it stops behind 'C1', which stays on antenna2 because no step in the file sends it on (e.g. pass antenna2 C1)"), "{e}");
+    }
+
+    #[test]
+    fn a_fast_carrier_goes_in_before_a_slow_one_that_gets_to_the_merge_later() {
+        // C1 is sampled on needle 1; C2 creeps up the spur. When C1 leaves its pit-lane
+        // it gets to the merge (rj1) long before C2: it goes in front, C2 follows.
+        let src = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n\
+            %% move C1 to antenna3\n%% at 0.5\n%% move C2 to antenna3\n%% on antenna3 C1\n%% divert antenna3 C1\n\
+            %% on antenna4 C1\n%% id at-s1\n%% pass antenna3 C2 duration=15\n%% after 1 at-s1\n%% pass antenna4 C1\n\
+            %% on antenna5 C1\n%% pass antenna5 C1\n%% on antenna5 C2\n%% pass antenna5 C2\n";
+        let sc = Scene::from_doc(&doc(src).unwrap()).unwrap();
+        let tl = Timeline::build(&sc).unwrap();
+        let at_d2 = |c: &str| -> f64 {
+            let l = tl.log.iter().find(|l| l.contains(&format!("move      {c} -> d2"))).unwrap();
+            assert!(!l.contains("waits"), "{l}");
+            l.split_whitespace().nth(2).unwrap().trim_end_matches('s').parse().unwrap()
+        };
+        assert!(at_d2("C1") < at_d2("C2"), "{:?}", tl.log);
+    }
+
+    #[test]
+    fn a_pass_written_before_the_pass_of_the_carrier_in_front_is_right() {
+        // C1 and C2 both on needle 1; the pass of C2 is written before the one of C1,
+        // which happens earlier: when C2 is on antenna4, C1 has already gone.
+        let src = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n\
+            %% move C1 to antenna3\n%% at 0.5\n%% move C2 to antenna3\n%% on antenna3 C1\n%% divert antenna3 C1\n\
+            %% on antenna3 C2\n%% divert antenna3 C2\n%% on antenna4 C2\n%% pass antenna4 C2\n\
+            %% on antenna4 C1\n%% id at-s1\n%% caption a | b\n%% after 1 at-s1\n%% pass antenna4 C1\n";
+        let sc = Scene::from_doc(&doc(src).unwrap()).unwrap();
+        let tl = Timeline::build(&sc).unwrap_or_else(|e| panic!("{e}"));
+        assert!(tl.log.iter().any(|l| l.contains("C2 -> d2")), "{:?}", tl.log);
     }
 
     #[test]

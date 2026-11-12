@@ -891,16 +891,22 @@ fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
     o.push_str("</g></g>");
 }
 
+/// The title of the caption that shows where a scene breaks (the video up to the
+/// error): its band is red.
+pub const ERROR_TITLE: &str = "Error";
+
 fn caption(o: &mut String, tl: &Timeline, t: f64) {
     let cur = tl.events.iter().filter(|e| matches!(e.ev, Ev::Caption { .. }) && e.t0 <= t).max_by(|a, b| a.t0.total_cmp(&b.t0));
-    let _ = write!(o, r#"<rect x="30" y="{CAPTION_Y}" width="1860" height="150" rx="16" fill="{INK}"/>"#);
+    let error = cur.is_some_and(|e| matches!(&e.ev, Ev::Caption { title, .. } if title.starts_with(ERROR_TITLE)));
+    let band = if error { "#991B1B" } else { INK };
+    let _ = write!(o, r#"<rect x="30" y="{CAPTION_Y}" width="1860" height="150" rx="16" fill="{band}"/>"#);
     if let Some(e) = cur {
         if let Ev::Caption { title, text } = &e.ev {
             let a = clamp01((t - e.t0) / 0.4);
             let _ = write!(o, r#"<g opacity="{a:.2}">"#);
             let mut y = CAPTION_Y + 42.0;
             if !title.is_empty() {
-                let _ = write!(o, r#"<text x="64" y="{y}" font-size="17" font-weight="700" letter-spacing="1.5" fill="{ACCENT}">{}</text>"#, esc(&title.to_uppercase()));
+                let _ = write!(o, r#"<text x="64" y="{y}" font-size="17" font-weight="700" letter-spacing="1.5" fill="{}">{}</text>"#, if error { "#FECACA" } else { ACCENT }, esc(&title.to_uppercase()));
                 y += 40.0;
             } else {
                 y += 14.0;

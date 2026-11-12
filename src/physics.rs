@@ -150,8 +150,9 @@ pub fn simulate(paths: &[CarrierPath], plans: &[Plan], twin: &[Option<usize>]) -
             })
             .collect();
         // Two moving carriers whose ways cross: the one already on the way of the
-        // other goes first (the other one follows it); otherwise the one nearer
-        // to the crossing, and on a tie the one declared first. The other one keeps
+        // other goes first (the other one follows it); otherwise the one that gets
+        // to the crossing first, at its own speed (a slow carrier lets a fast one
+        // in), and on a tie the one declared first. The other one keeps
         // clear of its way. first[i][j]: i goes before j.
         let mut first = vec![vec![false; n]; n];
         for i in 0..n {
@@ -167,7 +168,15 @@ pub fn simulate(paths: &[CarrierPath], plans: &[Plan], twin: &[Option<usize>]) -
                     match (on_way(&way[j], obstacles[i]), on_way(&way[i], obstacles[j])) {
                         (true, false) => true,
                         (false, true) => false,
-                        _ => ai <= aj,
+                        _ => {
+                            // Time to the crossing, at the speed of its move.
+                            let eta = |c: usize, a: usize| {
+                                let p = &plans[run[c].as_ref().unwrap().plan];
+                                let v = (p.s1 - p.s0).abs() / p.dur.max(1e-9);
+                                a as f64 * SWEEP_STEP / v.max(1e-9)
+                            };
+                            eta(i, ai) <= eta(j, aj) + 1e-9
+                        }
                     }
                 });
                 if i_first {

@@ -208,6 +208,12 @@ Only one of `on`, `after`, `at` per step.
 step started last: file, line number and its text (`13_spur2_happy_path.mmd:86 · AN->>IF: Sample Complete …`),
 to find in the file what you see. `%% @video show_line=false` hides it.
 
+**A scene that breaks.** When a scene has an error, rendering it still writes
+`out/<scene>_error.mp4`: the video up to the step where it breaks (the longest beginning
+of the scene that works), ending with a red caption with the error and its line. You
+see the carriers as they are when it breaks (e.g. one stopped on a gate, another queued
+behind it). The error is also printed, as with `--check`, and the command fails.
+
 
 ### The track
 
