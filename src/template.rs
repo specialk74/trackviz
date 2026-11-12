@@ -201,6 +201,8 @@ const SPUR2: &str = "    %% move C1 to antenna2
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::{Scene, Timeline};
+    use crate::{lint, mermaid};
     use std::path::Path;
 
     /// Every skeleton is a valid scene at any belt speed, and without warnings at
@@ -213,13 +215,13 @@ mod tests {
                 let text = scene("Test", g, 3).unwrap().replacen("sequenceDiagram\n", &format!("{belt}sequenceDiagram\n"), 1);
                 let path = std::env::temp_dir().join(format!("trackviz_new_{g}_{}.mmd", belt.len()));
                 std::fs::write(&path, text).unwrap();
-                let doc = crate::mermaid::load(&path, scenes).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
-                let sc = crate::scene::Scene::from_doc(&doc).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
-                let tl = crate::scene::Timeline::build(&sc).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
+                let doc = mermaid::load(&path, scenes).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
+                let sc = Scene::from_doc(&doc).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
+                let tl = Timeline::build(&sc).unwrap_or_else(|e| panic!("{g} {belt}: {e}"));
                 // The order of the messages in the file matches the video only within
                 // a range of speeds: no warnings at the usual ones.
                 if belt.contains("=10") || belt.contains("=17.5") {
-                    let w = crate::lint::warnings(&sc, &tl);
+                    let w = lint::warnings(&sc, &tl);
                     assert!(w.is_empty(), "{g} {belt}: {w:?}");
                 }
                 let _ = std::fs::remove_file(path);
