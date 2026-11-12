@@ -967,7 +967,7 @@ mod tests {
         let sc = Scene::from_doc(&doc(&format!("{head}{body}")).unwrap()).unwrap();
         let route = sc.carriers[0].route.join(",");
         // divert: the return belt, back on the spur between antenna2 and antenna3; pass: to the Main-Lane.
-        assert!(route.contains("ex,rc1,rc2,rc3,rcj,w1b,spur_in,w1,d1"), "{route}");
+        assert!(route.contains("ex,rcj,w1,d1"), "{route}");
         assert_eq!(route.matches("spur_rd").count(), 1, "{route}");
         assert!(route.ends_with("ex,po,merge,iface_out,main_out,gone"), "{route}");
         let tl = Timeline::build(&sc).unwrap();

@@ -16,6 +16,9 @@ const GLOVE: &str = "#3B82F6";
 // Layout of the two panels and the caption band (in the 1920x1080 space).
 const TRACK: (f64, f64, f64, f64) = (30.0, 120.0, 920.0, 765.0);
 const SEQ: (f64, f64, f64, f64) = (970.0, 120.0, 920.0, 765.0);
+/// Radius of a carrier as drawn: 90% of CARRIER_R, which stays the size for the
+/// physics and the scale (so the times of the videos don't change).
+const DRAW_R: f64 = 0.9 * CARRIER_R;
 const CAPTION_Y: f64 = 905.0;
 
 /// Sequence diagram: below this row height the diagram scrolls instead of
@@ -253,7 +256,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
             let poly: String = pts.iter().map(|(x, y)| format!("{x},{y} ")).collect();
             let _ = write!(
                 o,
-                r##"<polyline points="{poly}" fill="none" stroke="#AEB8C5" stroke-width="40" stroke-linejoin="round"/><polyline points="{poly}" fill="none" stroke="#DDE3EA" stroke-width="34" stroke-linejoin="round"/>"##
+                r##"<polyline points="{poly}" fill="none" stroke="#AEB8C5" stroke-width="36" stroke-linejoin="round"/><polyline points="{poly}" fill="none" stroke="#DDE3EA" stroke-width="30.6" stroke-linejoin="round"/>"##
             );
             // Direction chevrons
             for w in pts.windows(2) {
@@ -369,7 +372,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
                 }
                 for p in 0..3 {
                     let (px, py) = w.pocket_pos(p, t);
-                    let _ = write!(o, r##"<circle cx="{px:.1}" cy="{py:.1}" r="27" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>"##);
+                    let _ = write!(o, r##"<circle cx="{px:.1}" cy="{py:.1}" r="24.3" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>"##);
                 }
                 let _ = write!(o, r##"<circle cx="{cx}" cy="{cy}" r="12" fill="#64748B"/>"##);
                 // The sampling position (under the needle) is fixed.
@@ -391,8 +394,8 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
                     .iter()
                     .map(|&(a, b)| Ease::InOut.apply(((t - (a - GATE_TIME)) / GATE_TIME).min((b + GATE_TIME - t) / GATE_TIME)))
                     .fold(0.0, f64::max);
-                let (px, py) = (gx + nx * 30.0, gy + ny * 30.0);
-                let len = 60.0 * (1.0 - open);
+                let (px, py) = (gx + nx * 27.0, gy + ny * 27.0);
+                let len = 54.0 * (1.0 - open);
                 if let Some(a) = glow {
                     let _ = write!(o, r#"<circle cx="{gx}" cy="{gy}" r="38" fill="none" stroke="{ACCENT}" stroke-width="8" opacity="{a:.2}"/>"#);
                 }
@@ -425,7 +428,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
                         let _ = write!(
                             o,
                             r##"<circle cx="{ax}" cy="{ay}" r="{:.1}" fill="none" stroke="#2563EB" stroke-width="2.5" opacity="{:.2}"/>"##,
-                            CARRIER_R + 4.0 + 18.0 * phase,
+                            DRAW_R + 4.0 + 18.0 * phase,
                             0.7 * (1.0 - phase)
                         );
                     }
@@ -433,7 +436,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
                 let coil = if reading { "#2563EB" } else { "#64748B" };
                 let _ = write!(
                     o,
-                    r##"<g transform="translate({ax} {ay}) rotate({deg:.1})"><rect x="-9" y="-15" width="18" height="30" rx="4" fill="#CBD5E1" stroke="#334155" stroke-width="2"/><rect x="-5" y="-10" width="10" height="20" rx="2" fill="none" stroke="{coil}" stroke-width="1.8"/></g>"##
+                    r##"<g transform="translate({ax} {ay}) rotate({deg:.1})"><rect x="-8" y="-13.5" width="16" height="27" rx="4" fill="#CBD5E1" stroke="#334155" stroke-width="2"/><rect x="-4.5" y="-9" width="9" height="18" rx="2" fill="none" stroke="{coil}" stroke-width="1.8"/></g>"##
                 );
             }
             DeviceKind::Antenna => {}
@@ -471,34 +474,34 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
         let _ = write!(o, r#"<g opacity="{:.2}">"#, op[ci]);
         if tl.carriers[ci].running_away(t) {
             let a = 0.35 + 0.45 * (t * 2.0 * std::f64::consts::PI * 2.0).sin().abs();
-            let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="31" fill="none" stroke="#DC2626" stroke-width="5" opacity="{a:.2}"/>"##);
+            let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="27.9" fill="none" stroke="#DC2626" stroke-width="5" opacity="{a:.2}"/>"##);
         }
         if c.ghost {
             let _ = write!(
                 o,
-                r##"<circle cx="{x:.1}" cy="{y:.1}" r="26" fill="#FFFFFF" fill-opacity="0.6" stroke="#475569" stroke-width="2.5" stroke-dasharray="6 4"/>"##
+                r##"<circle cx="{x:.1}" cy="{y:.1}" r="23.4" fill="#FFFFFF" fill-opacity="0.6" stroke="#475569" stroke-width="2.5" stroke-dasharray="6 4"/>"##
             );
             if c.tube {
                 let _ = write!(
                     o,
-                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="11" fill="none" stroke="{}" stroke-width="2.5" stroke-dasharray="4 3"/>"##,
+                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="9.9" fill="none" stroke="{}" stroke-width="2.5" stroke-dasharray="4 3"/>"##,
                     c.cap_color
                 );
             }
         } else {
             let _ = write!(
                 o,
-                r##"<circle cx="{:.1}" cy="{:.1}" r="23" fill="#0F172A" opacity="0.18"/><circle cx="{x:.1}" cy="{y:.1}" r="22" fill="#334155" stroke="#1E293B" stroke-width="2"/>"##,
+                r##"<circle cx="{:.1}" cy="{:.1}" r="20.7" fill="#0F172A" opacity="0.18"/><circle cx="{x:.1}" cy="{y:.1}" r="19.8" fill="#334155" stroke="#1E293B" stroke-width="2"/>"##,
                 x + 2.0, y + 3.0
             );
             if c.tube {
                 let _ = write!(
                     o,
-                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="13" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/><circle cx="{x:.1}" cy="{y:.1}" r="9.5" fill="{}"/>"##,
+                    r##"<circle cx="{x:.1}" cy="{y:.1}" r="11.7" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/><circle cx="{x:.1}" cy="{y:.1}" r="8.6" fill="{}"/>"##,
                     c.cap_color
                 );
             } else {
-                let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="12" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>"##);
+                let _ = write!(o, r##"<circle cx="{x:.1}" cy="{y:.1}" r="10.8" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>"##);
             }
         }
         o.push_str("</g>");
@@ -521,7 +524,7 @@ fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers: bool) {
             tag.push_str(" · RUN-AWAY");
         }
         let w = 16.0 + tag.chars().count() as f64 * 9.0;
-        let cands = [(x + 30.0, y - 13.0), (x - 30.0 - w, y - 13.0), (x - w / 2.0, y + 30.0), (x - w / 2.0, y - 56.0)];
+        let cands = [(x + 27.0, y - 13.0), (x - 27.0 - w, y - 13.0), (x - w / 2.0, y + 27.0), (x - w / 2.0, y - 53.0)];
         let inside = |(tx, ty): (f64, f64)| tx > TRACK.0 + 8.0 && tx + w < TRACK.0 + TRACK.2 - 8.0 && ty > TRACK.1 && ty + 26.0 < TRACK.1 + TRACK.3;
         let free = |(tx, ty): (f64, f64)| {
             taken.iter().all(|&(k, b)| k == ci || tx >= b.2 || tx + w <= b.0 || ty >= b.3 || ty + 26.0 <= b.1)
