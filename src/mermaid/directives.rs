@@ -1,6 +1,9 @@
 //! The `%%` directives.
 
 use super::*;
+use super::suggest::suggest;
+use crate::doc::{parse_line, Table, Value};
+use std::collections::HashMap;
 
 /// `key=value` options after the words of a directive.
 fn options<'a>(words: &[&'a str]) -> (Vec<&'a str>, HashMap<&'a str, &'a str>) {

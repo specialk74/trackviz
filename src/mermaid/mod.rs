@@ -15,12 +15,11 @@ mod lines;
 mod suggest;
 mod timing;
 
-use crate::doc::{parse_line, Doc, Table, Value};
+use crate::doc::{Doc, Value};
 use importer::Importer;
-use lines::{read_into, read_lines, Line};
+use lines::{read_lines, Line};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use suggest::suggest;
+use std::path::Path;
 
 /// Keys of a table being built.
 type Keys = Vec<(&'static str, Value)>;

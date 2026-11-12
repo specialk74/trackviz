@@ -1,6 +1,7 @@
 //! Antennas, the devices `pipette` and `needle` work on, known carriers.
 
 use super::*;
+use crate::doc::Table;
 
 impl Importer {
     /// The antennas of the scene, also those declared on a device: (id, point).

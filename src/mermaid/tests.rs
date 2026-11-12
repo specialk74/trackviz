@@ -1,5 +1,7 @@
 use super::*;
+use crate::doc::{Doc, Value};
 use crate::scene::{Ev, Scene, Timeline};
+use std::path::{Path, PathBuf};
 
 /// The messages and notes of a timeline as Mermaid arrows, in the order of the
 /// sequence diagram rows.

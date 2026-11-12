@@ -1,6 +1,7 @@
 //! The lines of the Mermaid diagram itself: messages and notes.
 
 use super::*;
+use crate::doc::{Table, Value};
 
 /// A message of the shared library.
 pub struct MsgType {

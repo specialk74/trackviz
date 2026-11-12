@@ -2,6 +2,9 @@
 //! tables it adds.
 
 use super::*;
+use super::lines::read_into;
+use crate::doc::{Doc, Table, Value};
+use std::path::{Path, PathBuf};
 
 /// Turns a diagram into the data of a scene.
 pub(super) struct Importer {
