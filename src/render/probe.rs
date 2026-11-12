@@ -1,6 +1,10 @@
 //! The probe of the analyzer, drawn above the carrier.
 
 use super::*;
+use super::devices::{device_state, needle_bands};
+use super::track::Ctx;
+use crate::scene::{AnalyzerState, DeviceKind, Ease, Ev, TS_RIM};
+use std::fmt::Write;
 
 /// Analyzer probe: a `pipette` (down, aspirate, up) or the needle moved by
 /// `needle` steps (it stays down in between).

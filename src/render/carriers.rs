@@ -1,6 +1,9 @@
 //! The carriers and their tags.
 
 use super::*;
+use super::track::Ctx;
+use crate::scene::DeviceKind;
+use std::fmt::Write;
 
 /// The carriers. SampleId tags go right of the carrier if there is room,
 /// otherwise left, below or above: whichever doesn't cover other carriers or tags.

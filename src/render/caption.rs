@@ -1,6 +1,8 @@
 //! The caption band.
 
 use super::*;
+use crate::scene::{Ev, Timeline};
+use std::fmt::Write;
 
 /// Caption lines, and how many of them fit in the band.
 pub fn caption_lines(title: &str, text: &str) -> (Vec<String>, usize) {

@@ -2,6 +2,8 @@
 //! don't fit.
 
 use super::*;
+use crate::scene::{label_lines, Ease, Ev, Scene, Timeline};
+use std::fmt::Write;
 
 pub(super) fn sequence(o: &mut String, sc: &Scene, tl: &Timeline, t: f64) {
     let n = sc.actors.len().max(1) as f64;

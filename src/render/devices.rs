@@ -2,6 +2,9 @@
 //! glows (`glow`: its opacity).
 
 use super::*;
+use super::track::Ctx;
+use crate::scene::{AnalyzerState, Device, DeviceKind, Ease, Ev, Scene, Timeline, GATE_TIME, TS_RIM};
+use std::fmt::Write;
 
 /// Device `di`, with its glow while a `highlight` is on.
 pub(super) fn device(o: &mut String, c: &Ctx, di: usize, d: &Device) {

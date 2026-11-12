@@ -2,6 +2,9 @@
 //! the list of the devices.
 
 use super::*;
+use super::track::track;
+use crate::scene::{Device, DeviceKind, Point, Scene, Timeline};
+use std::fmt::Write;
 
 /// Where a device is drawn, for the layout.
 fn device_place(sc: &Scene, d: &Device) -> (f64, f64) {

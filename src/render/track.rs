@@ -2,6 +2,10 @@
 //! of the analyzer, in this order (later ones on top).
 
 use super::*;
+use super::devices::device_state;
+use super::operator::operator;
+use crate::scene::{AnalyzerState, DeviceKind, Ev, LaneKind, Scene, Timeline};
+use std::fmt::Write;
 
 /// What every part of the track is drawn for: the scene, its timeline, the instant.
 #[derive(Clone, Copy)]

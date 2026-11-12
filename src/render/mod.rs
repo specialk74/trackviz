@@ -18,13 +18,11 @@ mod track;
 pub use caption::{caption_lines, ERROR_TITLE};
 pub use layout::layout;
 use caption::caption;
-use devices::{device_state, needle_bands};
-use operator::operator;
+use crate::scene::{Ev, Scene, Timed, Timeline, CARRIER_R};
 use sequence::sequence;
-use track::{track, Ctx};
-
-use crate::scene::*;
 use std::fmt::Write;
+use track::track;
+
 
 const FONT: &str = "Inter, 'DejaVu Sans', sans-serif";
 const MONO: &str = "'DejaVu Sans Mono', monospace";

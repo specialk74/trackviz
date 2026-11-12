@@ -1,6 +1,8 @@
 //! The lab operator working on the analyzer.
 
 use super::*;
+use crate::scene::{Device, Ease};
+use std::fmt::Write;
 
 /// Stylized clinical lab operator (front view: white lab coat, thin blue
 /// gloves): walks in during the first part of the step, works on the analyzer
