@@ -127,8 +127,20 @@ trackviz/
     ├── index.rs          # trackviz index: pagina con l'elenco dei video
     ├── sort.rs           # trackviz sort: riordina una scena per tempo
     ├── lint.rs           # avvisi su scene valide (carrier sovrapposti, didascalie tagliate, ...)
-    ├── scene.rs          # modello della scena, validazione, calcolo timeline
-    ├── scene_tests.rs    # unit test di scene.rs (scene di prova minime + tutte le scene in scenes/)
+    ├── scene/            # modello della scena, validazione, calcolo timeline
+    │   ├── mod.rs        # tipi (Scene, Device, Carrier, Step, Action, ...) e ricerche per id
+    │   ├── load.rs       # Scene::from_doc: una funzione per sezione (video, punti, device, corsie, ...)
+    │   ├── lanes.rs      # corsie come percorsi e come grafo (LaneGraph), direzione di marcia
+    │   ├── routes.rs     # percorso dei carrier dai loro step, fermate, pit-lane piena
+    │   ├── path.rs       # CarrierPath: posizione di un carrier nel tempo
+    │   ├── wheels.rs     # tornelli: ruota, tasche, controlli in ordine di tempo
+    │   ├── timeline/
+    │   │   ├── mod.rs    # Timeline, eventi, ciclo di assestamento con la fisica
+    │   │   ├── layout.rs # Layout: lo stato mentre si dispongono gli step, quando parte uno step
+    │   │   ├── steps.rs  # una funzione per tipo di step (move, rotate, show/hide, messaggi, ...)
+    │   │   ├── pass.rs   # pass/divert: il move del carrier fermo sull'antenna
+    │   │   └── finish.rs # dopo gli step: righe del diagramma, controlli, letture, gate
+    │   └── tests.rs      # unit test (scene di prova minime + tutte le scene in scenes/)
     └── render.rs         # generazione dell'SVG di un fotogramma (con i suoi test)
 ```
 
@@ -201,7 +213,7 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 - `Table` offre accessor tipizzati (`str_opt/str_req`, `num_opt/num_req`, `bool_opt`, `str_list`) e `check_keys(allowed)`, che **rifiuta le chiavi sconosciute** (protegge dagli errori di battitura). Ogni tabella ricorda file e riga da cui viene, per gli errori.
 - `mermaid.rs`: legge il diagramma con i suoi `%% include`, i file comuni e la geometria, e trasforma direttive, messaggi e righe `@` in tabelle.
 
-### 7.2 `scene.rs` — modello e timeline
+### 7.2 `scene/` — modello e timeline
 
 **Modello:** `Video`, `Point`, `Lane` (Main/Pit/Link), `Device` (Nsd/Sampling/Analyzer/Zone), `Actor`, `Carrier`, `Step` con `Action`.
 
@@ -463,7 +475,7 @@ Miglioramenti proposti e punti da confermare: vedi [`IMPROVEMENTS.md`](IMPROVEME
 
 ## 12. Limiti noti e note per chi riparte
 
-- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid.rs`), della timeline (`scene_tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
+- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid.rs`), della timeline (`scene/tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
 
 - Le righe `@` non hanno testo su più righe: un valore lungo va su una riga sola.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
