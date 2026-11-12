@@ -119,7 +119,18 @@ trackviz/
 │   └── common/           # parti comuni .mmd: video, attori, messaggi, geometrie, direttive
 ├── out/                  # video generati, immagini di layout e fogli riassuntivi, index.html
 └── src/
-    ├── main.rs           # CLI, rasterizzazione resvg → ffmpeg (RGBA grezzo), thread worker
+    ├── main.rs           # solo i moduli e main()
+    ├── cli/              # la riga di comando
+    │   ├── mod.rs        # opzioni (run), Job (cosa chiede la riga di comando), --watch
+    │   ├── files.rs      # caratteri jolly, common/, caricamento di una scena (load), testo di --check
+    │   ├── raster.rs     # SVG → pixel con resvg, font incorporati
+    │   ├── video.rs      # fotogrammi da rendere, thread worker → ffmpeg (RGBA grezzo), più scene in parallelo
+    │   ├── images.rs     # immagine di layout e foglio riassuntivo
+    │   ├── error_video.rs# video fino all'errore
+    │   ├── new_scene.rs  # trackviz new
+    │   ├── sort_scene.rs # trackviz sort
+    │   ├── index_page.rs # trackviz index
+    │   └── tests.rs
     ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
     ├── physics.rs        # fisica dei carrier: code a contatto, incroci, precedenze
     ├── mermaid.rs        # lettura delle scene Mermaid
@@ -187,17 +198,17 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 **Immagine di layout:** ogni video completo scrive anche `out/<nome>_layout.png` (`render::layout`): il tracciato senza carrier con i nomi di tutti i punti e device (le antenne invisibili come cerchio tratteggiato) e l'elenco dei device con tipo e posizione. `--layout` scrive solo l'immagine.
 
-**Foglio riassuntivo:** `--sheet` scrive `out/<nome>_sheet.png` (`write_sheet` in `main.rs`): per ogni didascalia il fotogramma subito prima della successiva (0,1 s prima; l'ultima alla fine della scena; mai prima che la didascalia sia comparsa), a metà dimensione, due per riga, resi in parallelo. Una scena senza didascalie è un errore.
+**Foglio riassuntivo:** `--sheet` scrive `out/<nome>_sheet.png` (`write_sheet` in `cli/images.rs`): per ogni didascalia il fotogramma subito prima della successiva (0,1 s prima; l'ultima alla fine della scena; mai prima che la didascalia sia comparsa), a metà dimensione, due per riga, resi in parallelo. Una scena senza didascalie è un errore.
 
-**Riordino per tempo:** `trackviz sort` (`src/sort.rs`, `sort_cmd` in `main.rs`) divide il corpo della scena in blocchi (uno step con le direttive sopra: `on`, `after`, `at`, `id`, `color`, `for`, `duration`, commenti e righe vuote; una `Note` subito dopo una `pipette` resta con la pipette) e li ordina per istante di partenza nel video (a parità, l'ordine del file). Dove lo step prima, o l'ultima `pipette`/`rotate`/`needle` sullo stesso device, cambierebbe, lo step viene legato a quello di prima con un `id` generato (`pipette-antenna4`, `eac-u07-c1`, `show-c2l`). La scena riordinata viene scritta in un file temporaneo accanto (per trovare `common/`), costruita e confrontata con l'originale (durata e log ordinato): solo se coincidono il file viene riscritto. Una riga che non è uno step né una direttiva di uno step in mezzo agli step è un errore.
+**Riordino per tempo:** `trackviz sort` (`src/sort.rs`, `sort_cmd` in `cli/sort_scene.rs`) divide il corpo della scena in blocchi (uno step con le direttive sopra: `on`, `after`, `at`, `id`, `color`, `for`, `duration`, commenti e righe vuote; una `Note` subito dopo una `pipette` resta con la pipette) e li ordina per istante di partenza nel video (a parità, l'ordine del file). Dove lo step prima, o l'ultima `pipette`/`rotate`/`needle` sullo stesso device, cambierebbe, lo step viene legato a quello di prima con un `id` generato (`pipette-antenna4`, `eac-u07-c1`, `show-c2l`). La scena riordinata viene scritta in un file temporaneo accanto (per trovare `common/`), costruita e confrontata con l'originale (durata e log ordinato): solo se coincidono il file viene riscritto. Una riga che non è uno step né una direttiva di uno step in mezzo agli step è un errore.
 
-**Indice dei video:** `trackviz index` (`src/index.rs`, `index_cmd` in `main.rs`) scrive una pagina HTML autonoma per consegnare i video: titolo comune, sommario con le durate, e per ogni scena sottotitolo, video (`<nome>.mp4` nella cartella della pagina, cioè il nome di un render completo), copertina (fotogramma alla fine della didascalia centrale, 960×540, PNG in base64 nella pagina) e didascalie come capitoli cliccabili. Se un video manca la scena mostra la copertina e un avviso, e il comando lo segnala. Scene con errori: saltate, elencate alla fine (codice di uscita 1).
+**Indice dei video:** `trackviz index` (`src/index.rs`, `index_cmd` in `cli/index_page.rs`) scrive una pagina HTML autonoma per consegnare i video: titolo comune, sommario con le durate, e per ogni scena sottotitolo, video (`<nome>.mp4` nella cartella della pagina, cioè il nome di un render completo), copertina (fotogramma alla fine della didascalia centrale, 960×540, PNG in base64 nella pagina) e didascalie come capitoli cliccabili. Se un video manca la scena mostra la copertina e un avviso, e il comando lo segnala. Scene con errori: saltate, elencate alla fine (codice di uscita 1).
 
 **Avvisi in più di `--check`:** didascalie visibili meno di 2,5 s o scritte in un ordine diverso da quello in cui compaiono; messaggi scritti in un ordine diverso da quello di invio (il video segue il tempo, il diagramma Mermaid l'ordine del file). Il test sulle scene li vieta.
 
 **Parti comuni:** `common/` è cercata accanto al diagramma e poi in `scenes/`. Ogni scena legge prima `common/video.mmd`, `common/actors.mmd` e `common/messages.mmd`; `%% geometry <nome>` legge `common/<nome>.mmd`. `%% include <file>` inserisce altre direttive (percorso relativo, annidabile, niente inclusioni circolari). Un file incluso può contenere solo righe `%%`: un messaggio incluso mancherebbe dal diagramma mostrato da Mermaid. `--watch` controlla anche i file inclusi e quelli comuni.
 
-**Video fino all'errore:** se una scena dà errore, il rendering di una sola scena (non `--check`, `--still`, né più scene insieme) scrive comunque `out/<scena>_error.mp4` (`main::until_error`): parte dallo step che dà errore (dalla riga nel messaggio) e torna indietro uno step alla volta finché la scena si costruisce (una scena tagliata prima può rompersi altrove, per esempio un carrier lasciato su un gate senza il suo `pass`); se non ci riesce entro 60 step, cerca per bisezione; aggiunge in fondo una didascalia `Error · line N` col messaggio (fascia rossa: `render::ERROR_TITLE`) e ne fa il video; poi il comando fallisce con l'errore come sempre. **Partenza predefinita:** il primo carrier parte da `main_in`, gli altri da `spawn` (fuori dal pannello); `start=<antenna|punto>` la cambia (i fantasmi partono da `antenna1`).
+**Video fino all'errore:** se una scena dà errore, il rendering di una sola scena (non `--check`, `--still`, né più scene insieme) scrive comunque `out/<scena>_error.mp4` (`cli::error_video::until_error`): parte dallo step che dà errore (dalla riga nel messaggio) e torna indietro uno step alla volta finché la scena si costruisce (una scena tagliata prima può rompersi altrove, per esempio un carrier lasciato su un gate senza il suo `pass`); se non ci riesce entro 60 step, cerca per bisezione; aggiunge in fondo una didascalia `Error · line N` col messaggio (fascia rossa: `render::ERROR_TITLE`) e ne fa il video; poi il comando fallisce con l'errore come sempre. **Partenza predefinita:** il primo carrier parte da `main_in`, gli altri da `spawn` (fuori dal pannello); `start=<antenna|punto>` la cambia (i fantasmi partono da `antenna1`).
 
 **Anteprima:** `--preview` genera a metà dimensione e a 15 fps, `--from`/`--to` solo quel tratto (l'orologio mostra il tempo reale della scena). Scrivono `out/<nome>_preview.mp4`, così il video completo non viene toccato. Su una scena da 55 s: 11,1 s il video completo, 2,2 s con `--preview`, 0,4 s con `--preview` su 10 s. `--watch` ripete il comando quando cambia la scena o un file incluso (controllo ogni 300 ms), su una sola scena; un file con errori stampa l'errore e il controllo continua.
 

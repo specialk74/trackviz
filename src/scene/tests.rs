@@ -513,7 +513,7 @@ fn all_scenes_in_the_repository_are_valid() {
     let list = scene_files();
     assert!(list.len() >= 17, "found only {} scenes", list.len());
     for path in list {
-        crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
     }
 }
 
@@ -584,7 +584,7 @@ fn the_videos_do_not_mention_the_nsd() {
         assert!(!text.contains("NSD") && !text.contains("No Stop"), "{}: {what}: {text}", path.display());
     };
     for path in scene_files() {
-        let (sc, tl) = crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        let (sc, tl) = crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
         bad("title", &sc.video.title, &path);
         bad("subtitle", &sc.video.subtitle, &path);
         sc.devices.iter().for_each(|d| bad("device", &d.label, &path));
@@ -660,7 +660,7 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
 #[test]
 fn no_scene_has_warnings() {
     for path in scene_files() {
-        let (sc, tl) = crate::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        let (sc, tl) = crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
         let w = crate::lint::warnings(&sc, &tl);
         assert!(w.is_empty(), "{}: {w:?}", path.display());
     }
@@ -716,7 +716,7 @@ fn when_errors() {
 fn a_slower_carrier_moves_the_whole_scene() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/09_spur_happy_path.mmd");
     let times = |slow: bool| {
-        let mut doc = crate::scene_doc(path).unwrap();
+        let mut doc = crate::cli::scene_doc(path).unwrap();
         if slow {
             for c in doc.arrays.get_mut("carrier").unwrap() {
                 c.entries.insert("speed".into(), crate::doc::Value::Num(80.0));
@@ -781,7 +781,7 @@ fn a_carrier_declared_first_but_behind_still_follows() {
 #[test]
 fn the_video_shows_the_line_of_the_scene_that_ran_last() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/01_prepare_sample_release.mmd");
-    let (sc, tl) = crate::load(path).unwrap();
+    let (sc, tl) = crate::cli::load(path).unwrap();
     let text = std::fs::read_to_string(path).unwrap();
     let file: Vec<&str> = text.lines().collect();
     // Every line shown is the line of the file, by time.
