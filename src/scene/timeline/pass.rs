@@ -1,6 +1,8 @@
 //! `pass` and `divert`: the move of the carrier stopped on an antenna.
 
-use super::*;
+use super::layout::Layout;
+use crate::scene::lanes::lane_paths;
+use crate::scene::{Action, DeviceKind, Ease, Step};
 
 impl Layout<'_> {
     /// The move a `pass` (or `divert`) stands for: the carrier stopped on the

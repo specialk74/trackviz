@@ -3,6 +3,10 @@
 //! antennas and the gates opening.
 
 use super::*;
+use super::layout::Layout;
+use crate::physics;
+use crate::scene::wheels::simulate_wheels;
+use crate::scene::{DeviceKind, CARRIER_R, READ_LIGHT, TS_RIM};
 
 impl Layout<'_> {
     /// The timeline of the steps laid out (they end by `max_end`). Before the

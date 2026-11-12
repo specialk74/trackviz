@@ -16,10 +16,9 @@ mod wheels;
 pub use path::{Attach, CarrierPath, MoveSeg};
 pub use timeline::{label_lines, Ev, Timed, Timeline};
 pub use wheels::Wheel;
-use lanes::*;
-use wheels::{simulate_wheels, wheel_free_at, WheelEv, WheelRec};
-
+use lanes::{lane_dir, sc_pt};
 use std::collections::HashMap;
+
 
 #[derive(Clone)]
 pub struct Video {

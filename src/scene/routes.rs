@@ -2,6 +2,7 @@
 //! carriers sent straight on when their pit-lane is full.
 
 use super::*;
+use super::lanes::{expand_route, lane_paths, LaneGraph};
 
 impl Scene {
     /// The ways of the carriers written without `route`, from their steps in the

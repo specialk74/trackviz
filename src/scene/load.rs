@@ -2,7 +2,9 @@
 //! steps; then the gates of the antennas and the way of each carrier.
 
 use super::*;
+use super::lanes::{expand_route, lane_dir, sc_pt};
 use crate::doc::{Doc, Table};
+use std::collections::HashMap;
 
 fn arr<'a>(doc: &'a Doc, name: &str) -> &'a [Table] {
     doc.arrays.get(name).map(|v| v.as_slice()).unwrap_or(&[])

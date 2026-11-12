@@ -2,6 +2,10 @@
 //! line in the log. Moves, rotations and fades change the layout.
 
 use super::*;
+use super::layout::{Laid, Layout, Stuck};
+use crate::physics;
+use crate::scene::wheels::{wheel_free_at, WheelEv, WheelRec};
+use crate::scene::{Action, Attach, DeviceKind, MoveSeg, Step};
 
 impl Layout<'_> {
     /// Lays out step `si`, asked to start at `t0`.

@@ -1,16 +1,16 @@
 //! The steps laid out in time: events, and the loop that lays them out and
 //! plays the moves together until the timing settles.
 
+use crate::physics;
+use crate::scene::{AnalyzerState, CarrierPath, Scene, Wheel};
+use std::collections::HashMap;
+
 mod finish;
 mod layout;
 mod pass;
 mod steps;
 
-use layout::{Laid, Layout, Stuck};
 
-use super::*;
-use crate::physics;
-use std::collections::HashMap;
 
 pub enum Ev {
     Caption { title: String, text: String },

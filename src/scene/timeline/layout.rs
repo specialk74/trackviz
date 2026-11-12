@@ -4,6 +4,10 @@
 //! order of the file (`steps.rs`), then the final checks (`finish.rs`).
 
 use super::*;
+use crate::physics;
+use crate::scene::wheels::WheelRec;
+use crate::scene::{Action, Anchor, CarrierPath, DeviceKind, Scene, StartMode, Step, Wheel};
+use std::collections::HashMap;
 
 impl Timeline {
     /// One layout of the steps. `actual`: the moves as they really happen (from
