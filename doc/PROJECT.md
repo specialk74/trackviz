@@ -133,7 +133,16 @@ trackviz/
     │   └── tests.rs
     ├── doc.rs            # dati della scena: tabelle, valori, lettura delle righe @
     ├── physics.rs        # fisica dei carrier: code a contatto, incroci, precedenze
-    ├── mermaid.rs        # lettura delle scene Mermaid
+    ├── mermaid/          # lettura delle scene Mermaid
+    │   ├── mod.rs        # load, parse_text (test), aiuti per le tabelle
+    │   ├── lines.rs      # righe del diagramma con i %% include
+    │   ├── importer.rs   # Importer: lo stato durante la lettura, riga per riga
+    │   ├── directives.rs # le direttive %% (un metodo per quelle lunghe: move, pass, pipette, ...)
+    │   ├── timing.rs     # on, after, at, id
+    │   ├── antennas.rs   # antenne, device di pipette/needle, carrier noti
+    │   ├── diagram.rs    # messaggi e note del diagramma
+    │   ├── suggest.rs    # la direttiva più vicina a una scritta male
+    │   └── tests.rs
     ├── template.rs       # trackviz new: scheletro di una scena nuova
     ├── index.rs          # trackviz index: pagina con l'elenco dei video
     ├── sort.rs           # trackviz sort: riordina una scena per tempo
@@ -176,7 +185,7 @@ trackviz <flusso.mmd>                             # le scene possono essere diag
 
 La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **log degli eventi** per regolare i tempi; con più scene in rendering si stampa solo una riga per scena.
 
-**Scene in Mermaid:** una scena è un sequence diagram Mermaid (`.mmd`) e ogni comando lo accetta (`trackviz scena.mmd`, `--preview`, `--watch`, `--check`, caratteri jolly). `src/mermaid.rs` legge il diagramma e costruisce direttamente i dati della scena (`src/doc.rs`), che passano poi al modello (`scene.rs`). Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%`. Una direttiva sconosciuta è un errore, `%% # testo` è un commento, gli errori indicano file e riga. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso.
+**Scene in Mermaid:** una scena è un sequence diagram Mermaid (`.mmd`) e ogni comando lo accetta (`trackviz scena.mmd`, `--preview`, `--watch`, `--check`, caratteri jolly). `src/mermaid/` legge il diagramma e costruisce direttamente i dati della scena (`src/doc.rs`), che passano poi al modello (`scene.rs`). Mermaid descrive solo i messaggi: geometria, carrier, movimenti, didascalie e tempi stanno nei commenti `%%`. Una direttiva sconosciuta è un errore, `%% # testo` è un commento, gli errori indicano file e riga. Gli step sono in sequenza, a meno di `when`, `with`, `at`, `delay` prima di essi. I messaggi diventano messaggi con nome se esiste il tipo, il secondo Prepare di un campione è quello viola, `alt`/`loop`/`opt`/`par` sono rifiutati perché una scena è un solo percorso.
 
 **Righe `@`:** `%% @<sezione> chiave=valore ...` descrive una tabella di dati (`point`, `lane`, `device`, `actor`, `message`, `carrier`, `step`, `video`). Valori: `true`/`false`, numeri, liste separate da virgole (`points=a,b,c`), testo tra virgolette se ha spazi (con `\"` e `\\`), oppure una parola. Le righe `@video` aggiungono chiavi all'unica tabella video (vince l'ultima); le altre sezioni sono liste nell'ordine del file. Le direttive producono le stesse tabelle.
 
@@ -218,11 +227,11 @@ La timeline viene stampata su stderr (inizio/fine di ogni step) e serve come **l
 
 ## 7. Moduli in dettaglio
 
-### 7.1 `doc.rs` e `mermaid.rs` — lettura delle scene
+### 7.1 `doc.rs` e `mermaid/` — lettura delle scene
 
 - `doc.rs`: i dati di una scena sono tabelle (`Table`) di chiavi e valori (`Value`: testo, numero, booleano, lista), raccolte in sezioni (`Doc`). `parse_line` legge una riga `@`; chiavi duplicate e valori malformati sono errori.
 - `Table` offre accessor tipizzati (`str_opt/str_req`, `num_opt/num_req`, `bool_opt`, `str_list`) e `check_keys(allowed)`, che **rifiuta le chiavi sconosciute** (protegge dagli errori di battitura). Ogni tabella ricorda file e riga da cui viene, per gli errori.
-- `mermaid.rs`: legge il diagramma con i suoi `%% include`, i file comuni e la geometria, e trasforma direttive, messaggi e righe `@` in tabelle.
+- `mermaid/`: legge il diagramma con i suoi `%% include`, i file comuni e la geometria, e trasforma direttive, messaggi e righe `@` in tabelle.
 
 ### 7.2 `scene/` — modello e timeline
 
@@ -486,7 +495,7 @@ Miglioramenti proposti e punti da confermare: vedi [`IMPROVEMENTS.md`](IMPROVEME
 
 ## 12. Limiti noti e note per chi riparte
 
-- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid.rs`), della timeline (`scene/tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
+- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid/tests.rs`), della timeline (`scene/tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
 
 - Le righe `@` non hanno testo su più righe: un valore lungo va su una riga sola.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
