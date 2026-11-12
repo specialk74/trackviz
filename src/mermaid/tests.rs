@@ -1,5 +1,6 @@
 use super::*;
 use crate::doc::{Doc, Value};
+use crate::lint;
 use crate::scene::{Ev, Scene, Timeline};
 use std::path::{Path, PathBuf};
 
@@ -69,7 +70,7 @@ const EX: &str = "%% geometry spur\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\
 #[test]
 fn a_diagram_builds_a_valid_scene_with_the_messages_written() {
     let (sc, tl) = build(&doc(EX).unwrap());
-    assert!(crate::lint::warnings(&sc, &tl).is_empty(), "{:?}", crate::lint::warnings(&sc, &tl));
+    assert!(lint::warnings(&sc, &tl).is_empty(), "{:?}", lint::warnings(&sc, &tl));
     assert_eq!(arrows(&sc, &tl), lines(EX));
 }
 

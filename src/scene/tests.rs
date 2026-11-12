@@ -1,6 +1,8 @@
 //! Unit tests of the scene model and of the timeline.
 
 use super::*;
+use crate::doc::Value;
+use crate::{cli, lint, mermaid, render};
 
 /// Straight Main-Lane with an NSD, a Pit-Lane with a sampling point.
 pub(crate) const SAMPLING: &str = r#"
@@ -44,7 +46,7 @@ fn scene_files() -> Vec<std::path::PathBuf> {
 }
 
 fn build(base: &str, steps: &str) -> Result<(Scene, Timeline), String> {
-    let doc = crate::mermaid::parse_text(&format!("{base}\n{steps}"))?;
+    let doc = mermaid::parse_text(&format!("{base}\n{steps}"))?;
     let sc = Scene::from_doc(&doc)?;
     let tl = Timeline::build(&sc)?;
     Ok((sc, tl))
@@ -513,7 +515,7 @@ fn all_scenes_in_the_repository_are_valid() {
     let list = scene_files();
     assert!(list.len() >= 17, "found only {} scenes", list.len());
     for path in list {
-        crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
     }
 }
 
@@ -584,7 +586,7 @@ fn the_videos_do_not_mention_the_nsd() {
         assert!(!text.contains("NSD") && !text.contains("No Stop"), "{}: {what}: {text}", path.display());
     };
     for path in scene_files() {
-        let (sc, tl) = crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        let (sc, tl) = cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
         bad("title", &sc.video.title, &path);
         bad("subtitle", &sc.video.subtitle, &path);
         sc.devices.iter().for_each(|d| bad("device", &d.label, &path));
@@ -660,8 +662,8 @@ fn pipette_adds_its_note_on_the_analyzer_actor() {
 #[test]
 fn no_scene_has_warnings() {
     for path in scene_files() {
-        let (sc, tl) = crate::cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
-        let w = crate::lint::warnings(&sc, &tl);
+        let (sc, tl) = cli::load(&path.to_string_lossy()).unwrap_or_else(|e| panic!("{e}"));
+        let w = lint::warnings(&sc, &tl);
         assert!(w.is_empty(), "{}: {w:?}", path.display());
     }
 }
@@ -716,10 +718,10 @@ fn when_errors() {
 fn a_slower_carrier_moves_the_whole_scene() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/09_spur_happy_path.mmd");
     let times = |slow: bool| {
-        let mut doc = crate::cli::scene_doc(path).unwrap();
+        let mut doc = cli::scene_doc(path).unwrap();
         if slow {
             for c in doc.arrays.get_mut("carrier").unwrap() {
-                c.entries.insert("speed".into(), crate::doc::Value::Num(80.0));
+                c.entries.insert("speed".into(), Value::Num(80.0));
             }
         }
         let sc = Scene::from_doc(&doc).unwrap();
@@ -781,7 +783,7 @@ fn a_carrier_declared_first_but_behind_still_follows() {
 #[test]
 fn the_video_shows_the_line_of_the_scene_that_ran_last() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/01_prepare_sample_release.mmd");
-    let (sc, tl) = crate::cli::load(path).unwrap();
+    let (sc, tl) = cli::load(path).unwrap();
     let text = std::fs::read_to_string(path).unwrap();
     let file: Vec<&str> = text.lines().collect();
     // Every line shown is the line of the file, by time.
@@ -792,7 +794,7 @@ fn the_video_shows_the_line_of_the_scene_that_ran_last() {
         let n: usize = head.strip_prefix("01_prepare_sample_release.mmd:").unwrap().parse().unwrap();
         assert_eq!(file[n - 1].trim(), shown);
     }
-    let svg = crate::render::frame(&sc, &tl, tl.lines[2].0 + 0.01);
+    let svg = render::frame(&sc, &tl, tl.lines[2].0 + 0.01);
     let shown = tl.lines.iter().rfind(|l| l.0 <= tl.lines[2].0 + 0.01).unwrap();
-    assert!(svg.contains(&crate::render::esc(&shown.1)), "{}", shown.1);
+    assert!(svg.contains(&render::esc(&shown.1)), "{}", shown.1);
 }

@@ -6,7 +6,7 @@
 //! it is tied explicitly to the same step with an `id`. The result is checked:
 //! the scene must give the same timeline, otherwise the file is left as it is.
 
-use crate::scene::{Action, Anchor, Scene, StartMode, Step, Timeline};
+use crate::scene::{Action, Anchor, DeviceKind, Scene, StartMode, Step, Timeline};
 use std::collections::{HashMap, HashSet};
 
 /// A step of the scene's own file with the lines that go with it.
@@ -58,7 +58,7 @@ fn slug(s: &str) -> String {
 
 /// The antenna written for a device (its own name if it has none).
 fn antenna_of(sc: &Scene, device: &str) -> String {
-    sc.devices.iter().find(|d| d.kind == crate::scene::DeviceKind::Antenna && d.part_of.as_deref() == Some(device)).map_or_else(|| device.to_string(), |d| d.id.clone())
+    sc.devices.iter().find(|d| d.kind == DeviceKind::Antenna && d.part_of.as_deref() == Some(device)).map_or_else(|| device.to_string(), |d| d.id.clone())
 }
 
 /// A readable name for a step that needs an id: what it does and its carrier
