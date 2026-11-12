@@ -79,7 +79,7 @@ fn name_for(sc: &Scene, st: &Step) -> String {
         Action::Pipette { device, .. } => format!("pipette-{}", slug(&antenna_of(sc, device))),
         Action::Needle { device, .. } => format!("needle-{}", slug(&antenna_of(sc, device))),
         Action::Rotate { device } => format!("rotate-{}", slug(device)),
-        Action::Pass { device, divert, carrier } => {
+        Action::Pass { device, divert, carrier, .. } => {
             format!("{}-{}{}", if *divert { "divert" } else { "pass" }, slug(device), carrier.as_deref().map_or(String::new(), |c| format!("-{}", slug(c))))
         }
         Action::Move { carrier, .. } => format!("move-{}", slug(carrier)),

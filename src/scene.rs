@@ -188,7 +188,7 @@ pub enum Action {
     /// the next stop of its route (a gated antenna, a turnstile entry) or its end.
     /// `pass` / `divert`: the carrier stopped on the antenna goes on, or turns.
     /// `carrier`: which one it must be.
-    Pass { device: String, divert: bool, carrier: Option<String> },
+    Pass { device: String, divert: bool, carrier: Option<String>, speed: Option<f64> },
     Message { kind: Option<String>, from: String, to: String, text: String, params: String, reply: bool, carrier: Option<String>, color: Option<String>, needle: Option<u32> },
     Note { actor: String, text: String },
     /// `note`: the text of the note on the analyzer, if the diagram gives it;
@@ -685,7 +685,7 @@ impl Scene {
             let extra: &[&str] = match action_name.as_str() {
                 "caption" => &["title", "text"],
                 "move" => &["carrier", "to", "ease", "speed", "runaway"],
-                "pass" => &["device", "divert", "carrier"],
+                "pass" => &["device", "divert", "carrier", "speed"],
                 "message" if t.str_opt("type")?.is_some() => &["type", "carrier", "needle"],
                 "message" => &["from", "to", "text", "params", "reply", "carrier", "color", "needle", "event"],
                 "note" => &["actor", "text"],
@@ -703,7 +703,12 @@ impl Scene {
             t.check_keys(&allowed)?;
             let action = match action_name.as_str() {
                 "caption" => Action::Caption { title: t.str_opt("title")?.unwrap_or_default(), text: t.str_req("text")? },
-                "pass" => Action::Pass { device: t.str_req("device")?, divert: t.bool_opt("divert")?.unwrap_or(false), carrier: t.str_opt("carrier")? },
+                "pass" => Action::Pass {
+                    device: t.str_req("device")?,
+                    divert: t.bool_opt("divert")?.unwrap_or(false),
+                    carrier: t.str_opt("carrier")?,
+                    speed: t.num_opt("speed")?,
+                },
                 "move" => Action::Move {
                     carrier: t.str_req("carrier")?,
                     to: t.str_req("to")?,
@@ -854,7 +859,7 @@ impl Scene {
                     lanes[ci] = l;
                     last[ci] = Some((line(&st.loc), format!("move {carrier} to {}", place(to))));
                 }
-                Action::Pass { device, divert, carrier: Some(c) } => {
+                Action::Pass { device, divert, carrier: Some(c), .. } => {
                     let Some(ci) = self.carrier_idx(c).filter(|&ci| derived[ci]) else { continue };
                     let cmd = if *divert { "divert" } else { "pass" };
                     let at = self.devices.iter().find(|d| d.id == *device).and_then(|d| d.at.clone()).unwrap_or_default();
@@ -1068,7 +1073,7 @@ impl Scene {
     /// end. Its route says where it goes; `divert` must be on a divert where the
     /// route turns into a lane, `pass` where it goes straight on.
     #[allow(clippy::too_many_arguments)]
-    fn pass_move(&self, device: &str, divert: bool, who: Option<&str>, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
+    fn pass_move(&self, device: &str, divert: bool, who: Option<&str>, speed: Option<f64>, paths: &[CarrierPath], cur_idx: &[usize], attached: &[Option<usize>], t: f64, loc: &str) -> Result<Action, String> {
         let cmd = if divert { "divert" } else { "pass" };
         // Only antennas: the antenna of a device is named instead of the device.
         let d = self.devices.iter().find(|d| d.id == device && d.kind == DeviceKind::Antenna).ok_or_else(|| {
@@ -1129,7 +1134,7 @@ impl Scene {
             .or(c.route.last())
             .filter(|_| from + 1 < c.route.len())
             .ok_or_else(|| format!("{loc}: {cmd} {device}: carrier '{}' is at the end of its route", c.id))?;
-        Ok(Action::Move { carrier: c.id.clone(), to: to.clone(), ease: Ease::Linear, speed: None, runaway: false })
+        Ok(Action::Move { carrier: c.id.clone(), to: to.clone(), ease: Ease::Linear, speed, runaway: false })
     }
 
     fn need_carrier(&self, id: &str, loc: &str) -> Result<usize, String> {
@@ -1709,7 +1714,7 @@ impl Timeline {
             // `pass`: a move of the carrier stopped on the device, to its next stop.
             let passed;
             let action = match &st.action {
-                Action::Pass { device, divert, carrier } => match sc.pass_move(device, *divert, carrier.as_deref(), &carriers, &cur_idx, &attached, t0, &st.loc) {
+                Action::Pass { device, divert, carrier, speed } => match sc.pass_move(device, *divert, carrier.as_deref(), *speed, &carriers, &cur_idx, &attached, t0, &st.loc) {
                     Ok(a) => {
                         passed = a;
                         &passed

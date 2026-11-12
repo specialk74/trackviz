@@ -161,14 +161,14 @@
     "body": [
       "%% pass ${1|antenna2,antenna3,antenna4,antenna5,antenna6,antenna7|} ${2:C1}"
     ],
-    "description": "The carrier stopped on the antenna goes on, straight, to the next stop of its route (gated antenna, turnstile entry) or its end"
+    "description": "The carrier stopped on the antenna goes on, straight, to the next stop of its route (gated antenna, turnstile entry) or its end. Options: duration=<s>, speed=<px/s>"
   },
   "divert": {
     "prefix": "tv-divert",
     "body": [
       "%% divert ${1|antenna3,antenna5,antenna7|} ${2:C1}"
     ],
-    "description": "The carrier stopped on the antenna of a divert turns into the lane that starts there (spur2: antenna3/antenna5 the pit-lane of a needle, antenna7 the return belt)"
+    "description": "The carrier stopped on the antenna of a divert turns into the lane that starts there (spur2: antenna3/antenna5 the pit-lane of a needle, antenna7 the return belt). Options: duration=<s>, speed=<px/s>"
   },
   "pipette": {
     "prefix": "tv-pipette",

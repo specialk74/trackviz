@@ -428,7 +428,7 @@ impl Importer {
             // The carrier stopped on the antenna goes on (pass) or is diverted (divert).
             "pass" | "divert" => {
                 let [name, carrier] = plain[..] else {
-                    return Err(format!("'{cmd}' is written: {cmd} <antenna> <carrier>"));
+                    return Err(format!("'{cmd}' is written: {cmd} <antenna> <carrier> [speed=n] [duration=s]"));
                 };
                 self.known_carrier(&format!("{cmd} {name} {carrier}"), carrier)?;
                 if !self.antennas().iter().any(|a| a.0 == name) {
@@ -444,6 +444,10 @@ impl Importer {
                 if cmd == "divert" {
                     k.push(("divert", Value::Bool(true)));
                 }
+                if let Some(v) = o.get("speed") {
+                    k.push(("speed", seconds("speed", v)?));
+                }
+                k.extend(duration(&o)?);
                 self.step("pass", k)?;
             }
             "needle" => {
@@ -966,6 +970,26 @@ mod tests {
         let sc = Scene::from_doc(&doc(src).unwrap()).unwrap();
         let e = Timeline::build(&sc).err().unwrap();
         assert!(e.contains("'C2' never gets to antenna2: after line 7 it stops behind 'C1', which stays on antenna2 because no step before this one sends it on (e.g. pass antenna2 C1)"), "{e}");
+    }
+
+    #[test]
+    fn pass_and_divert_take_a_duration_or_a_speed() {
+        let head = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% move C1 to antenna3\n";
+        // How long the trip after the pass takes (the last move in the log).
+        let trip = |body: &str| {
+            let sc = Scene::from_doc(&doc(&format!("{head}{body}")).unwrap()).unwrap();
+            let tl = Timeline::build(&sc).unwrap();
+            let l = tl.log.iter().rfind(|l| l.contains("move      C1")).unwrap().clone();
+            let t: Vec<f64> = l.split_whitespace().take(3).filter(|w| *w != "-").map(|w| w.trim_end_matches('s').parse().unwrap()).collect();
+            t[1] - t[0]
+        };
+        let free = trip("%% divert antenna3 C1\n");
+        assert!((trip("%% divert antenna3 C1 duration=4\n") - 4.0).abs() < 0.02);
+        assert!((trip("%% pass antenna3 C1 duration=6\n") - 6.0).abs() < 0.02);
+        // Half the speed of the belt: twice the time.
+        let belt = Scene::from_doc(&doc(head).unwrap()).unwrap().carriers[0].speed;
+        assert!((trip(&format!("%% divert antenna3 C1 speed={}\n", belt / 2.0)) - 2.0 * free).abs() < 0.05);
+        fails(&format!("{head}%% pass antenna3 C1 speed=fast\n"), "speed");
     }
 
     #[test]
