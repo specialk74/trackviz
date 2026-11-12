@@ -14,6 +14,8 @@ pub struct Video {
     pub tail: f64,
     pub show_clock: bool,
     pub show_times: bool,
+    /// Show, small under the clock, the line of the scene that ran last (`show_line=`).
+    pub show_line: bool,
     /// Speed of the belt under the carriers, in cm/s (`belt=`).
     pub belt: f64,
     /// How long the arrow of a message takes, in s, when the message has no
@@ -471,7 +473,7 @@ impl Scene {
             return Err("keys outside of any section are not allowed".into());
         }
         let v = doc.tables.get("video").ok_or("missing [video] section")?;
-        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times", "belt", "message"])?;
+        v.check_keys(&["title", "subtitle", "width", "height", "fps", "tail", "show_clock", "show_times", "show_line", "belt", "message"])?;
         let video = Video {
             title: v.str_opt("title")?.unwrap_or_default(),
             subtitle: v.str_opt("subtitle")?.unwrap_or_default(),
@@ -481,6 +483,7 @@ impl Scene {
             tail: v.num_opt("tail")?.unwrap_or(2.0),
             show_clock: v.bool_opt("show_clock")?.unwrap_or(true),
             show_times: v.bool_opt("show_times")?.unwrap_or(true),
+            show_line: v.bool_opt("show_line")?.unwrap_or(true),
             belt: match v.num_opt("belt")? {
                 Some(b) if b > 0.0 => b,
                 Some(b) => return Err(format!("{}: belt must be a speed in cm/s above 0, not {b}", v.location())),
@@ -1535,6 +1538,8 @@ pub struct Timeline {
     pub rows: usize,
     pub duration: f64,
     pub log: Vec<String>,
+    /// The lines of the scene, by the time their step starts: (t0, "file:line  text").
+    pub lines: Vec<(f64, String)>,
 }
 
 impl Timeline {
@@ -1896,7 +1901,7 @@ impl Timeline {
             max_end = max_end.max(t1);
         }
         if !check {
-            let tl = Timeline { events, carriers, wheels, gates: Vec::new(), rows: 0, duration: max_end, log: Vec::new() };
+            let tl = Timeline { events, carriers, wheels, gates: Vec::new(), rows: 0, duration: max_end, log: Vec::new(), lines: Vec::new() };
             return Ok((tl, plans));
         }
         simulate_wheels(sc, &wheels, &mut carriers, wheel_recs)?;
@@ -2041,8 +2046,30 @@ impl Timeline {
             }
             gates.push((di, iv));
         }
-        Ok((Timeline { events, carriers, wheels, gates, rows, duration: max_end + sc.video.tail, log: std::mem::take(log) }, plans))
+        let lines = if check { source_lines(&events) } else { Vec::new() };
+        Ok((Timeline { events, carriers, wheels, gates, rows, duration: max_end + sc.video.tail, log: std::mem::take(log), lines }, plans))
     }
+}
+
+/// The line of the scene of each step, by the time it starts (stable: in the
+/// order of the file at the same time). The text is read from the file; a
+/// scene not read from a file only has the line number.
+fn source_lines(events: &[Timed]) -> Vec<(f64, String)> {
+    let mut files: HashMap<String, Vec<String>> = HashMap::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut v = Vec::new();
+    for e in events {
+        let Some((f, n)) = &e.at else { continue };
+        if !seen.insert((f.clone(), *n)) {
+            continue;
+        }
+        let lines = files.entry(f.clone()).or_insert_with(|| std::fs::read_to_string(f).map(|s| s.lines().map(str::to_string).collect()).unwrap_or_default());
+        let text = lines.get(n.wrapping_sub(1)).map_or("", |l| l.trim());
+        let name = std::path::Path::new(f).file_name().map_or(f.as_str(), |s| s.to_str().unwrap_or(f));
+        v.push((e.t0, format!("{name}:{n} · {text}").trim_end_matches([' ', '·']).to_string()));
+    }
+    v.sort_by(|a, b| a.0.total_cmp(&b.0));
+    v
 }
 
 fn with_log(e: String, log: &[String]) -> String {

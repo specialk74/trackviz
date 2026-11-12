@@ -204,6 +204,10 @@ Only one of `on`, `after`, `at` per step.
 | `wait <seconds>` | Nothing happens for that time | — |
 | `caption <title> \| <text>` | A caption in the band, until the next caption. Takes no time | — |
 
+**The line that ran.** Under the clock, small, the video shows the line of the scene whose
+step started last: file, line number and its text (`13_spur2_happy_path.mmd:86 · AN->>IF: Sample Complete …`),
+to find in the file what you see. `%% @video show_line=false` hides it.
+
 
 ### The track
 

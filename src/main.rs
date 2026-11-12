@@ -882,7 +882,7 @@ mod tests {
     }
 
     fn video() -> scene::Video {
-        scene::Video { title: String::new(), subtitle: String::new(), width: 1920, height: 1080, fps: 30, tail: 0.0, show_clock: true, show_times: true, belt: scene::BELT_SPEED, message: 1.5 }
+        scene::Video { title: String::new(), subtitle: String::new(), width: 1920, height: 1080, fps: 30, tail: 0.0, show_clock: true, show_times: true, show_line: true, belt: scene::BELT_SPEED, message: 1.5 }
     }
 
     #[test]

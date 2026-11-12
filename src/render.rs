@@ -77,6 +77,16 @@ pub fn frame(sc: &Scene, tl: &Timeline, t: f64) -> String {
             t
         );
     }
+    // The line of the scene that ran last, small, under the clock.
+    if v.show_line {
+        if let Some((_, line)) = tl.lines.iter().rfind(|l| l.0 <= t + 1e-9) {
+            let mut s: String = line.chars().take(96).collect();
+            if line.chars().count() > 96 {
+                s.push('…');
+            }
+            let _ = write!(o, r#"<text x="1880" y="100" font-size="14" text-anchor="end" font-family="{MONO}" fill="{MUTED}">{}</text>"#, esc(&s));
+        }
+    }
 
     for (r, title) in [(TRACK, "TRACK · TOP VIEW"), (SEQ, "MESSAGE SEQUENCE")] {
         let _ = write!(

@@ -284,7 +284,7 @@ Le sezioni delle righe `@` e le loro chiavi; le direttive producono le stesse ta
 
 | Sezione | Chiavi |
 |---|---|
-| `@video` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true) |
+| `@video` | `title`, `subtitle`, `width` (1920), `height` (1080), `fps` (30), `tail` (2), `show_clock` (true), `show_times` (true), `show_line` (true: sotto l'orologio, in piccolo, file e riga della scena dell'ultimo step partito, con il suo testo) |
 | `@point` | `id`, `x`, `y` |
 | `@lane` | `id`, `label`, `kind` = main\|pit\|link, `points` = lista di id, `label_x`, `label_y`, `capacity` |
 | `@device` | `id`, `kind` = nsd\|sampling\|divert\|antenna (richiedono `at`; `label_x`, `label_y` opzionali per spostare l'etichetta o, per un'antenna, il lettore; ogni `sampling` è un ago dell'analizzatore) \| analyzer\|zone (richiedono `x`,`y`,`w`,`h`) \| turnstile (`x`,`y` centro, `r` (70), `entry` = right\|left (right)) \| gate\|antenna (richiedono `at`), `label` |

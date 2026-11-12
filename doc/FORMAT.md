@@ -47,7 +47,7 @@ x 30–950 and y 120–885. The video `width` and `height` only scale the output
 
 | Section | Keys |
 |---|---|
-| `@video` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times`, `belt` (cm/s, default 17.5), `message` (s the arrow of a message takes, default 1.5) |
+| `@video` | `title`, `subtitle`, `width`, `height`, `fps`, `tail` (seconds held at the end), `show_clock`, `show_times`, `show_line` (small, under the clock: file, line and text of the scene line whose step started last; default true), `belt` (cm/s, default 17.5), `message` (s the arrow of a message takes, default 1.5) |
 | `@point` | `id`, `x`, `y` |
 | `@lane` | `id`, `label`, `kind` = `main` \| `pit` \| `link`, `points` = list of ids, `label_x`, `label_y`, `capacity` (most carriers in it at once, see Pit-lane capacity in `README.md`) |
 | `@device` | `id`, `kind` = `nsd` \| `sampling` \| `divert` (need `at` = point id) \| `analyzer` \| `zone` (need `x`,`y`,`w`,`h`) \| `turnstile` (see below) \| `gate`, `antenna` (need `at`, see below), `label` |

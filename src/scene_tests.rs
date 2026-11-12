@@ -777,3 +777,22 @@ fn a_carrier_declared_first_but_behind_still_follows() {
     }
     assert!(tl.log[1].contains("behind C2"), "{}", tl.log[1]);
 }
+
+#[test]
+fn the_video_shows_the_line_of_the_scene_that_ran_last() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/scenes/01_prepare_sample_release.mmd");
+    let (sc, tl) = crate::load(path).unwrap();
+    let text = std::fs::read_to_string(path).unwrap();
+    let file: Vec<&str> = text.lines().collect();
+    // Every line shown is the line of the file, by time.
+    assert!(!tl.lines.is_empty());
+    assert!(tl.lines.windows(2).all(|w| w[0].0 <= w[1].0));
+    for (_, l) in &tl.lines {
+        let (head, shown) = l.split_once(" · ").unwrap();
+        let n: usize = head.strip_prefix("01_prepare_sample_release.mmd:").unwrap().parse().unwrap();
+        assert_eq!(file[n - 1].trim(), shown);
+    }
+    let svg = crate::render::frame(&sc, &tl, tl.lines[2].0 + 0.01);
+    let shown = tl.lines.iter().rfind(|l| l.0 <= tl.lines[2].0 + 0.01).unwrap();
+    assert!(svg.contains(&crate::render::esc(&shown.1)), "{}", shown.1);
+}
