@@ -1612,6 +1612,8 @@ impl Timeline {
     fn build_inner(sc: &Scene, log: &mut Vec<String>, actual: &HashMap<usize, physics::Done>, check: bool) -> Result<(Timeline, Vec<physics::Plan>), String> {
         let mut carriers = Vec::new();
         let mut cur_idx = Vec::new();
+        // A carrier whose last move ended in a queue: (the carrier in front, line).
+        let mut stuck: Vec<Option<(usize, String)>> = vec![None; sc.carriers.len()];
         for c in &sc.carriers {
             let pts: Vec<(f64, f64)> = c.route.iter().map(|p| sc.pt(p)).collect();
             let mut cum = vec![0.0];
@@ -1682,7 +1684,21 @@ impl Timeline {
                         .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
                     let path = &carriers[ci];
                     path.reaches(path.cum[i]).ok_or_else(|| {
-                        format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc)
+                        let name = |p: &str| {
+                            sc.devices.iter().find(|d| d.kind == DeviceKind::Antenna && d.at.as_deref() == Some(p)).map_or_else(|| format!("'{p}'"), |d| d.id.clone())
+                        };
+                        match &stuck[ci] {
+                            Some((b, line)) if i <= cur_idx[ci] => {
+                                let who = &sc.carriers[*b].id;
+                                let there = name(&sc.carriers[*b].route[cur_idx[*b]]);
+                                format!(
+                                    "{}: '{carrier}' never gets to {}: after {line} it stops behind '{who}', which stays on {there} because no step before this one sends it on (e.g. pass {there} {who})",
+                                    st.loc,
+                                    name(point)
+                                )
+                            }
+                            _ => format!("{}: no earlier step moves carrier '{carrier}' to '{point}' (the move must come before this step in the file)", st.loc),
+                        }
                     })?
                 }
                 _ if first => 0.0,
@@ -1755,6 +1771,10 @@ impl Timeline {
                         attached[ci] = Some(ai);
                         wheel_recs.push(WheelRec { t: t_in, wheel: wi, ev: WheelEv::Arrive(ci, ai), loc: st.loc.clone() });
                     }
+                    stuck[ci] = match (done.end, done.waits.first()) {
+                        (None, Some(w)) => Some((w.2, format!("line {}", st.loc.rsplit("line ").next().unwrap_or(&st.loc)))),
+                        _ => None,
+                    };
                     let mut tag = if *runaway { "  (run-away)".to_string() } else { String::new() };
                     let waited: f64 = done.waits.iter().map(|w| w.1 - w.0).sum();
                     if let Some(w) = done.waits.first() {

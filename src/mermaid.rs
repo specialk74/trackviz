@@ -960,6 +960,15 @@ mod tests {
     }
 
     #[test]
+    fn waiting_for_a_carrier_stuck_in_a_queue_names_the_one_in_front() {
+        let src = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n\
+            %% move C1 to antenna2\n%% at 1\n%% move C2 to antenna2\n%% on antenna2 C2\nIF->>AN: A\n";
+        let sc = Scene::from_doc(&doc(src).unwrap()).unwrap();
+        let e = Timeline::build(&sc).err().unwrap();
+        assert!(e.contains("'C2' never gets to antenna2: after line 7 it stops behind 'C1', which stays on antenna2 because no step before this one sends it on (e.g. pass antenna2 C1)"), "{e}");
+    }
+
+    #[test]
     fn the_exit_of_spur2_sends_a_carrier_out_or_round_again() {
         let head = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
         let lap = "%% pass antenna3 C1\n%% on antenna5 C1\n%% pass antenna5 C1\n%% on antenna7 C1\n";
