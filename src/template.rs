@@ -19,7 +19,8 @@ enum Kind {
     Turnstile,
     /// Two sampling points: antenna1 NSD, antenna2 on the spur (pass only),
     /// antenna3 Divert 1, antenna4 sampling point 1, antenna5 Divert 2, antenna6
-    /// sampling point 2, antenna7 end.
+    /// sampling point 2, antenna7 exit (gate: pass to the Main-Lane, divert on the
+    /// return belt).
     Spur2,
 }
 
@@ -194,6 +195,7 @@ const SPUR2: &str = "    %% move C1 to antenna2
     %% after 0.1
     %% for C1
     AN-->>IF: OK
+    %% pass antenna7 C1
 ";
 
 #[cfg(test)]

@@ -52,17 +52,17 @@ sequenceDiagram
     IF->>AN: Prepare SampleId=SID-000123
     %% after 0.2 prepare-c2
     AN-->>IF: OK SampleId=SID-000124
-    %% after 0.6 antenna3 C1
-    %% divert antenna3 C1
     %% after 0.2 query-c1
     %% id tests-to-perform-c1
     DMX-->>AN: Tests to perform SampleId=SID-000123
-    %% after 0.1 prepare-c1-2
-    %% for C1
-    AN-->>IF: OK
+    %% after 0.6 antenna3 C1
+    %% divert antenna3 C1
     %% on antenna1
     %% id prepare-c3
     IF->>AN: Prepare SampleId=SID-000125
+    %% after 0.1 prepare-c1-2
+    %% for C1
+    AN-->>IF: OK
     %% after 0.1 tests-to-perform-c1
     %% id query-c2
     AN->>DMX: Query SampleId=SID-000124
@@ -131,13 +131,17 @@ sequenceDiagram
     %% caption 7 · Back to normal | Sample Complete for the third sample: the carrier goes on up the spur, stops at the second divert and, once it has left the module, gets its Release.
     %% after 0.1 sample-complete-c3
     %% for C3
+    %% id ok-c3-3
     IF-->>AN: OK
-    %% pass antenna4 C3
     %% on antenna7
+    %% id release-c1
     IF->>AN: Release SampleId=SID-000123
-    %% after 0.1
+    %% after 0 ok-c3-3
+    %% pass antenna4 C3
     %% for C1
+    %% after 0.1 release-c1
     AN-->>IF: OK
+    %% pass antenna7 C1
     %% after 0.401 antenna5 C3
     %% pass antenna5 C3
     %% on antenna7
@@ -146,6 +150,7 @@ sequenceDiagram
     %% for C3
     %% id ok-c3-2
     AN-->>IF: OK
+    %% pass antenna7 C3
     %% after 0.5
     %% caption 8 · Results | Later, when the analysis is complete, the analyzer sends the results to DMX.
     %% after 0.5 ok-c3-2

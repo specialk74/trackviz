@@ -9,15 +9,17 @@
 %% # goes straight on, while the next carrier stops behind. A pit-lane leaves to the
 %% # right, rises past the sampling point (needle on its right) and rejoins the up
 %% # branch above its divert, so a carrier leaving needle 1 still stops at d2.
-%% @point id=spawn x=1010 y=790
-%% @point id=main_in x=910 y=790
-%% @point id=nsd x=800 y=790
-%% @point id=pit_in x=740 y=730
-%% @point id=spur_rd x=660 y=730
-%% @point id=spur_in x=440 y=730
-%% @point id=w1b x=500 y=730
-%% @point id=w1c x=560 y=730
-%% @point id=w1 x=440 y=710
+%% @point id=spawn x=1010 y=830
+%% @point id=main_in x=910 y=830
+%% @point id=nsd x=800 y=830
+%% @point id=pit_in x=740 y=710
+%% @point id=spur_rd x=660 y=710
+%% # The return belt joins the spur here, between antenna2 and antenna3.
+%% @point id=rcj x=530 y=710
+%% @point id=spur_in x=440 y=710
+%% @point id=w1b x=500 y=710
+%% @point id=w1c x=560 y=710
+%% @point id=w1 x=440 y=690
 %% @point id=d1 x=440 y=650
 %% @point id=q2 x=540 y=650
 %% @point id=pc1 x=600 y=650
@@ -35,17 +37,21 @@
 %% @point id=rj2 x=440 y=260
 %% @point id=top_r x=440 y=218
 %% @point id=top_l x=230 y=218
-%% @point id=back x=230 y=730
-%% @point id=po x=200 y=730
-%% @point id=merge x=140 y=790
+%% @point id=ex x=230 y=560
+%% @point id=po x=230 y=720
+%% # The return belt: from the exit antenna back to the bottom stretch of the spur.
+%% @point id=rc1 x=290 y=560
+%% @point id=rc2 x=290 y=770
+%% @point id=rc3 x=530 y=770
+%% @point id=merge x=140 y=830
 %% # A carrier here has completely left the interface module.
-%% @point id=iface_out x=87 y=790
-%% @point id=main_out x=65 y=790
-%% @point id=gone x=-40 y=790
+%% @point id=iface_out x=87 y=830
+%% @point id=main_out x=65 y=830
+%% @point id=gone x=-40 y=830
 
-%% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=850
+%% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=870
 
-%% @lane id=spur label=Spur kind=pit points=pit_in,spur_rd,spur_in,d1,d2,rj2,top_r,top_l,back,po label_x=310 label_y=460
+%% @lane id=spur label=Spur kind=pit points=pit_in,spur_rd,rcj,spur_in,d1,d2,rj2,top_r,top_l,ex,po label_x=310 label_y=460
 
 %% @lane id=pit1 kind=pit points=d1,pc1,pt1u,rj1
 
@@ -55,7 +61,9 @@
 
 %% @lane id=return kind=link points=po,merge
 
-%% @device id=interface kind=zone label="Interface module" x=110 y=160 w=830 h=705
+%% @lane id=recirc kind=pit points=ex,rc1,rc2,rc3,rcj
+
+%% @device id=interface kind=zone label="Interface module" x=110 y=160 w=830 h=716
 
 %% @device id=zone1 kind=zone x=470 y=440 w=212 h=230
 
@@ -67,15 +75,18 @@
 
 %% @device id=antenna2 kind=antenna at=spur_rd gate=true
 
-%% @device id=div1 kind=divert at=d1 antenna=antenna3 gate=true label="Divert 1" label_x=340 label_y=610
+%% @device id=div1 kind=divert at=d1 antenna=antenna3 gate=true label="Divert 1" label_x=360 label_y=610
 
-%% @device id=div2 kind=divert at=d2 antenna=antenna5 gate=true label="Divert 2" label_x=340 label_y=370
+%% @device id=div2 kind=divert at=d2 antenna=antenna5 gate=true label="Divert 2" label_x=360 label_y=370
 
 %% @device id=sp1 kind=sampling at=s1 antenna=antenna4 gate=true label="Sampling point" label_x=520 label_y=545
 
 %% @device id=sp2 kind=sampling at=s2 antenna=antenna6 gate=true label="Sampling point" label_x=520 label_y=305
+
+%% # The exit (antenna7): every carrier stops there before the Main-Lane. pass antenna7
+%% # lets it go to the Main-Lane; divert antenna7 sends it on the return belt, back on
+%% # the spur between antenna2 and antenna3, so it stops again at antenna3 (Divert 1).
+%% @device id=exit kind=divert at=ex antenna=antenna7 gate=true label="Exit" label_x=160 label_y=566
 %% # Antennas on the lanes: a step can start when a carrier is over one (%% on antennaN).
 %% # antenna= on a device puts one on its point; gate=true: a gate holds the carrier
-%% # on the antenna (the belt never stops);
-%% # visible=false: a trigger only (the last one, at the end of the pit-lane: Release).
-%% @device id=antenna7 kind=antenna at=po visible=false
+%% # on the antenna (the belt never stops).

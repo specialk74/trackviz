@@ -960,6 +960,30 @@ mod tests {
     }
 
     #[test]
+    fn the_exit_of_spur2_sends_a_carrier_out_or_round_again() {
+        let head = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n";
+        let lap = "%% pass antenna3 C1\n%% on antenna5 C1\n%% pass antenna5 C1\n%% on antenna7 C1\n";
+        let body = format!("%% move C1 to antenna2\n%% pass antenna2 C1\n%% on antenna3 C1\n{lap}%% divert antenna7 C1\n%% on antenna3 C1\n%% caption a | b\n{lap}%% pass antenna7 C1\n");
+        let sc = Scene::from_doc(&doc(&format!("{head}{body}")).unwrap()).unwrap();
+        let route = sc.carriers[0].route.join(",");
+        // divert: the return belt, back on the spur between antenna2 and antenna3; pass: to the Main-Lane.
+        assert!(route.contains("ex,rc1,rc2,rc3,rcj,w1b,spur_in,w1,d1"), "{route}");
+        assert_eq!(route.matches("spur_rd").count(), 1, "{route}");
+        assert!(route.ends_with("ex,po,merge,iface_out,main_out,gone"), "{route}");
+        let tl = Timeline::build(&sc).unwrap();
+        // The second `on antenna3 C1` waits for the second arrival there, after the lap.
+        let cap = tl.events.iter().find(|e| matches!(e.ev, Ev::Caption { .. })).unwrap().t0;
+        let arrivals: Vec<f64> = tl
+            .log
+            .iter()
+            .filter(|l| l.contains("C1 -> d1"))
+            .map(|l| l.split_whitespace().nth(2).unwrap().trim_end_matches('s').parse().unwrap())
+            .collect();
+        assert_eq!(arrivals.len(), 2);
+        assert!((cap - arrivals[1]).abs() < 0.01, "caption at {cap}, arrivals {arrivals:?}");
+    }
+
+    #[test]
     fn pass_goes_on_and_divert_turns_into_the_lane() {
         // At Divert 1 (antenna3) C1 turns into needle 1, C2 goes on to Divert 2.
         let head = "%% geometry spur2\nsequenceDiagram\n%% carrier id=C1 sid=SID-1\n%% carrier id=C2 sid=SID-2\n";

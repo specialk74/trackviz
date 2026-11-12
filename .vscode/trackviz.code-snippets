@@ -159,16 +159,16 @@
   "pass": {
     "prefix": "tv-pass",
     "body": [
-      "%% pass ${1|antenna2,antenna3,antenna4,antenna5,antenna6|} ${2:C1}"
+      "%% pass ${1|antenna2,antenna3,antenna4,antenna5,antenna6,antenna7|} ${2:C1}"
     ],
     "description": "The carrier stopped on the antenna goes on, straight, to the next stop of its route (gated antenna, turnstile entry) or its end"
   },
   "divert": {
     "prefix": "tv-divert",
     "body": [
-      "%% divert ${1|antenna3,antenna5|} ${2:C1}"
+      "%% divert ${1|antenna3,antenna5,antenna7|} ${2:C1}"
     ],
-    "description": "The carrier stopped on the antenna of a divert turns into its pit-lane"
+    "description": "The carrier stopped on the antenna of a divert turns into the lane that starts there (spur2: antenna3/antenna5 the pit-lane of a needle, antenna7 the return belt)"
   },
   "pipette": {
     "prefix": "tv-pipette",

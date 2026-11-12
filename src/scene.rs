@@ -1674,7 +1674,11 @@ impl Timeline {
                 }
                 StartMode::When(Anchor::Arrival { carrier, point }) => {
                     let ci = sc.need_carrier(carrier, &st.loc)?;
-                    let i = sc.carriers[ci].route.iter().position(|p| p == point)
+                    // A carrier can go round more than once (the return belt of spur2):
+                    // the last arrival there among the moves written so far.
+                    let route = &sc.carriers[ci].route;
+                    let i = route.iter().take(cur_idx[ci] + 1).rposition(|p| p == point)
+                        .or_else(|| route.iter().position(|p| p == point))
                         .ok_or_else(|| format!("{}: point '{point}' is not on the route of carrier '{carrier}'", st.loc))?;
                     let path = &carriers[ci];
                     path.reaches(path.cum[i]).ok_or_else(|| {

@@ -147,7 +147,7 @@ The antennas of each geometry, numbered in the direction of the carriers:
 |---|---|
 | `sampling`, `spur` | 1 NSD, 2 sampling point, 3 end of the pit-lane (Release) |
 | `turnstile` | 1 NSD, 2 in front of the gate, 3 under the needle (for `pipette` and `needle`: the wheel brings the carriers there, so `on`/`after` can't wait for it; start from `rotate`), 4 end of the pit-lane (Release) |
-| `spur2` | 1 NSD, 2 on the spur before Divert 1 (with a gate: it only lets the carrier go on with `pass antenna2 <carrier>`, it can't divert), 3 Divert 1, 4 sampling point 1, 5 Divert 2, 6 sampling point 2, 7 end of the spur (Release) |
+| `spur2` | 1 NSD, 2 on the spur before Divert 1 (with a gate: it only lets the carrier go on with `pass antenna2 <carrier>`, it can't divert), 3 Divert 1, 4 sampling point 1, 5 Divert 2, 6 sampling point 2, 7 exit, at the end of the spur (Release; with a gate: `pass antenna7 <carrier>` lets it go to the Main-Lane, `divert antenna7 <carrier>` sends it on the return belt, back on the spur between antenna2 and antenna3) |
 
 ### All the directives
 
@@ -225,7 +225,10 @@ shows it: `move C2 -> sampling  (waits 12.0s behind C1)`.
 carrier must stop on an antenna (sampling points, antenna 2 and the diverts of `spur2`, in front of
 the turnstile) a gate holds it there, until `pass` (or `divert`); at the NSD the carrier is read on
 the fly. The gate opens and closes in 0.22 s. The last antenna is not drawn: it only
-triggers the Release. When an antenna reads a carrier the NSD, a divert or the antenna
+triggers the Release; in `spur2` it is the exit, with a gate (the carrier waits there for
+`pass antenna7`, or `divert antenna7` back to the spur on the return belt). A carrier sent
+round again stops on the same antennas again: `on antenna3 C1` waits for its last arrival
+there among the steps written before. When an antenna reads a carrier the NSD, a divert or the antenna
 itself lights up by itself, at least 1 s.
 
 **The way of a carrier.** It is not written: it comes from its steps, in the order of
