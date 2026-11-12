@@ -161,7 +161,17 @@ trackviz/
     │   │   ├── pass.rs   # pass/divert: il move del carrier fermo sull'antenna
     │   │   └── finish.rs # dopo gli step: righe del diagramma, controlli, letture, gate
     │   └── tests.rs      # unit test (scene di prova minime + tutte le scene in scenes/)
-    └── render.rs         # generazione dell'SVG di un fotogramma (con i suoi test)
+    └── render/           # generazione dell'SVG di un fotogramma
+        ├── mod.rs        # frame(): intestazione, pannelli; costanti di colori e misure
+        ├── track.rs      # pannello della pista: zone, corsie, poi device, carrier, sonda (Ctx: scena, timeline, istante)
+        ├── devices.rs    # una funzione per tipo di device (analizzatore, NSD/divert, tornello, gate, antenna, ...)
+        ├── carriers.rs   # carrier e cartellini
+        ├── probe.rs      # sonda dell'analizzatore (pipette, needle)
+        ├── operator.rs   # l'operatore
+        ├── sequence.rs   # diagramma di sequenza
+        ├── caption.rs    # fascia delle didascalie
+        ├── layout.rs     # immagine di layout
+        └── tests.rs
 ```
 
 ### CLI
@@ -271,7 +281,7 @@ Le scene sono una catena: ogni risposta segue la sua richiesta, la `pipette` la 
 
 **Durata totale** = fine dell'ultimo step + `tail`.
 
-### 7.3 `render.rs` — fotogramma SVG
+### 7.3 `render/` — fotogramma SVG
 
 **Layout fisso** (coordinate 1920×1080):
 
@@ -495,7 +505,7 @@ Miglioramenti proposti e punti da confermare: vedi [`IMPROVEMENTS.md`](IMPROVEME
 
 ## 12. Limiti noti e note per chi riparte
 
-- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid/tests.rs`), della timeline (`scene/tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
+- **Test:** `cargo test` esegue gli unit test della lettura delle righe `@` (`doc.rs`) e dei diagrammi (`mermaid/tests.rs`), della timeline (`scene/tests.rs`: tempi di partenza, movimenti, messaggi, fantasmi, turnstile, ago, stato, operatore e la validità di tutte le scene in `scenes/`) e del disegno (`render/tests.rs`). Vanno aggiornati quando si aggiunge un'azione o una regola.
 
 - Le righe `@` non hanno testo su più righe: un valore lungo va su una riga sola.
 - La larghezza dei testi è **stimata** dal numero di caratteri (font proporzionale), quindi le etichette molto lunghe possono uscire un po' dai box.
