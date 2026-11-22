@@ -29,6 +29,33 @@ fn analyzer_status_badges() {
 }
 
 #[test]
+fn manual_and_warning_badges() {
+    let steps = "\n%% @step action=status at=1 device=an state=manual \
+                 \n%% @step action=status at=3 device=an state=warning ";
+    assert!(frame_at(steps, 2.0).contains(">MANUAL<"));
+    let f = frame_at(steps, 4.0);
+    assert!(f.contains(">WARNING<") && !f.contains(">MANUAL<"));
+}
+
+#[test]
+fn timer_counts_then_times_out_and_fades() {
+    let steps = "\n%% @step action=timer at=1 device=an value=300 duration=4 label=\"Manual Mode timeout\" ";
+    assert!(!frame_at(steps, 0.5).contains("MANUAL MODE TIMEOUT"));
+    let f = frame_at(steps, 3.0);
+    assert!(f.contains("MANUAL MODE TIMEOUT") && f.contains(">02:30<") && !f.contains(">TIMEOUT<"));
+    let f = frame_at(steps, 5.1);
+    assert!(f.contains(">05:00<") && f.contains(">TIMEOUT<"));
+    assert!(!frame_at(steps, 8.0).contains("MANUAL MODE TIMEOUT"));
+}
+
+#[test]
+fn timer_stopped_before_its_limit() {
+    let steps = "\n%% @step action=timer at=0 device=an value=100 limit=300 duration=2 label=Clock ";
+    let f = frame_at(steps, 2.5);
+    assert!(f.contains(">01:40<") && f.contains(">stopped<") && !f.contains(">TIMEOUT<"));
+}
+
+#[test]
 fn needle_label_depends_on_the_device_state() {
     let steps = "\n%% @step action=needle at=0 device=sp to=down \
                  \n%% @step action=status at=3 device=an state=error ";
@@ -44,6 +71,14 @@ fn ghost_is_drawn_only_while_visible_with_a_custom_tag() {
     let (sc, tl) = ok(&base_tag, steps);
     assert!(!frame(&sc, &tl, 0.5).contains("(expected)"));
     assert!(frame(&sc, &tl, 2.0).contains("(expected)"));
+}
+
+#[test]
+fn operator_can_hold_tubes() {
+    let plain = frame_at("\n%% @step action=operator at=0 device=an ", 4.0);
+    let tubes = frame_at("\n%% @step action=operator at=0 device=an tubes=true ", 4.0);
+    assert!(!plain.contains("#0EA5E9") || plain.matches("#0EA5E9").count() < tubes.matches("#0EA5E9").count());
+    assert!(tubes.len() > plain.len());
 }
 
 #[test]

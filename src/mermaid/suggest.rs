@@ -1,8 +1,8 @@
 //! The closest directive to a mistyped one.
 
 /// Directive names, for suggestions.
-const DIRECTIVES: [&str; 25] = [
-    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "id", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status",
+const DIRECTIVES: [&str; 26] = [
+    "title", "subtitle", "geometry", "carrier", "include", "on", "after", "at", "color", "for", "id", "duration", "move", "pipette", "rotate", "highlight", "operator", "needle", "status", "timer",
     "show", "hide", "wait", "caption", "pass", "divert",
 ];
 

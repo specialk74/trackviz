@@ -86,7 +86,7 @@ impl Importer {
             "move" => self.move_step(&plain, &o)?,
             "pipette" | "rotate" | "highlight" | "operator" => {
                 need(1, &format!("{cmd} <device> [duration=s]"))?;
-                self.device_step(cmd, plain[0], &o)?;
+                self.device_step(cmd, plain[0], &plain[1..], &o)?;
             }
             "pass" | "divert" => self.pass_step(cmd, &plain, &o)?,
             "needle" => {
@@ -94,8 +94,26 @@ impl Importer {
                 self.needle_step(plain[0], plain[1], &o)?;
             }
             "status" => {
-                need(2, "status <device> error|ready|normal")?;
+                need(2, "status <device> error|ready|warning|manual|normal")?;
                 self.step("status", vec![("device", text(plain[0])), ("state", text(plain[1]))])?;
+            }
+            "timer" => {
+                let usage = "timer <device> <seconds> [limit=<seconds>] [label=text] [duration=s] [x=n y=n]";
+                need(2, usage)?;
+                let mut k: Keys = vec![("device", text(plain[0])), ("value", seconds("timer", plain[1])?)];
+                if let Some(v) = o.get("limit") {
+                    k.push(("limit", seconds("limit", v)?));
+                }
+                if let Some(v) = o.get("label") {
+                    k.push(("label", text(&v.replace('_', " "))));
+                }
+                for key in ["x", "y"] {
+                    if let Some(v) = o.get(key) {
+                        k.push((key, seconds(key, v)?));
+                    }
+                }
+                k.extend(duration(&o)?);
+                self.step("timer", k)?;
             }
             "show" | "hide" => {
                 need(1, &format!("{cmd} <carrier>"))?;
@@ -171,9 +189,16 @@ impl Importer {
 
     /// `%% pipette|rotate|highlight|operator <device>`; a pipette works on the
     /// antenna of a sampling point (`probe`).
-    fn device_step(&mut self, cmd: &str, name: &str, o: &HashMap<&str, &str>) -> Result<(), String> {
+    fn device_step(&mut self, cmd: &str, name: &str, words: &[&str], o: &HashMap<&str, &str>) -> Result<(), String> {
         let device = if cmd == "pipette" { self.probe(cmd, name)? } else { name.to_string() };
         let mut k: Keys = vec![("device", text(&device))];
+        // `operator <device> tubes`: with a rack of sample tubes in hand.
+        for w in words {
+            match (cmd, *w) {
+                ("operator", "tubes") => k.push(("tubes", Value::Bool(true))),
+                _ => return Err(format!("'{cmd}': unknown word '{w}'{}", if cmd == "operator" { " (only 'tubes')" } else { "" })),
+            }
+        }
         k.extend(duration(o)?);
         // The sample the analyzer aspirates, for its note: sid=.
         match (cmd, o.get("sid")) {

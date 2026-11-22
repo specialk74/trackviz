@@ -7,7 +7,7 @@ use std::fmt::Write;
 /// Stylized clinical lab operator (front view: white lab coat, thin blue
 /// gloves): walks in during the first part of the step, works on the analyzer
 /// with one hand, then walks away.
-pub(super) fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
+pub(super) fn operator(o: &mut String, an: &Device, tubes: bool, u: f64, dur: f64, t: f64) {
     use std::f64::consts::PI;
     let (ax, ay, aw, ah) = an.rect;
     let walk = (dur / 3.0).min(2.0);
@@ -43,6 +43,20 @@ pub(super) fn operator(o: &mut String, an: &Device, u: f64, dur: f64, t: f64) {
         r##"<line x1="{:.1}" y1="{:.1}" x2="{bx:.1}" y2="{by:.1}" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/><line x1="{:.1}" y1="{:.1}" x2="{bx:.1}" y2="{by:.1}" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/><circle cx="{bx:.1}" cy="{:.1}" r="3.6" fill="{GLOVE}"/>"##,
         x - dir * 12.0, y - 12.0, x - dir * 12.0, y - 12.0, by + 2.0
     );
+    // A small rack of sample tubes held in the back hand.
+    if tubes {
+        let (rx, ry) = (bx - 15.0 - dir * 15.0, by + 5.0);
+        for (k, cap) in ["#7C3AED", "#0EA5E9", "#16A34A"].iter().enumerate() {
+            let tx = rx + 3.5 + k as f64 * 8.5;
+            let _ = write!(
+                o,
+                r##"<rect x="{tx:.1}" y="{:.1}" width="6" height="19" rx="3" fill="#F8FAFC" stroke="#475569" stroke-width="1.2"/><rect x="{tx:.1}" y="{:.1}" width="6" height="5" rx="1.2" fill="{cap}"/>"##,
+                ry - 14.0, ry - 15.0
+            );
+        }
+        let _ = write!(o, r##"<rect x="{rx:.1}" y="{:.1}" width="30" height="8" rx="2" fill="#94A3B8" stroke="#475569" stroke-width="1.2"/>"##, ry + 1.0);
+        let _ = write!(o, r##"<circle cx="{bx:.1}" cy="{:.1}" r="3.6" fill="{GLOVE}"/>"##, by + 2.0);
+    }
     let ang = if walking {
         PI / 2.0 - 0.3 + step * 0.3
     } else if below {

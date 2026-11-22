@@ -11,52 +11,102 @@ sequenceDiagram
     participant AN as Analyzer
     participant DMX as DMX
 
-    %% carrier id=C1 sid=SID-000123 route=main_in,pit1,pit2,gone
-    %% carrier id=C2 sid=SID-000124 route=spawn,pit2,gone color=#0EA5E9
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
+    %% carrier id=C2L sid=SID-000124 start=antenna3 color=#0EA5E9 ghost hidden tag=SID-000124_(expected)
+    %% @video message=0.5
 
-    %% at 2.5
-    %% move C1 to d1
-    %% at 2.89
-    %% move C2 to d1
-
-    %% on antenna1 C1
-    IF->>AN: EAC^U07<br/>ECD-2: Prepare, ECD-5: 0<br/>SAC-3: SID-000123
-    %% after 0.2 antenna1 C1
-    AN->>DMX: Query Order SID-000123<br/>QBP^Q11<br/>QPD-3: SID-000123
-    %% after 0.4 antenna1 C2
-    DMX-->>AN: TestX and TestY for SID-000123<br/>OML^O33<br/>SAC-3: SID-000123<br/>OBR-4: TestX<br/>OBR-4: TestY
-    %% after 0.6 antenna1 C2
-    AN-->>IF: EAR^U08<br/>ECD-2: Prepare<br/>SAC-3: SID-000123<br/>ECR-3: 1^2
-
-
-    %% on antenna1 C2
-    IF->>AN: EAC^U07<br/>ECD-2: Prepare, ECD-5: 0<br/>SAC-3: SID-000124
-    %% after 0.2 antenna1 C2
-    AN->>DMX: Query Order SID-000124<br/>QBP^Q11<br/>QPD-3: SID-000124
-    %% after 0.4 antenna1 C2
-    DMX-->>AN: TestX and TestY for SID-000124<br/>OML^O33<br/>SAC-3: SID-000124br/>OBR-4: TestX<br/>OBR-4: TestY
-    %% after 0.6 antenna1 C2
-    AN-->>IF: EAR^U08<br/>ECD-2: Prepare<br/>SAC-3: SID-000124<br/>ECR-3: 1^2
-
+    %% at 1.5
+    %% move C1 to antenna2
+    %% at 1.8
+    %% move C2 to antenna2
 
     %% on antenna2 C1
-    %% color #9333EA
-    IF->>AN: EAC^U07<br/>ECD-2: Prepare, ECD-5: 1<br/>SAC-3: SID-000123
-    %% on antenna2 C1 after 0.2
-    AN-->>IF: EAR^U08<br/>ECD-2: Prepare<br/>SAC-3: SID-000123<br/>ECR-3: 1
-    %% after 0.1
-    %% pass div1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000123
+    AN->>DMX: Query Order SID-000123<br/>QBP^Q11<br/>QPD-3: SID-000123
+    DMX->>AN: TestX and TestY for SID-000123<br/>OML^O33<br/>SAC-3: SID-000123<br/>OBR-4: TestX<br/>OBR-4: TestY
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000123<br/>ECR-1: OK, ECR-3: 1^2
+    %% pass antenna2 C1
 
     %% on antenna2 C2
-    %% color #9333EA
-    IF->>AN: EAC^U07<br/>ECD-2: Prepare, ECD-5: 1<br/>SAC-3: SID-000124
-    %% after 0.2 antenna2 C2
-    AN-->>IF: EAR^U08<br/>ECD-2: Prepare<br/>SAC-3: SID-000124<br/>ECR-3: 1
-    %% after 0.1
-    %% pass div1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000124
+    AN->>DMX: Query Order SID-000124<br/>QBP^Q11<br/>QPD-3: SID-000124
+    DMX->>AN: TestX and TestY for SID-000124<br/>OML^O33<br/>SAC-3: SID-000124br/>OBR-4: TestX<br/>OBR-4: TestY
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000124<br/>ECR-1: OK, ECR-3: 1^2
+    %% pass antenna2 C2
 
+    %% on antenna3 C1
+    %% color #9333EA
+    %% id eac-u07-c1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 1<br/>SAC-3: SID-000123
+    %% on antenna3 C1
+    %% caption 2 · Standard divert — Prepare again | Each carrier is diverted into the spur without stopping (Prepare), then stops at the divert and is read. The first needs needle 1: Prepare again and diverted. The second only needs needle 2: straight on.
+    %% after 0 eac-u07-c1
+    AN->>IF: EAR^U08<br/>ECD-2: PR, ECD-5: 1<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% divert antenna3 C1
+
+    %% on antenna3 C2
+    %% color #9333EA
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 1<br/>SAC-3: SID-000124
+    %% id ear-u08-c2
+    AN->>IF: EAR^U08<br/>ECD-2: PR, ECD-5: 1<br/>SAC-3: SID-000124<br/>ECR-1: OK
+
+    %% on antenna4 C1
+    %% id eac-u07-c1-2
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000123
+    %% after 0 ear-u08-c2
+    %% pass antenna3 C2
+    %% id show-c2l
+    %% show C2L duration=0.4
+    %% after 0 eac-u07-c1-2
+    %% id pipette-antenna4
+    %% pipette antenna4 duration=8.5 sid=SID-000123
+    %% after 0 show-c2l
+    %% divert antenna3 C2L
+
+    %% on antenna5 C2
+    IF->>AN: EAC^U07<br/>ECD-2: CL, ECD-5: 1<br/>SAC-3: SID-000124
+    AN->>IF: EAR^U08<br/>ECD-2: CL, ECD-5: 1<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% hide C2L
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 2<br/>SAC-3: SID-000124
+    AN->>IF: EAR^U08<br/>ECD-2: PR, ECD-5: 2<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% divert antenna5 C2
     
+    %% on antenna6 C2
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000124
+    %% id pipette-antenna6
+    %% pipette antenna6 duration=5.5 sid=SID-000124
+    %% after 0 pipette-antenna4
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% pass antenna4 C1
+
+    %% on antenna5 C1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 2<br/>SAC-3: SID-000123
+    %% id ear-u08-c1
+    AN->>IF: EAR^U08<br/>ECD-2: PR, ECD-5: 2<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% after 0 pipette-antenna6
+    %% id ear-u08-c2-2
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% after 0 ear-u08-c1
+    %% divert antenna5 C1
+    %% after 0 ear-u08-c2-2
+    %% pass antenna6 C2
+    
+    %% on antenna6 C1
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000123
+    %% pipette antenna6 duration=5.5 sid=SID-000123
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% pass antenna6 C1
+
+    %% on antenna7 C2
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000124
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000124<br/>ECR-1: Ok
+    %% pass antenna7 C2
+
+    %% on antenna7 C1
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000123
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000123<br/>ECR-1: Ok
+    %% pass antenna7 C1
+
 
     %% caption 1 · One analyzer, two sampling points | The spur serves one analyzer with two needles, each on its own pit-lane. Which needles a sample needs depends on its tests: one of them, or both.
-    %% on antenna2 C1
-    %% caption 2 · Standard divert — Prepare again | Each carrier is diverted into the spur without stopping (Prepare), then stops at the divert and is read. The first needs needle 1: Prepare again and diverted. The second only needs needle 2: straight on.

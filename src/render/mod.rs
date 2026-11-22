@@ -13,6 +13,7 @@ mod layout;
 mod operator;
 mod probe;
 mod sequence;
+mod timer;
 mod track;
 
 pub use caption::{caption_lines, ERROR_TITLE};

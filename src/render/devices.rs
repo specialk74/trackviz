@@ -31,11 +31,11 @@ fn analyzer(o: &mut String, c: &Ctx, di: usize, d: &Device) {
     let Ctx { sc, tl, t } = *c;
     let (x, y, w, h) = d.rect;
     let st = device_state(tl, di, t);
-    let (fill, stroke, badge) = match st.map(|s| s.0) {
-        Some(AnalyzerState::Error) => ("#FEE2E2", "#DC2626", Some(("ERROR", "#DC2626"))),
-        Some(AnalyzerState::Ready) => ("#DCFCE7", "#16A34A", Some(("READY", "#16A34A"))),
-        _ => ("#E8EDF3", "#64748B", None),
+    let (fill, stroke) = match st.map(|s| s.0) {
+        Some(s) if s != AnalyzerState::Normal => state_colors(s),
+        _ => ("#E8EDF3", "#64748B"),
     };
+    let badge = st.and_then(|s| state_badge(s.0));
     // A status change pulses for 1.5 s.
     if let Some((_, t0)) = st.filter(|s| s.0 != AnalyzerState::Normal && t - s.1 < 1.5) {
         let a = 0.35 + 0.35 * ((t - t0) / 1.5 * std::f64::consts::PI * 4.0).sin().abs();
@@ -50,11 +50,11 @@ fn analyzer(o: &mut String, c: &Ctx, di: usize, d: &Device) {
     if bands.len() > 1 {
         for (n, &(sd, y0, y1)) in bands.iter().enumerate() {
             let band = device_state(tl, sd, t);
-            let (fill, stroke, badge) = match band.map(|s| s.0) {
-                Some(AnalyzerState::Error) => ("#FEE2E2", "#DC2626", Some(("ERROR", "#DC2626"))),
-                Some(AnalyzerState::Ready) => ("#DCFCE7", "#16A34A", Some(("READY", "#16A34A"))),
-                _ => ("none", "none", None),
+            let (fill, stroke) = match band.map(|s| s.0) {
+                Some(s) if s != AnalyzerState::Normal => state_colors(s),
+                _ => ("none", "none"),
             };
+            let badge = band.and_then(|s| state_badge(s.0));
             if badge.is_some() {
                 let _ = write!(o, r##"<rect x="{x}" y="{y0}" width="{w}" height="{}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="3.5"/>"##, y1 - y0);
             }
@@ -193,12 +193,32 @@ fn antenna(o: &mut String, c: &Ctx, d: &Device, glow: Option<f64>) {
     );
 }
 
-/// ERROR / READY pill centered on x, with its top at y.
-fn status_badge(o: &mut String, x: f64, y: f64, text: &str, col: &str) {
+/// Fill and stroke of an analyzer (or a needle band) in a state other than normal.
+fn state_colors(s: AnalyzerState) -> (&'static str, &'static str) {
+    match s {
+        AnalyzerState::Ready => ("#DCFCE7", "#16A34A"),
+        AnalyzerState::Manual => ("#FEF3C7", "#D97706"),
+        _ => ("#FEE2E2", "#DC2626"),
+    }
+}
+
+/// The text and color of the badge of a state; none for normal.
+pub(super) fn state_badge(s: AnalyzerState) -> Option<(&'static str, &'static str)> {
+    match s {
+        AnalyzerState::Normal => None,
+        AnalyzerState::Error => Some(("ERROR", "#DC2626")),
+        AnalyzerState::Ready => Some(("READY", "#16A34A")),
+        AnalyzerState::Warning => Some(("WARNING", "#DC2626")),
+        AnalyzerState::Manual => Some(("MANUAL", "#D97706")),
+    }
+}
+
+/// ERROR / READY / WARNING / MANUAL pill centered on x, with its top at y.
+pub(super) fn status_badge(o: &mut String, x: f64, y: f64, text: &str, col: &str) {
     let _ = write!(
         o,
-        r##"<rect x="{}" y="{y}" width="96" height="28" rx="14" fill="{col}"/><text x="{x}" y="{}" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#FFFFFF">{text}</text>"##,
-        x - 48.0, y + 19.5
+        r##"<rect x="{}" y="{y}" width="112" height="28" rx="14" fill="{col}"/><text x="{x}" y="{}" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#FFFFFF">{text}</text>"##,
+        x - 56.0, y + 19.5
     );
 }
 

@@ -1,0 +1,162 @@
+%% # Like pkl_3, on the turnstile: analyzer in Manual Mode.
+%% # C1 is under the needle and C2 waits at the gate when the analyzer goes into
+%% # Manual Mode: the interface turns red (warning) and stops diverting (C3 goes
+%% # straight on). After the timeout it releases the carriers in the pit-lane
+%% # (through the wheel) and sends Clear for each. The analyzer leaves Manual Mode,
+%% # the interface diverts again (C4); the analyzer goes back into Manual Mode for a
+%% # short while, then C4 is sampled and released normally.
+%% # A technician with tubes in hand walks up and puts the analyzer in Manual Mode.
+%% # Manual Mode: ESU^U01 with EQU-3 MM; back to normal operation: EQU-3 OP.
+%% geometry turnstile
+%% subtitle Turnstile — analyzer in Manual Mode, timeout and recovery
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 color=#9333EA
+    %% carrier id=C4 sid=SID-000126 color=#16A34A
+    %% @video message=0.5
+
+    %% caption 1 · Two samples in the pit-lane | Two carriers are diverted into the Pit-Lane. The first is read at the antenna and enters the wheel, which brings it under the needle; the second is read and held by the gate.
+    %% at 1.5
+    %% move C1 to antenna2
+    %% at 2.5
+    %% move C2 to antenna2
+
+    %% on antenna2 C1
+    %% id eac-u07-c1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000123
+
+    %% after 0.3 antenna2 C1
+    %% caption 2 · Analyzer in Manual Mode | A technician with a few tubes in hand switches the analyzer to Manual Mode. The interface turns red, in warning: it does not divert any more carriers and does not ask for samplings.
+    %% after 0.3 antenna2 C1
+    %% operator analyzer tubes duration=16.6
+    %% after 0 eac-u07-c1
+    %% id qbp-q11-c1
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000123
+    %% after 0 qbp-q11-c1
+    %% id oml-o33-c1
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000123<br/>OBR-4: TestX
+    %% after 0 oml-o33-c1
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000123<br/>ECR-1: OK, ECR-3: 1
+    %% id pass-antenna2-c1
+    %% pass antenna2 C1
+
+    %% on antenna2 C2
+    %% id eac-u07-c2
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000124
+    %% after 2.6 antenna2 C1
+    %% id manual-1
+    AN->>IF: ESU^U01<br/>EQU-3: MM (Manual Mode)
+    %% id qbp-q11-c2
+    %% after 0 eac-u07-c2
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000124
+    %% after 0 manual-1
+    %% status analyzer manual
+    %% status interface warning
+    IF->>AN: ACK^U01<br/>MSA-1: AA
+    %% id rotate-c1
+    %% after 0.15 pass-antenna2-c1
+    %% rotate ts
+    %% after 0 qbp-q11-c2
+    %% id oml-o33-c2
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000124<br/>OBR-4: TestY
+
+    %% after 0.5 manual-1
+    %% id timeout-1
+    %% timer interface 300 duration=7 label=Manual_Mode_timeout
+    %% after 0 oml-o33-c2
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000124<br/>ECR-1: OK, ECR-3: 1
+
+    %% after 1.5 manual-1
+    %% move C3 to gone
+    %% after 3.0 manual-1
+    %% caption 3 · No more diverts | A new carrier arrives: the analyzer cannot take it, so the interface leaves it on the Main-Lane, straight on. Meanwhile the Manual Mode timeout runs.
+
+    %% after 0.8 timeout-1
+    %% caption 4 · Timeout — Release and Clear | The timeout has expired and the analyzer is still in Manual Mode: the interface releases all the carriers in the pit-lane through the wheel, without sampling, and sends Clear for each sample to the instrument.
+    %% after 0.8 timeout-1
+    %% id pass-antenna2-c2
+    %% pass antenna2 C2
+    %% after 0.8 timeout-1
+    %% id clear-2
+    IF->>AN: EAC^U07<br/>ECD-2: CL, ECD-5: 1
+    AN->>IF: EAR^U08<br/>ECD-2: CL, ECD-5: 1<br/>ECR-1: OK
+    %% after 0.15 pass-antenna2-c2
+    %% rotate ts
+    %% after 0.1
+    %% move C1 to gone
+
+    %% after 3.0 clear-2
+    %% caption 5 · Manual Mode ended | The technician has finished and walks away: the analyzer goes back to normal operation. The interface leaves the warning and starts diverting carriers again.
+    %% after 3.0 clear-2
+    %% id remote-1
+    AN->>IF: ESU^U01<br/>EQU-3: OP (Operating)
+    %% after 0.3 rotate ts
+    %% id rotate-ts
+    %% rotate ts
+    %% after 0 remote-1
+    %% status analyzer normal
+    %% status interface normal
+    IF->>AN: ACK^U01<br/>MSA-1: AA
+
+    %% after 0.5 remote-1
+    %% move C4 to antenna2
+    %% after 2.0 remote-1
+    %% caption 6 · Diverting again | The next carrier is diverted into the Pit-Lane again: Prepare and test query at the antenna, then the wheel brings it under the needle.
+    %% after 0.1 rotate-ts
+    %% move C2 to gone
+    %% on antenna2 C4
+    %% id eac-u07-c4
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000126
+
+    %% after 0.3 antenna2 C4
+    %% caption 7 · Manual Mode again | The technician comes back and puts the analyzer into Manual Mode again before the carrier reaches the needle: the interface is in warning again and the timeout starts.
+    %% after 0.3 antenna2 C4
+    %% operator analyzer tubes duration=10.3
+    %% after 0 eac-u07-c4
+    %% id qbp-q11-c4
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000126
+    %% after 0 qbp-q11-c4
+    %% id oml-o33-c4
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000126<br/>OBR-4: TestX
+    %% after 0 oml-o33-c4
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000126<br/>ECR-1: OK, ECR-3: 1
+    %% id pass-antenna2-c4
+    %% pass antenna2 C4
+    %% after 2.6 antenna2 C4
+    %% id manual-2
+    AN->>IF: ESU^U01<br/>EQU-3: MM (Manual Mode)
+    %% after 0 manual-2
+    %% status analyzer manual
+    %% status interface warning
+    IF->>AN: ACK^U01<br/>MSA-1: AA
+    %% after 0.15 pass-antenna2-c4
+    %% rotate ts
+    %% after 0.5 manual-2
+    %% id timeout-2
+    %% timer interface 200 limit=300 duration=5 label=Manual_Mode_timeout
+
+    %% after 0 timeout-2
+    %% caption 8 · Back before the timeout | The technician is done quickly: the analyzer leaves Manual Mode before the timeout expires. The carrier is now under the needle: the interface asks for its sampling.
+    %% after 0 timeout-2
+    AN->>IF: ESU^U01<br/>EQU-3: OP (Operating)
+    %% status analyzer normal
+    %% status interface normal
+    IF->>AN: ACK^U01<br/>MSA-1: AA
+    %% after 0.4
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000126
+    %% pipette antenna3 duration=4 sid=SID-000126
+    %% after 0.3 pipette antenna3
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000126<br/>ECR-1: OK
+    %% caption 9 · Sampled and released | Sampling is complete: the wheel brings the carrier to the exit, it leaves the module and the interface sends Release.
+    %% rotate ts
+    %% after 0.1
+    %% move C4 to gone
+
+    %% on antenna4 C4
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000126
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000126<br/>ECR-1: OK

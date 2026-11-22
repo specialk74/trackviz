@@ -24,7 +24,10 @@ pub enum Ev {
     Status { device: usize, state: AnalyzerState },
     /// Needle of the analyzer at a sampling/turnstile device going down or up.
     Needle { device: usize, down: bool },
-    Operator { device: usize },
+    Operator { device: usize, tubes: bool },
+    /// A fast clock next to a device: it counts up to `value` seconds over the
+    /// event; `limit` is the timeout (full turn of the dial).
+    Timer { device: usize, value: f64, limit: f64, label: String, pos: Option<(f64, f64)> },
     Wait,
 }
 

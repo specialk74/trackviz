@@ -306,9 +306,10 @@ fn step(t: &Table, msg_types: &HashMap<String, &Table>) -> Result<Step, String> 
         "show" | "hide" => &["carrier"],
         "status" => &["device", "state"],
         "needle" => &["device", "to"],
-        "operator" => &["device"],
+        "operator" => &["device", "tubes"],
+        "timer" => &["device", "value", "limit", "label", "x", "y"],
         "wait" => &[],
-        o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|status|needle|operator|wait)", t.location())),
+        o => return Err(format!("{}: unknown action '{o}' (caption|move|message|note|pipette|highlight|rotate|show|hide|status|needle|operator|timer|wait)", t.location())),
     };
     let allowed: Vec<&str> = common.iter().chain(extra.iter()).copied().collect();
     t.check_keys(&allowed)?;
@@ -368,13 +369,24 @@ fn action(t: &Table, name: &str, msg_types: &HashMap<String, &Table>) -> Result<
             device: t.str_req("device")?,
             state: {
                 let v = t.str_req("state")?;
-                [AnalyzerState::Normal, AnalyzerState::Error, AnalyzerState::Ready]
+                AnalyzerState::ALL
                     .into_iter()
                     .find(|s| s.name() == v)
-                    .ok_or_else(|| format!("{}: unknown state '{v}' (normal|error|ready)", t.location()))?
+                    .ok_or_else(|| format!("{}: unknown state '{v}' (normal|error|ready|warning|manual)", t.location()))?
             },
         },
-        "operator" => Action::Operator { device: t.str_req("device")? },
+        "operator" => Action::Operator { device: t.str_req("device")?, tubes: t.bool_opt("tubes")?.unwrap_or(false) },
+        "timer" => Action::Timer {
+            device: t.str_req("device")?,
+            value: t.num_opt("value")?.ok_or_else(|| format!("{}: 'timer' needs a value", t.location()))?,
+            limit: t.num_opt("limit")?,
+            label: t.str_opt("label")?,
+            pos: match (t.num_opt("x")?, t.num_opt("y")?) {
+                (Some(x), Some(y)) => Some((x, y)),
+                (None, None) => None,
+                _ => return Err(format!("{}: 'timer' takes both x= and y=, or neither", t.location())),
+            },
+        },
         "needle" => Action::Needle {
             device: t.str_req("device")?,
             down: match t.str_req("to")?.as_str() {

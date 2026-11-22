@@ -198,8 +198,9 @@ Only one of `on`, `after`, `at` per step.
 | `rotate <device>` | The turnstile turns by one position: entry → needle → exit. It waits by itself until the wheel is free (see Turnstile). Lasts 2 s | `duration=<s>` |
 | `highlight <device>` | The device lights up. Not needed when an antenna reads a carrier: the NSD, a divert or an antenna on its own light up by themselves. Lasts 1.5 s | `duration=<s>` |
 | `needle <antenna> down\|up` | On the sampling point of the antenna, like `pipette`. Moves the needle by hand: down it stays there until `up`. Meanwhile the wheel can't turn and the carrier can't leave. The device must be a sampling point or a turnstile. Lasts 0.9 s | `duration=<s>` |
-| `status <device> error\|ready\|normal` | The color of an analyzer, a zone or a sampling point (one needle): red, green, grey, until the next `status`. Takes no time | — |
-| `operator <device>` | An operator walks in, works on the analyzer and walks away. Lasts 7 s | `duration=<s>`, at least 2 |
+| `status <device> error\|ready\|warning\|manual\|normal` | The color of an analyzer, a zone or a sampling point (one needle): red, green, red with WARNING (on a zone it keeps pulsing), amber with MANUAL, grey; until the next `status`. A zone in a state other than normal also shows the badge next to its name. Takes no time | — |
+| `timer <device> <seconds>` | A clock in the top-right corner of the device that runs fast: `<seconds>` of plant time go by during the step, shown as mm:ss and on a dial. When it reaches the limit it turns red and blinks TIMEOUT; otherwise it says "stopped". It stays 1.5 s after the step, then fades. Lasts 4 s | `limit=<s>`: the timeout, one turn of the dial; default `<seconds>` (it expires at the end).<br>`label=<text>`: `_` for spaces; default "Timeout".<br>`duration=<s>`: how long the step lasts.<br>`x=<n> y=<n>`: the center of the dial instead of the corner |
+| `operator <device>` | An operator walks in, works on the analyzer and walks away. Lasts 7 s | `duration=<s>`, at least 2.<br>`tubes`: with a small rack of sample tubes in one hand |
 | `show <carrier>` / `hide <carrier>` | The carrier fades in / out. Lasts 0.5 s | `duration=<s>` |
 | `wait <seconds>` | Nothing happens for that time | — |
 | `caption <title> \| <text>` | A caption in the band, until the next caption. Takes no time | — |
@@ -279,7 +280,7 @@ front, but doesn't hold up anyone. It moves with `move`, `pass` and `divert` lik
 others (written with its id: `divert antenna3 C2L`). Usually `hidden`, then `show` when
 it should appear and `hide` when it is cleared (scenes 03 and 04).
 
-**Analyzer error and needle.** `status AN error|ready|normal` colors the analyzer
+**Analyzer error and needle.** `status AN error|ready|warning|manual|normal` colors the analyzer
 (also a zone, or one needle of `spur2` with its sampling point). `needle <antenna> down`
 keeps the needle in the tube until `needle ... up` (scenes 05, 06).
 

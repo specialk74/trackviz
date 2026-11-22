@@ -221,7 +221,11 @@ pub enum Action {
     /// The analyzer needle goes down into the tube (and stays) or back up.
     Needle { device: String, down: bool },
     /// An operator walks to the analyzer, works on it and walks away.
-    Operator { device: String },
+    /// `tubes`: with a small rack of sample tubes in one hand.
+    Operator { device: String, tubes: bool },
+    /// A clock next to a device that runs fast: `value` seconds of the plant pass
+    /// in the duration of the step; `limit`: the timeout (the full turn of the dial).
+    Timer { device: String, value: f64, limit: Option<f64>, label: Option<String>, pos: Option<(f64, f64)> },
     Wait,
 }
 
@@ -230,6 +234,10 @@ pub enum AnalyzerState {
     Normal,
     Error,
     Ready,
+    /// Red, with a WARNING badge that keeps pulsing.
+    Warning,
+    /// Amber, MANUAL badge: the instrument is in manual (local) mode.
+    Manual,
 }
 
 impl AnalyzerState {
@@ -238,8 +246,12 @@ impl AnalyzerState {
             AnalyzerState::Normal => "normal",
             AnalyzerState::Error => "error",
             AnalyzerState::Ready => "ready",
+            AnalyzerState::Warning => "warning",
+            AnalyzerState::Manual => "manual",
         }
     }
+
+    pub const ALL: [AnalyzerState; 5] = [AnalyzerState::Normal, AnalyzerState::Error, AnalyzerState::Ready, AnalyzerState::Warning, AnalyzerState::Manual];
 }
 
 /// When a step starts, as the directives say; `delay` is added on top.

@@ -66,13 +66,23 @@ impl Layout<'_> {
                 let dir = if *down { "down" } else { "up" };
                 simple(d.unwrap_or(0.9), Ev::Needle { device: di, down: *down }, format!("needle    {device} {dir}"))
             }
-            Action::Operator { device } => {
+            Action::Operator { device, tubes } => {
                 let di = sc.need_device(device, loc, "operator", &[(DeviceKind::Analyzer, "analyzer")])?;
                 let d = d.unwrap_or(7.0);
                 if d < 2.0 {
                     return Err(format!("{loc}: operator needs a duration of at least 2 s (walk in and out)"));
                 }
-                simple(d, Ev::Operator { device: di }, format!("operator  at {device}"))
+                simple(d, Ev::Operator { device: di, tubes: *tubes }, format!("operator  at {device}{}", if *tubes { " with tubes" } else { "" }))
+            }
+            Action::Timer { device, value, limit, label, pos } => {
+                let di = sc.need_device(device, loc, "timer", &[])?;
+                let limit = limit.unwrap_or(*value);
+                if *value < 0.0 || limit <= 0.0 {
+                    return Err(format!("{loc}: timer needs a value >= 0 and a limit > 0"));
+                }
+                let label = label.clone().unwrap_or_else(|| "Timeout".to_string());
+                let ev = Ev::Timer { device: di, value: *value, limit, label, pos: *pos };
+                simple(d.unwrap_or(4.0), ev, format!("timer     at {device} {value} s of {limit} s"))
             }
             Action::Wait => simple(d.unwrap_or(0.0), Ev::Wait, "wait".to_string()),
             Action::Pass { .. } => unreachable!("a pass is laid out as a move"),

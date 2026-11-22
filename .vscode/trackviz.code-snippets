@@ -194,9 +194,16 @@
   "status": {
     "prefix": "tv-status",
     "body": [
-      "%% status ${1:analyzer} ${2|error,ready,normal|}"
+      "%% status ${1:analyzer} ${2|error,ready,warning,manual,normal|}"
     ],
     "description": "State of the analyzer, of a needle (sampling device) or of a zone"
+  },
+  "timer": {
+    "prefix": "tv-timer",
+    "body": [
+      "%% timer ${1:interface} ${2:300} limit=${3:300} duration=${4:4} label=${5:Timeout}"
+    ],
+    "description": "A fast clock next to a device, counting towards a timeout"
   },
   "operator": {
     "prefix": "tv-operator",

@@ -29,6 +29,17 @@ pub(super) fn track(o: &mut String, sc: &Scene, tl: &Timeline, t: f64, carriers:
     }
     carriers::carriers(o, &c);
     probe::probes(o, &c);
+    timers(o, &c);
+}
+
+/// Fast clocks (`timer`), on top of everything; they stay a moment after they stop.
+fn timers(o: &mut String, c: &Ctx) {
+    let Ctx { sc, tl, t } = *c;
+    for e in tl.events.iter().filter(|e| t >= e.t0 && t <= e.t1 + super::timer::LINGER + 0.5) {
+        if let Ev::Timer { device, value, limit, ref label, pos } = e.ev {
+            super::timer::timer(o, &sc.devices[device], pos, value, limit, label, e.t0, e.t1, t);
+        }
+    }
 }
 
 /// Zones (e.g. the interface module) first, as background. A `status` turns
@@ -39,19 +50,36 @@ fn zones(o: &mut String, c: &Ctx) {
             let (x, y, w, h) = d.rect;
             let st = device_state(tl, di, t);
             let (fill, stroke, text, sw) = match st.map(|s| s.0) {
-                Some(AnalyzerState::Error) => ("#FEF2F2", "#DC2626", "#B91C1C", 3.0),
+                Some(AnalyzerState::Error | AnalyzerState::Warning) => ("#FEF2F2", "#DC2626", "#B91C1C", 3.0),
                 Some(AnalyzerState::Ready) => ("#F0FDF4", "#16A34A", "#15803D", 3.0),
+                Some(AnalyzerState::Manual) => ("#FFFBEB", "#D97706", "#B45309", 3.0),
                 _ => ("#F8FAFC", "#94A3B8", MUTED, 2.0),
             };
-            if let Some((_, t0)) = st.filter(|s| s.0 != AnalyzerState::Normal && t - s.1 < 1.5) {
-                let a = 0.3 + 0.3 * ((t - t0) / 1.5 * std::f64::consts::PI * 4.0).sin().abs();
-                let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="22" fill="none" stroke="{stroke}" stroke-width="10" opacity="{a:.2}"/>"#, x - 5.0, y - 5.0, w + 10.0, h + 10.0);
+            // A status change pulses for 1.5 s; a warning keeps pulsing, slower.
+            if let Some((s, t0)) = st.filter(|s| s.0 != AnalyzerState::Normal) {
+                let a = if t - t0 < 1.5 {
+                    Some(0.3 + 0.3 * ((t - t0) / 1.5 * std::f64::consts::PI * 4.0).sin().abs())
+                } else if s == AnalyzerState::Warning {
+                    Some(0.1 + 0.25 * ((t - t0) * std::f64::consts::PI / 1.2).sin().abs())
+                } else {
+                    None
+                };
+                if let Some(a) = a {
+                    let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="22" fill="none" stroke="{stroke}" stroke-width="10" opacity="{a:.2}"/>"#, x - 5.0, y - 5.0, w + 10.0, h + 10.0);
+                }
             }
             let _ = write!(
                 o,
                 r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="18" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-dasharray="10 8"/><text x="{}" y="{}" font-size="16" font-weight="600" fill="{text}">{}</text>"##,
                 x + 16.0, y + 28.0, esc(&d.label)
             );
+            // A badge after the name, except for normal.
+            if let Some((badge, col)) = st.and_then(|s| devices::state_badge(s.0)) {
+                let bx = x + 16.0 + 9.0 * d.label.chars().count() as f64 + 14.0;
+                let _ = write!(o, r##"<g transform="translate({bx} {})">"##, y + 10.0);
+                devices::status_badge(o, 56.0, 0.0, badge, col);
+                o.push_str("</g>");
+            }
         }
 }
 
@@ -92,8 +120,8 @@ fn lanes(o: &mut String, sc: &Scene) {
 fn operators(o: &mut String, c: &Ctx) {
     let Ctx { sc, tl, t } = *c;
     for e in tl.events.iter().filter(|e| t >= e.t0 && t <= e.t1) {
-        if let Ev::Operator { device } = e.ev {
-            operator(o, &sc.devices[device], t - e.t0, e.t1 - e.t0, t);
+        if let Ev::Operator { device, tubes } = e.ev {
+            operator(o, &sc.devices[device], tubes, t - e.t0, e.t1 - e.t0, t);
         }
     }
 }
