@@ -17,6 +17,9 @@ enum Kind {
     /// A turnstile: antenna1 NSD, antenna2 in front of the gate, antenna3 under
     /// the needle, antenna4 end of the pit-lane.
     Turnstile,
+    /// Two sampling points in a row on the pit-lane: antenna1 NSD, antenna2
+    /// sampling point 1, antenna3 sampling point 2, antenna4 end of the pit-lane.
+    Sampling2,
     /// Two sampling points: antenna1 NSD, antenna2 on the spur (pass only),
     /// antenna3 Divert 1, antenna4 sampling point 1, antenna5 Divert 2, antenna6
     /// sampling point 2, antenna7 exit (gate: pass to the Main-Lane, divert on the
@@ -24,8 +27,9 @@ enum Kind {
     Spur2,
 }
 
-const GEOMETRIES: [Geo; 7] = [
+const GEOMETRIES: [Geo; 8] = [
     Geo { name: "sampling", kind: Kind::Sampling },
+    Geo { name: "sampling2", kind: Kind::Sampling2 },
     Geo { name: "sampling_queue", kind: Kind::Sampling },
     Geo { name: "sampling_queue2", kind: Kind::Sampling },
     Geo { name: "turnstile", kind: Kind::Turnstile },
@@ -67,6 +71,7 @@ pub fn scene(name: &str, geometry: &str, carriers: usize) -> Result<String, Stri
     );
     s.push_str(match g.kind {
         Kind::Sampling => SAMPLING,
+        Kind::Sampling2 => SAMPLING2,
         Kind::Turnstile => TURNSTILE,
         Kind::Spur2 => SPUR2,
     });
@@ -100,6 +105,52 @@ const SAMPLING: &str = "    %% move C1 to antenna2
     %% on antenna3 C1
     %% caption 5 · Release | Before the carrier is back on the Main-Lane the interface sends Release.
     %% on antenna3
+    IF->>AN: Release SampleId=SID-000123
+    %% after 0.1
+    %% for C1
+    AN-->>IF: OK
+";
+
+/// C1 through both sampling points of a pit-lane with double sampling.
+const SAMPLING2: &str = "    %% move C1 to antenna2
+    %% on antenna1 C1
+    %% caption 2 · Diverted — Prepare — Sample Acquisition | The carrier is diverted without stopping and the interface sends Prepare. The gate stops it on sampling point 1: Sample Acquisition with Needle=1.
+    %% on antenna1
+    IF->>AN: Prepare SampleId=SID-000123
+    %% after 0.1
+    AN-->>IF: OK SampleId=SID-000123
+    %% on antenna2
+    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=1
+    %% after 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% after 0.1
+    %% caption 3 · Needle 1 | Needle 1 aspirates the sample while the gate holds the carrier.
+    %% pipette antenna2 duration=4 sid=SID-000123
+    %% after 0.3 pipette antenna2
+    %% caption 4 · Sampling point 2 | Sample Complete for needle 1; the carrier goes on to sampling point 2: Sample Acquisition with Needle=2.
+    %% after 0.3 pipette antenna2
+    AN->>IF: Sample Complete SampleId=SID-000123 Needle=1
+    %% after 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% pass antenna2 C1
+    %% on antenna3
+    IF->>AN: Sample Acquisition SampleId=SID-000123 Needle=2
+    %% after 0.1
+    %% for C1
+    AN-->>IF: OK
+    %% after 0.1
+    %% pipette antenna3 duration=4 sid=SID-000123
+    %% after 0.3 pipette antenna3
+    AN->>IF: Sample Complete SampleId=SID-000123 Needle=2
+    %% after 0.1
+    %% for C1
+    IF-->>AN: OK
+    %% pass antenna3 C1
+    %% on antenna4 C1
+    %% caption 5 · Release | Before the carrier is back on the Main-Lane the interface sends Release.
+    %% on antenna4
     IF->>AN: Release SampleId=SID-000123
     %% after 0.1
     %% for C1

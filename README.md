@@ -57,7 +57,7 @@ cargo test --release             # the tests, all the scenes included
   The sorted scene is built first and must give the same timeline: otherwise the file
   is left as it is. `--dry-run` only says what it would do.
 - `new` writes a scene that is valid as it is, for one geometry (`sampling`,
-  `sampling_queue`, `sampling_queue2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`;
+  `sampling_queue`, `sampling_queue2`, `sampling2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`;
   default `sampling`): carrier C1 goes the whole way, the others are declared. It never
   overwrites a file.
 
@@ -146,6 +146,7 @@ The antennas of each geometry, numbered in the direction of the carriers:
 | Geometry | Antennas |
 |---|---|
 | `sampling`, `spur` | 1 NSD, 2 sampling point, 3 end of the pit-lane (Release) |
+| `sampling2` | 1 NSD, 2 sampling point 1 (needle 1), 3 sampling point 2 (needle 2), on the same pit-lane, with gates; 4 end of the pit-lane (Release). The analyzer runs along the pit-lane, its two needles side by side |
 | `turnstile` | 1 NSD, 2 in front of the gate, 3 under the needle (for `pipette` and `needle`: the wheel brings the carriers there, so `on`/`after` can't wait for it; start from `rotate`), 4 end of the pit-lane (Release) |
 | `spur2` | 1 NSD, 2 on the spur before Divert 1 (with a gate: it only lets the carrier go on with `pass antenna2 <carrier>`, it can't divert), 3 Divert 1, 4 sampling point 1, 5 Divert 2, 6 sampling point 2, 7 exit, at the end of the spur (Release; with a gate: `pass antenna7 <carrier>` lets it go to the Main-Lane, `divert antenna7 <carrier>` sends it on the return belt, back on the spur between antenna2 and antenna3) |
 
@@ -165,7 +166,7 @@ each.
 
 | Directive | What it does | Optional |
 |---|---|---|
-| `geometry <name>` | Loads the track from `common/<name>.mmd`: points, lanes, devices, antennas, gates. One of `sampling`, `sampling_queue`, `sampling_queue2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`. Write it before the carriers | — |
+| `geometry <name>` | Loads the track from `common/<name>.mmd`: points, lanes, devices, antennas, gates. One of `sampling`, `sampling_queue`, `sampling_queue2`, `sampling2`, `turnstile`, `turnstile_queue`, `spur`, `spur2`. Write it before the carriers | — |
 | `title <text>` | The title at the top of the video | without it: the title in `common/video.mmd` |
 | `subtitle <text>` | The line under the title | without it: no subtitle |
 | `carrier id=<id>` | Declares a carrier. Declare all of them before the steps; the order counts when two start on the same spot (the first one goes first) | `sid=<sample id>`: the sample in its tube, used by `SampleId=` in the messages; without it the carrier is empty (no tube, tag `<id> (empty)`).<br>`start=<antenna>\|<point>`: where it is at the beginning; default the Main-Lane for the first carrier (`main_in`), off the panel for the others (`spawn`). Its way is not written: it comes from its `move`, `pass` and `divert` (see The way of a carrier).<br>`color=#RRGGBB`: color of its cap; default purple `#7C3AED`.<br>`speed=<px/s>`: its own speed; default the belt's.<br>`tag=<text>`: the text of its label, `_` for spaces; default the sample id (`<id> (empty)` without a tube).<br>`ghost`: drawn dashed, where the interface *believes* it is (see Ghost carriers).<br>`hidden`: not shown until a `show` |

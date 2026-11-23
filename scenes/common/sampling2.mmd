@@ -1,0 +1,44 @@
+%% # Pit-Lane above the Main-Lane with two sampling points in a row (double
+%% # sampling): one analyzer, parallel to the Pit-Lane and the Main-Lane, with two
+%% # needles side by side. A carrier stops at sampling point 1 (needle 1), then at
+%% # sampling point 2 (needle 2), or goes straight on where it has nothing to do.
+%% # Carrier flow: right to left, Pit-Lane above the Main-Lane.
+%% # Coordinates are in a fixed 1920x1080 space (track panel: x 30..950, y 120..885).
+%% # Points left of x=30 or right of x=950 are outside the panel (hidden).
+
+%% # ---------------------------------------------------------------- track
+%% @point id=spawn x=1010 y=740
+%% @point id=main_in x=910 y=740
+%% @point id=nsd x=830 y=740
+%% @point id=pit_in x=740 y=540
+%% @point id=sampling1 x=620 y=540
+%% @point id=sampling2 x=360 y=540
+%% @point id=pit_out x=210 y=540
+%% @point id=merge x=120 y=740
+%% @point id=main_out x=65 y=740
+%% @point id=gone x=-40 y=740
+
+%% @lane id=main label=Main-Lane kind=main points=spawn,main_in,nsd,merge,main_out,gone label_x=470 label_y=800
+
+%% @lane id=pit label=Pit-Lane kind=pit points=pit_in,sampling1,sampling2,pit_out label_x=440 label_y=505 capacity=10
+
+%% @lane id=divert kind=link points=nsd,pit_in
+
+%% @lane id=return kind=link points=pit_out,merge
+
+%% @device id=interface kind=zone label="Interface module" x=80 y=400 w=840 h=450
+
+%% # The analyzer runs along the Pit-Lane: needle 1 on the right, needle 2 on the left.
+%% @device id=analyzer kind=analyzer label=Analyzer x=200 y=180 w=580 h=180
+
+%% @device id=nsd kind=nsd at=nsd antenna=antenna1
+
+%% @device id=sp1 kind=sampling at=sampling1 antenna=antenna2 gate=true label="Sampling point 1" label_x=620 label_y=622
+
+%% @device id=sp2 kind=sampling at=sampling2 antenna=antenna3 gate=true label="Sampling point 2" label_x=360 label_y=622
+
+%% # Antennas on the lanes: a step can start when a carrier is over one (%% on antennaN).
+%% # antenna= on a device puts one on its point; gate=true: a gate holds the carrier
+%% # on the antenna (the belt never stops);
+%% # visible=false: a trigger only (the last one, at the end of the pit-lane: Release).
+%% @device id=antenna4 kind=antenna at=pit_out visible=false

@@ -1,0 +1,118 @@
+%% # Scene 20 — double sampling on the pit-lane, happy path
+%% # One analyzer, parallel to the Pit-Lane, with two needles: two sampling points in
+%% # a row on the same Pit-Lane. C1 and C2 need both needles, C3 only needle 2.
+%% # While C1 is at needle 2, C2 is already sampled at needle 1. C3 is read at
+%% # sampling point 1 and goes on without a sampling.
+%% # Carrier flow: right to left, Pit-Lane above the Main-Lane.
+%% geometry sampling2
+%% subtitle Pit-Lane with double sampling — one analyzer, two needles in a row
+sequenceDiagram
+    participant IF as Interface
+    participant AN as Analyzer
+    participant DMX as DMX
+
+    %% carrier id=C1 sid=SID-000123
+    %% carrier id=C2 sid=SID-000124 color=#0EA5E9
+    %% carrier id=C3 sid=SID-000125 color=#16A34A
+    %% @video message=0.5
+
+    %% caption 1 · Double sampling | The Pit-Lane has two sampling points in a row, both in front of the same analyzer: needle 1 and needle 2. Which needles a sample needs depends on its tests.
+    %% at 1.5
+    %% move C1 to antenna2
+
+    %% on antenna1 C1
+    %% id eac-u07-c1
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000123
+    %% at 2.5
+    %% move C2 to antenna2
+    %% after 0 eac-u07-c1
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000123
+    %% id oml-o33-c1
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000123<br/>OBR-4: TestX<br/>OBR-4: TestY
+    %% at 3.5
+    %% move C3 to antenna2
+    %% after 0 oml-o33-c1
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000123<br/>ECR-1: OK, ECR-3: 1^2
+
+    %% on antenna1 C2
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000124
+    %% id qbp-q11-c2
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000124
+
+    %% on antenna1 C3
+    %% id eac-u07-c3
+    IF->>AN: EAC^U07<br/>ECD-2: PR, ECD-5: 0<br/>SAC-3: SID-000125
+    %% after 0 qbp-q11-c2
+    %% id oml-o33-c2
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000124<br/>OBR-4: TestX<br/>OBR-4: TestY
+
+    %% on antenna2 C1
+    %% caption 2 · Needle 1 | The first carrier needs both needles. The gate stops it on sampling point 1: Sample Acquisition for needle 1.
+    %% on antenna2 C1
+    %% id eac-u07-c1-2
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000123
+    %% after 0 eac-u07-c3
+    %% id qbp-q11-c3
+    AN->>DMX: QBP^Q11<br/>QPD-3: SID-000125
+    %% after 0 oml-o33-c2
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000124<br/>ECR-1: OK, ECR-3: 1^2
+    %% after 0 eac-u07-c1-2
+    %% pipette antenna2 duration=4 sid=SID-000123
+    %% after 0 qbp-q11-c3
+    DMX->>AN: OML^O33<br/>SAC-3: SID-000125<br/>OBR-4: TestY
+    AN->>IF: EAR^U08<br/>ECD-2: PR<br/>SAC-3: SID-000125<br/>ECR-1: OK, ECR-3: 2
+
+    %% after 0.3 pipette antenna2
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% pass antenna2 C1
+    %% on antenna2 C2
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000124
+    %% pipette antenna2 duration=4 sid=SID-000124
+
+    %% on antenna3 C1
+    %% caption 3 · Two needles at once | The first carrier is at needle 2 while the second one is already at needle 1: the analyzer samples both at the same time.
+    %% on antenna3 C1
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000123
+    %% id pipette-c1-2
+    %% pipette antenna3 duration=4 sid=SID-000123
+
+    %% after 0.3 pipette antenna2
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 1<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% pass antenna2 C2
+
+    %% on antenna2 C3
+    %% caption 4 · Only needle 2 | The third sample only needs needle 2: the gate of sampling point 1 lets it go on without a sampling.
+    %% after 0.5 antenna2 C3
+    %% pass antenna2 C3
+
+    %% after 0.3 pipette antenna3
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% pass antenna3 C1
+
+    %% on antenna3 C2
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000124
+    %% pipette antenna3 duration=4 sid=SID-000124
+
+    %% on antenna4 C1
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000123
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000123<br/>ECR-1: OK
+    %% after 0.3 pipette antenna3
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% pass antenna3 C2
+
+    %% on antenna3 C3
+    %% caption 5 · Needle 2 — Release | The third carrier is sampled at needle 2. Every carrier, once out of the Pit-Lane, is released (Release) and goes back on the Main-Lane.
+    %% on antenna3 C3
+    IF->>AN: EAC^U07<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000125
+    %% pipette antenna3 duration=4 sid=SID-000125
+
+    %% on antenna4 C2
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000124
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000124<br/>ECR-1: OK
+    %% after 0.3 pipette antenna3
+    AN->>IF: EAR^U08<br/>ECD-2: SA, ECD-5: 2<br/>SAC-3: SID-000125<br/>ECR-1: OK
+    %% pass antenna3 C3
+
+    %% on antenna4 C3
+    IF->>AN: EAC^U07<br/>ECD-2: RL<br/>SAC-3: SID-000125
+    AN->>IF: EAR^U08<br/>ECD-2: RL<br/>SAC-3: SID-000125<br/>ECR-1: OK

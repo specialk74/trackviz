@@ -47,22 +47,34 @@ fn analyzer(o: &mut String, c: &Ctx, di: usize, d: &Device) {
     // Several needles: a band of the instrument for each one, which
     // shows the status of that needle.
     let bands = needle_bands(sc, di);
+    let across = needles_across(sc, di);
     if bands.len() > 1 {
-        for (n, &(sd, y0, y1)) in bands.iter().enumerate() {
+        for (n, &(sd, lo, hi)) in bands.iter().enumerate() {
             let band = device_state(tl, sd, t);
             let (fill, stroke) = match band.map(|s| s.0) {
                 Some(s) if s != AnalyzerState::Normal => state_colors(s),
                 _ => ("none", "none"),
             };
             let badge = band.and_then(|s| state_badge(s.0));
+            // The band: a slice of the instrument across (needles side by side
+            // along the lane) or along its height (needles one above the other).
+            let (bx, by, bw, bh) = if across { (lo, y, hi - lo, h) } else { (x, lo, w, hi - lo) };
             if badge.is_some() {
-                let _ = write!(o, r##"<rect x="{x}" y="{y0}" width="{w}" height="{}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="3.5"/>"##, y1 - y0);
+                let _ = write!(o, r##"<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="12" fill="{fill}" stroke="{stroke}" stroke-width="3.5"/>"##);
             }
-            let (_, sy) = sc.pt(sc.devices[sd].at.as_deref().unwrap());
-            let _ = write!(o, r##"<text x="{}" y="{}" font-size="15" font-weight="600" text-anchor="middle" fill="{MUTED}">Needle {}</text>"##, x + w / 2.0, sy - 34.0, n + 1);
+            let (sx, sy) = sc.pt(sc.devices[sd].at.as_deref().unwrap());
+            // Across: the name at the top of the band, the badge at the bottom.
+            let (nx, ny, bdy) = if across { (sx, y + 30.0, y + h - 40.0) } else { (x + w / 2.0, sy - 34.0, sy + 20.0) };
+            let _ = write!(o, r##"<text x="{nx}" y="{ny}" font-size="15" font-weight="600" text-anchor="middle" fill="{MUTED}">Needle {}</text>"##, n + 1);
             if let Some((text, col)) = badge {
-                status_badge(o, x + w / 2.0, sy + 20.0, text, col);
+                status_badge(o, nx, bdy, text, col);
             }
+        }
+    }
+    if across && bands.len() > 1 {
+        // Needles side by side: a thin dashed line between their bands.
+        for &(_, lo, _) in bands.iter().filter(|b| b.1 > x + 1.0) {
+            let _ = write!(o, r##"<line x1="{lo}" y1="{}" x2="{lo}" y2="{}" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 6"/>"##, y + 14.0, y + h - 14.0);
         }
     }
     if bands.len() > 1 {
@@ -222,12 +234,27 @@ pub(super) fn status_badge(o: &mut String, x: f64, y: f64, text: &str, col: &str
     );
 }
 
-/// Sampling devices (the needles, in file order) with the vertical band
-/// (y0, y1) of the analyzer that belongs to each one.
-pub(super) fn needle_bands(sc: &Scene, an: usize) -> Vec<(usize, f64, f64)> {
+/// The needles sit side by side along the lane, under (or over) the analyzer:
+/// every sampling point is outside its height. Otherwise they are one above the
+/// other, beside it (e.g. a spur).
+pub(super) fn needles_across(sc: &Scene, an: usize) -> bool {
     let (_, ay, _, ah) = sc.devices[an].rect;
+    let ys: Vec<f64> = sc.devices.iter().filter(|d| d.kind == DeviceKind::Sampling).map(|d| sc.pt(d.at.as_deref().unwrap()).1).collect();
+    !ys.is_empty() && ys.iter().all(|&y| y >= ay + ah || y <= ay)
+}
+
+/// Sampling devices (the needles, in file order) with the band (lo, hi) of the
+/// analyzer that belongs to each one: along x when the needles are across
+/// (`needles_across`), along y otherwise.
+pub(super) fn needle_bands(sc: &Scene, an: usize) -> Vec<(usize, f64, f64)> {
+    let (ax, ay, aw, ah) = sc.devices[an].rect;
+    let across = needles_across(sc, an);
+    let (ay, ah) = if across { (ax, aw) } else { (ay, ah) };
     let ids: Vec<usize> = sc.devices.iter().enumerate().filter(|(_, d)| d.kind == DeviceKind::Sampling).map(|(i, _)| i).collect();
-    let y_of = |i: usize| sc.pt(sc.devices[i].at.as_deref().unwrap()).1;
+    let y_of = |i: usize| {
+        let p = sc.pt(sc.devices[i].at.as_deref().unwrap());
+        if across { p.0 } else { p.1 }
+    };
     let edge = |i: usize, sign: f64| {
         // Half way to the nearest needle in that direction, or the analyzer edge.
         let y = y_of(i);
